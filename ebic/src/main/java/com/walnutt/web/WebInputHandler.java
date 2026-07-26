@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import com.walnutt.ability.Ability;
@@ -53,7 +54,9 @@ public final class WebInputHandler implements InputHandler {
     @Override
     public ActionChoice chooseAction(GameState state, Player player) {
         Team team = player.getTeam();
-        sendPrompt(team, promptOf("action", team));
+        JsonObject prompt = promptOf("action", team);
+        prompt.add("legalTargets", buildLegalTargets(state, player));
+        sendPrompt(team, prompt);
 
         while (true) {
             JsonObject msg = awaitTyped(team, "action");
@@ -140,7 +143,7 @@ public final class WebInputHandler implements InputHandler {
         Team team = player.getTeam();
         JsonObject prompt = promptOf("placement", team);
         prompt.addProperty("unitId", ids.idFor(unitToPlace));
-        com.google.gson.JsonArray candidateArray = new com.google.gson.JsonArray();
+        JsonArray candidateArray = new JsonArray();
         for (Tile tile : candidates) {
             JsonObject t = new JsonObject();
             t.addProperty("q", tile.getPosition().getQ());
@@ -176,6 +179,61 @@ public final class WebInputHandler implements InputHandler {
         String json = JsonSupport.envelope("prompt", payload);
         hub.cachePrompt(team, json);
         hub.sendTo(team, json);
+    }
+
+    /**
+     * Per unitId, per abilityId: which tiles/units are actually legal to click, so the
+     * client can highlight them instead of just accept-then-reject on a bad click. Scoped
+     * to this player's own units only (the opponent's units aren't actionable this turn
+     * anyway) and to ready active abilities only (a passive or on-cooldown ability has
+     * nothing worth highlighting). See Ability.getLegalTargets - this is the one place
+     * that consumes it.
+     */
+    private JsonObject buildLegalTargets(GameState state, Player player) {
+        JsonObject byUnit = new JsonObject();
+        for (Unit unit : player.getUnits()) {
+            if (unit.isDead()) {
+                continue;
+            }
+            JsonObject byAbility = new JsonObject();
+            for (Ability ability : unit.getActiveAbilities()) {
+                if (!ability.isReady()) {
+                    continue;
+                }
+                List<Target> targets = ability.getLegalTargets(state);
+                if (targets.isEmpty()) {
+                    continue;
+                }
+                byAbility.add(Identifiers.normalize(ability.getName()), targetsToJson(targets));
+            }
+            if (byAbility.size() > 0) {
+                byUnit.add(ids.idFor(unit), byAbility);
+            }
+        }
+        return byUnit;
+    }
+
+    private JsonObject targetsToJson(List<Target> targets) {
+        JsonObject obj = new JsonObject();
+        boolean noTarget = false;
+        JsonArray unitIds = new JsonArray();
+        JsonArray tiles = new JsonArray();
+        for (Target target : targets) {
+            if (target instanceof NoTarget) {
+                noTarget = true;
+            } else if (target instanceof UnitTarget unitTarget) {
+                unitIds.add(ids.idFor(unitTarget.getUnit()));
+            } else if (target instanceof TileTarget tileTarget) {
+                JsonObject t = new JsonObject();
+                t.addProperty("q", tileTarget.getTile().getPosition().getQ());
+                t.addProperty("r", tileTarget.getTile().getPosition().getR());
+                tiles.add(t);
+            }
+        }
+        obj.addProperty("noTarget", noTarget);
+        obj.add("unitIds", unitIds);
+        obj.add("tiles", tiles);
+        return obj;
     }
 
     private JsonObject promptOf(String kind, Team team) {

@@ -103,11 +103,23 @@ export interface DraftRoundSnapshot {
 
 export type PromptKind = "action" | "attribute" | "pick" | "placement";
 
-// The contract only pins down `kind` precisely; kind-specific fields are
-// described loosely ("...kind-specific"). Treat the rest as an open bag of
-// unknown fields and be defensive about reading anything beyond `kind`.
+// Per unitId, per abilityId: which tiles/units are actually legal to target, so the
+// board can highlight them instead of accept-then-reject on a bad click. Only present
+// on "action" prompts, and only for the acting player's own ready active abilities.
+export interface LegalTargets {
+  noTarget: boolean;
+  unitIds: string[];
+  tiles: { q: number; r: number }[];
+}
+export type LegalTargetsByUnit = Record<string, Record<string, LegalTargets>>;
+
+// The contract only pins down `kind` precisely for most fields; treat anything
+// beyond what's typed below as an open bag and be defensive about reading it.
 export interface PromptPayload {
   kind: PromptKind;
+  legalTargets?: LegalTargetsByUnit; // present when kind === "action"
+  candidates?: { q: number; r: number }[]; // present when kind === "placement"
+  unitId?: string; // present when kind === "attribute" | "placement"
   [key: string]: unknown;
 }
 

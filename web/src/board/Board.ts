@@ -4,7 +4,7 @@
 import { Application, Container, Graphics, Sprite, Text, Ticker } from "pixi.js";
 import { type AxialCoord, axialToPixel, hexPolygonPoints } from "../hex/HexMath";
 import { UnitIconFactory } from "../units/UnitIconFactory";
-import { GameStateStore } from "../state/GameStateStore";
+import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
 import type { UnitSnapshot, VfxEvent } from "../types/contract";
 
@@ -13,6 +13,9 @@ export const HEX_SIZE = 34;
 const TILE_FILL = 0x1e293b;
 const TILE_STROKE = 0x334155;
 const TILE_HOVER = 0x334155;
+const SELECTED_RING_COLOR = 0xfacc15;
+const LEGAL_TILE_COLOR = 0x4ade80;
+const LEGAL_UNIT_RING_COLOR = 0x4ade80;
 
 export interface BoardCallbacks {
   onTileClick(coord: AxialCoord): void;
@@ -47,7 +50,7 @@ export class Board {
       if (state.snapshot) {
         void this.applySnapshot(state.snapshot);
       }
-      this.refreshSelectionHighlight(state.selectedUnitId);
+      this.refreshHighlights(state);
     });
   }
 
@@ -179,13 +182,56 @@ export class Board {
     container.position.set(pos.x, pos.y);
   }
 
-  private refreshSelectionHighlight(selectedUnitId: string | null): void {
+  /**
+   * Draws (a) a ring around the currently-selected unit, and (b) a highlight over
+   * every tile/unit that's actually legal to click next - either the server's
+   * placement candidates, or (once a unit+ability is both selected) the matching
+   * entry in the "action" prompt's legalTargets, straight from Ability.getLegalTargets
+   * on the server. Replaces accept-then-reject with "only the clickable things glow."
+   */
+  private refreshHighlights(state: MatchUiState): void {
     this.uiLayer.removeChildren();
-    if (!selectedUnitId) return;
-    const sprite = this.unitSprites.get(selectedUnitId);
-    if (!sprite) return;
-    const ring = new Graphics().circle(0, 0, HEX_SIZE * 0.75).stroke({ width: 3, color: 0xfacc15 });
-    ring.position.copyFrom(sprite.position);
-    this.uiLayer.addChild(ring);
+
+    if (state.selectedUnitId) {
+      const sprite = this.unitSprites.get(state.selectedUnitId);
+      if (sprite) {
+        const ring = new Graphics().circle(0, 0, HEX_SIZE * 0.75).stroke({ width: 3, color: SELECTED_RING_COLOR });
+        ring.position.copyFrom(sprite.position);
+        this.uiLayer.addChild(ring);
+      }
+    }
+
+    if (state.prompt?.kind === "placement" && state.prompt.candidates) {
+      for (const tile of state.prompt.candidates) {
+        this.highlightTile(tile.q, tile.r);
+      }
+      return;
+    }
+
+    if (state.prompt?.kind === "action" && state.selectedUnitId && state.selectedAbilityId) {
+      const legal = state.prompt.legalTargets?.[state.selectedUnitId]?.[state.selectedAbilityId];
+      if (!legal) return;
+      for (const tile of legal.tiles) {
+        this.highlightTile(tile.q, tile.r);
+      }
+      for (const unitId of legal.unitIds) {
+        const sprite = this.unitSprites.get(unitId);
+        if (!sprite) continue;
+        const ring = new Graphics().circle(0, 0, HEX_SIZE * 0.75).stroke({ width: 3, color: LEGAL_UNIT_RING_COLOR });
+        ring.position.copyFrom(sprite.position);
+        this.uiLayer.addChild(ring);
+      }
+    }
+  }
+
+  private highlightTile(q: number, r: number): void {
+    const center = axialToPixel({ q, r }, HEX_SIZE);
+    const points = hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - 3);
+    const highlight = new Graphics()
+      .poly(points)
+      .fill({ color: LEGAL_TILE_COLOR, alpha: 0.25 })
+      .stroke({ width: 2, color: LEGAL_TILE_COLOR, alpha: 0.8 });
+    highlight.position.set(center.x, center.y);
+    this.uiLayer.addChild(highlight);
   }
 }

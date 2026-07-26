@@ -1,8 +1,16 @@
 package com.walnutt.ability;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.walnutt.TriggerHandler;
+import com.walnutt.ability.target.NoTarget;
 import com.walnutt.ability.target.Target;
+import com.walnutt.ability.target.TileTarget;
+import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.game.GameState;
+import com.walnutt.map.Position;
+import com.walnutt.map.Tile;
 import com.walnutt.unit.ActionKind;
 import com.walnutt.unit.Unit;
 
@@ -99,6 +107,36 @@ public abstract class Ability extends TriggerHandler {
      */
     public boolean canUse(GameState state, Target target) {
         return !isPassive && isReady() && owner != null && !owner.isBlockedFrom(ActionKind.ABILITY);
+    }
+
+    /**
+     * Brute-force but correct-by-construction: tries every unit, every tile, and a
+     * no-target candidate against this ability's own {@link #canUse}, rather than
+     * duplicating each subclass's range/team/target-shape logic a second time.
+     * The map is small (radius <= 8, so <= 217 tiles) and this is only called when
+     * a caller (e.g. a frontend deciding what to highlight) actually needs the
+     * full legal-target set, not on every turn - cheap enough to not warrant a
+     * per-ability override, though one is always possible if a future ability's
+     * canUse is expensive enough to need it.
+     */
+    public List<Target> getLegalTargets(GameState state) {
+        List<Target> legal = new ArrayList<>();
+        if (canUse(state, new NoTarget())) {
+            legal.add(new NoTarget());
+        }
+        for (Unit unit : state.getAllActiveUnits()) {
+            UnitTarget candidate = new UnitTarget(unit);
+            if (canUse(state, candidate)) {
+                legal.add(candidate);
+            }
+        }
+        for (Tile tile : state.getMap().getTilesInRadius(new Position(0, 0), state.getMap().getRadius())) {
+            TileTarget candidate = new TileTarget(tile);
+            if (canUse(state, candidate)) {
+                legal.add(candidate);
+            }
+        }
+        return legal;
     }
 
     public abstract void onUse(GameState state, Target target);
