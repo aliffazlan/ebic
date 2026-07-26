@@ -11,6 +11,7 @@ import com.walnutt.data.UnitDefinition;
 import com.walnutt.map.GameMap;
 import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
+import com.walnutt.ui.ConcurrentSetupHandler;
 import com.walnutt.ui.InputHandler;
 import com.walnutt.ui.Renderer;
 import com.walnutt.ui.TerminalInputHandler;
@@ -74,6 +75,38 @@ public class Game {
         new PlacementFlow().run(state, actualInput, actualRenderer);
 
         return new Game(state, actualRenderer);
+    }
+
+    /**
+     * Same shape as {@link #newFullDraftMatch()} but draft+placement run concurrently,
+     * one thread per player (see ConcurrentSetupFlow) - neither player waits on the
+     * other's pace during either phase. {@code setupHandler} drives the draft picks
+     * and placement arrangement (see ConcurrentSetupHandler); {@code input}/{@code
+     * renderer} take over for the ordinary turn-based match loop afterward, exactly
+     * like {@link #newFullDraftMatch(InputHandler, Renderer)} - in practice a web
+     * bridge implements all three via the same underlying object, but they're kept
+     * as separate parameters so a test can substitute different doubles for each role.
+     * This does not touch DraftFlow/PlacementFlow/newFullDraftMatch at all - terminal
+     * mode (a single shared stdin) has no meaningful way to run two players
+     * concurrently, so it keeps using the strictly-sequential path.
+     */
+    public static Game newConcurrentFullDraftMatch(ConcurrentSetupHandler setupHandler, InputHandler input, Renderer renderer) {
+        JsonDataLoader loader = new JsonDataLoader(JsonDataLoader.locateDesignIdeasRoot());
+        Map<String, UnitDefinition> unitDefs = loader.loadAllUnits();
+        Map<String, AbilityDefinition> abilityDefs = loader.loadAllAbilities();
+
+        GameMap map = new GameMap(FULL_MATCH_MAP_RADIUS);
+        Player playerOne = new Player("Player One", Team.PLAYER_ONE);
+        Player playerTwo = new Player("Player Two", Team.PLAYER_TWO);
+
+        GameState state = new GameState(map, List.of(playerOne, playerTwo), new Random());
+        state.setUnitDefinitions(unitDefs);
+        state.setAbilityDefinitions(abilityDefs);
+        state.setInputHandler(input);
+
+        ConcurrentSetupFlow.run(state, setupHandler);
+
+        return new Game(state, renderer);
     }
 
     /** chat.txt's minimal first playable test: 1 Champion + 1 Basic per side on a small hex map. */
