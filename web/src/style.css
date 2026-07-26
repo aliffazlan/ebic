@@ -272,6 +272,40 @@ input {
   margin: 0 4px 4px 0;
 }
 
+/* ---- placement editor ---- */
+
+.placement-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.placement-unit-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  cursor: pointer;
+  font-size: 12px;
+}
+.placement-unit-row:hover {
+  border-color: #60a5fa;
+}
+.placement-unit-row.selected {
+  outline: 2px solid #facc15;
+  border-color: #facc15;
+}
+
+.confirm-placement-btn {
+  width: 100%;
+}
+
 /* ---- modal overlays (draft / attribute / game-over) ---- */
 
 .modal-backdrop {
@@ -294,21 +328,10 @@ input {
   overflow-y: auto;
 }
 
-.draft-columns {
-  display: flex;
-  gap: 24px;
-}
-
-.draft-column h4 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: #94a3b8;
-  text-transform: uppercase;
-}
-
 .draft-cards {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .unit-card {

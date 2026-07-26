@@ -1,5 +1,10 @@
 import type { GameStateStore, MatchUiState } from "../state/GameStateStore";
-import type { AbilitySnapshot, Attribute, UnitDefinitionSnapshot } from "../types/contract";
+import type {
+  AbilitySnapshot,
+  Attribute,
+  PlacementUnitSnapshot,
+  UnitDefinitionSnapshot,
+} from "../types/contract";
 import type { MatchActions } from "./MatchActions";
 
 const ATTRIBUTES: Attribute[] = ["STRENGTH", "AGILITY", "INTELLIGENCE"];
@@ -40,30 +45,19 @@ export class Hud {
       this.hudHost.appendChild(banner);
     }
 
-    if (state.prompt?.kind === "placement") {
-      const banner = document.createElement("div");
-      banner.className = "hud-section";
-      const inner = document.createElement("div");
-      inner.className = "waiting-banner";
-      const raw = state.prompt as Record<string, unknown>;
-      const label =
-        typeof raw.unitName === "string"
-          ? `Place ${raw.unitName}`
-          : typeof raw.definitionId === "string"
-            ? `Place ${raw.definitionId}`
-            : "Place your unit";
-      inner.textContent = `${label}: click a tile on the board.`;
-      banner.appendChild(inner);
-      this.hudHost.appendChild(banner);
+    if (state.placementState) {
+      this.hudHost.appendChild(this.renderPlacementPanel(state));
+    } else {
+      this.hudHost.appendChild(this.renderUnitPanel(state, isYourTurn));
     }
-
-    this.hudHost.appendChild(this.renderUnitPanel(state, isYourTurn));
     this.hudHost.appendChild(this.renderMessageLog(state));
 
     // Modal overlays, highest priority first.
     if (state.gameOver) {
       this.hudHost.appendChild(this.renderGameOverModal(state));
-    } else if (state.prompt?.kind === "pick" && state.draftRound) {
+    } else if (state.draftRound) {
+      // Receiving a draft_round message doubles as the prompt to pick - see
+      // API_CONTRACT.md, there's no separate "pick" prompt kind anymore.
       this.hudHost.appendChild(this.renderDraftModal(state));
     } else if (state.prompt?.kind === "attribute") {
       this.hudHost.appendChild(this.renderAttributeModal());
@@ -145,6 +139,12 @@ export class Hud {
     hpText.style.marginBottom = "8px";
     hpText.textContent = `${unit.currentHp} / ${unit.maxHp} HP`;
     section.appendChild(hpText);
+
+    const attrText = document.createElement("div");
+    attrText.className = "hint";
+    attrText.style.marginBottom = "8px";
+    attrText.textContent = `STR ${unit.strength} · AGI ${unit.agility} · INT ${unit.intelligence}`;
+    section.appendChild(attrText);
 
     if (unit.statusFlags.length > 0) {
       const statusRow = document.createElement("div");
@@ -256,43 +256,22 @@ export class Hud {
     title.textContent = state.draftRound!.roundLabel;
     panel.appendChild(title);
 
-    const columns = document.createElement("div");
-    columns.className = "draft-columns";
-    panel.appendChild(columns);
-
-    columns.appendChild(
-      this.renderDraftColumn("Your options", state.draftRound!.yourOptions, true),
-    );
-    columns.appendChild(
-      this.renderDraftColumn("Opponent options", state.draftRound!.opponentOptions, false),
-    );
+    // Each player now drafts through their own rounds at their own pace, so
+    // there's no more opponent-options column to show alongside these - see
+    // API_CONTRACT.md's draft_round section.
+    const cards = document.createElement("div");
+    cards.className = "draft-cards";
+    for (const def of state.draftRound!.options) {
+      cards.appendChild(this.renderUnitCard(def));
+    }
+    panel.appendChild(cards);
 
     return backdrop;
   }
 
-  private renderDraftColumn(
-    heading: string,
-    options: UnitDefinitionSnapshot[],
-    clickable: boolean,
-  ): HTMLElement {
-    const col = document.createElement("div");
-    col.className = "draft-column";
-    const h4 = document.createElement("h4");
-    h4.textContent = heading;
-    col.appendChild(h4);
-
-    const cards = document.createElement("div");
-    cards.className = "draft-cards";
-    for (const def of options) {
-      cards.appendChild(this.renderUnitCard(def, clickable));
-    }
-    col.appendChild(cards);
-    return col;
-  }
-
-  private renderUnitCard(def: UnitDefinitionSnapshot, clickable: boolean): HTMLElement {
+  private renderUnitCard(def: UnitDefinitionSnapshot): HTMLElement {
     const card = document.createElement("div");
-    card.className = clickable ? "unit-card clickable" : "unit-card";
+    card.className = "unit-card clickable";
 
     const name = document.createElement("h5");
     name.textContent = def.name;
@@ -313,10 +292,77 @@ export class Hud {
     abilities.textContent = def.abilities.join(", ");
     card.appendChild(abilities);
 
-    if (clickable) {
-      card.addEventListener("click", () => this.actions.sendPick(def.definitionId));
-    }
+    card.addEventListener("click", () => this.actions.sendPick(def.definitionId));
     return card;
+  }
+
+  private renderPlacementPanel(state: MatchUiState): HTMLElement {
+    const section = document.createElement("div");
+    section.className = "hud-section";
+
+    const h3 = document.createElement("h3");
+    h3.textContent = "Placement";
+    section.appendChild(h3);
+
+    const placement = state.placementState!;
+
+    if (placement.confirmed) {
+      const banner = document.createElement("div");
+      banner.className = "waiting-banner";
+      banner.textContent = "Placement confirmed - waiting for opponent...";
+      section.appendChild(banner);
+      return section;
+    }
+
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.style.marginBottom = "8px";
+    hint.textContent = state.selectedUnitId
+      ? "Click another unit to swap with it, an empty tile to move it there, or click it again to cancel."
+      : "Click one of your units - on the board or in the list below - to select it.";
+    section.appendChild(hint);
+
+    const roster = document.createElement("div");
+    roster.className = "placement-roster";
+    for (const unit of placement.units) {
+      roster.appendChild(this.renderPlacementRow(unit, state.selectedUnitId));
+    }
+    section.appendChild(roster);
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.className = "primary confirm-placement-btn";
+    confirmBtn.textContent = "Confirm placement";
+    confirmBtn.addEventListener("click", () => this.actions.confirmPlacement());
+    section.appendChild(confirmBtn);
+
+    return section;
+  }
+
+  private renderPlacementRow(unit: PlacementUnitSnapshot, selectedUnitId: string | null): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "placement-unit-row";
+    if (unit.unitId === selectedUnitId) row.classList.add("selected");
+
+    const name = document.createElement("span");
+    name.textContent = unit.name;
+    row.appendChild(name);
+
+    const type = document.createElement("span");
+    type.className = "hint";
+    type.textContent = unit.unitType;
+    row.appendChild(type);
+
+    row.addEventListener("click", () => {
+      if (selectedUnitId === unit.unitId) {
+        this.actions.selectUnit(null);
+      } else if (selectedUnitId) {
+        this.actions.sendPlacementSwap(selectedUnitId, unit.unitId);
+      } else {
+        this.actions.selectUnit(unit.unitId);
+      }
+    });
+
+    return row;
   }
 
   private renderAttributeModal(): HTMLElement {

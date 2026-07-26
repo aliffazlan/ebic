@@ -8,6 +8,8 @@ export interface MatchActions {
   endTurn(): void;
   sendAttribute(value: Attribute): void;
   sendPick(definitionId: string): void;
-  sendPlacement(q: number, r: number): void;
+  sendPlacementSwap(unitId: string, targetUnitId: string): void;
+  sendPlacementMove(unitId: string, q: number, r: number): void;
+  confirmPlacement(): void;
   exitToLobby(): void;
 }

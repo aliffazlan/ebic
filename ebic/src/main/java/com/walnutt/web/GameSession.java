@@ -54,7 +54,7 @@ public final class GameSession {
 
     private void runMatch() {
         try {
-            Game game = Game.newFullDraftMatch(input, renderer);
+            Game game = Game.newConcurrentFullDraftMatch(input, input, renderer);
             this.state = game.getState();
             state.getEventBus().addGlobalListener(vfx);
             matchService.setStatus(matchId, MatchService.Status.IN_PROGRESS);

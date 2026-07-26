@@ -6,7 +6,7 @@ import { type AxialCoord, axialToPixel, hexPolygonPoints } from "../hex/HexMath"
 import { UnitIconFactory } from "../units/UnitIconFactory";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
-import type { UnitSnapshot, VfxEvent } from "../types/contract";
+import type { PlacementUnitSnapshot, UnitSnapshot, VfxEvent } from "../types/contract";
 
 export const HEX_SIZE = 34;
 
@@ -16,6 +16,14 @@ const TILE_HOVER = 0x334155;
 const SELECTED_RING_COLOR = 0xfacc15;
 const LEGAL_TILE_COLOR = 0x4ade80;
 const LEGAL_UNIT_RING_COLOR = 0x4ade80;
+
+// PlacementStateSnapshot carries no map radius (see API_CONTRACT.md) -
+// placement always happens before the first real GameStateSnapshot, which is
+// the only message that carries the authoritative one. Assume this radius
+// (matches Game.newFullDraftMatch()'s radius 8, per CLAUDE.md) until then;
+// ensureMap() will correct it automatically the moment a real snapshot
+// arrives with a different value.
+const PLACEMENT_MAP_RADIUS = 8;
 
 export interface BoardCallbacks {
   onTileClick(coord: AxialCoord): void;
@@ -49,6 +57,8 @@ export class Board {
     this.unsubscribe = this.store.subscribe((state) => {
       if (state.snapshot) {
         void this.applySnapshot(state.snapshot);
+      } else if (state.placementState) {
+        this.applyPlacementSnapshot(state.placementState.units);
       }
       this.refreshHighlights(state);
     });
@@ -128,6 +138,38 @@ export class Board {
     }
   }
 
+  /**
+   * Renders this player's own placement-phase units. Reuses the normal
+   * snapshot-apply pipeline by synthesizing minimal UnitSnapshots - no
+   * hp/status/ability data exists yet at this phase (fog of war means the
+   * opponent's units never appear here at all, so `team` is always our own),
+   * so hp is left at 0/0 (draws as an empty sliver rather than a misleading
+   * full bar) instead of guessing.
+   */
+  private applyPlacementSnapshot(units: PlacementUnitSnapshot[]): void {
+    const yourTeam = this.store.getState().yourTeam;
+    const synthetic: UnitSnapshot[] = units.map((u) => ({
+      id: u.unitId,
+      name: u.name,
+      definitionId: u.definitionId,
+      team: yourTeam,
+      unitType: u.unitType,
+      q: u.q,
+      r: u.r,
+      currentHp: 0,
+      maxHp: 0,
+      strength: 0,
+      agility: 0,
+      intelligence: 0,
+      dead: false,
+      hasMovedThisTurn: false,
+      hasAttackedThisTurn: false,
+      statusFlags: [],
+      abilities: [],
+    }));
+    void this.applySnapshot({ mapRadius: PLACEMENT_MAP_RADIUS, units: synthetic });
+  }
+
   private async upsertUnit(unit: UnitSnapshot): Promise<void> {
     let container = this.unitSprites.get(unit.id);
     if (!container) {
@@ -183,11 +225,14 @@ export class Board {
   }
 
   /**
-   * Draws (a) a ring around the currently-selected unit, and (b) a highlight over
-   * every tile/unit that's actually legal to click next - either the server's
-   * placement candidates, or (once a unit+ability is both selected) the matching
-   * entry in the "action" prompt's legalTargets, straight from Ability.getLegalTargets
-   * on the server. Replaces accept-then-reject with "only the clickable things glow."
+   * Draws (a) a ring around the currently-selected unit - doubles as the
+   * placement-mode selection indicator, since selectedUnitId is reused for
+   * both - and (b) once a unit+ability is selected during the match proper,
+   * a highlight over every tile/unit in the matching "action" prompt's
+   * legalTargets entry, straight from Ability.getLegalTargets on the server.
+   * Placement's `move` edit has no client-side legality precomputation (see
+   * API_CONTRACT.md) - any empty tile click is sent through and the server
+   * accepts or rejects it, so there's nothing to highlight there.
    */
   private refreshHighlights(state: MatchUiState): void {
     this.uiLayer.removeChildren();
@@ -199,13 +244,6 @@ export class Board {
         ring.position.copyFrom(sprite.position);
         this.uiLayer.addChild(ring);
       }
-    }
-
-    if (state.prompt?.kind === "placement" && state.prompt.candidates) {
-      for (const tile of state.prompt.candidates) {
-        this.highlightTile(tile.q, tile.r);
-      }
-      return;
     }
 
     if (state.prompt?.kind === "action" && state.selectedUnitId && state.selectedAbilityId) {

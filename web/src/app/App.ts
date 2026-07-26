@@ -18,9 +18,16 @@ export class App {
 
   async start(): Promise<void> {
     // Dev-only escape hatch: `?fixture=1` renders the board/HUD against a
-    // hand-crafted local snapshot, no backend required. See FixtureScreen.
-    if (new URLSearchParams(location.search).get("fixture") === "1") {
-      this.setScreen(new FixtureScreen(this.root));
+    // hand-crafted local match snapshot, `?fixture=placement` against a
+    // local placement-editor snapshot instead - no backend required either
+    // way. See FixtureScreen.
+    const fixtureParam = new URLSearchParams(location.search).get("fixture");
+    if (fixtureParam === "1") {
+      this.setScreen(new FixtureScreen(this.root, "match"));
+      return;
+    }
+    if (fixtureParam === "placement") {
+      this.setScreen(new FixtureScreen(this.root, "placement"));
       return;
     }
 

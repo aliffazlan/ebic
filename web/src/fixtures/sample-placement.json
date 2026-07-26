@@ -1,0 +1,19 @@
+{
+  "confirmed": false,
+  "units": [
+    { "unitId": "u-valor", "name": "Valor", "definitionId": "valor", "unitType": "CHAMPION", "q": -8, "r": 0 },
+    { "unitId": "u-dirge", "name": "Dirge", "definitionId": "dirge", "unitType": "ELITE", "q": -8, "r": 1 },
+    { "unitId": "u-evayne", "name": "Evayne", "definitionId": "evayne", "unitType": "ELITE", "q": -7, "r": -1 },
+    { "unitId": "u-spitter", "name": "Spitter", "definitionId": "spitter", "unitType": "ELITE", "q": -7, "r": 0 },
+    { "unitId": "u-basic-1", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -8, "r": -1 },
+    { "unitId": "u-basic-2", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -8, "r": 2 },
+    { "unitId": "u-basic-3", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -7, "r": 1 },
+    { "unitId": "u-basic-4", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -7, "r": -2 },
+    { "unitId": "u-basic-5", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -6, "r": -1 },
+    { "unitId": "u-basic-6", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -6, "r": 0 },
+    { "unitId": "u-basic-7", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -6, "r": 1 },
+    { "unitId": "u-basic-8", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -8, "r": -2 },
+    { "unitId": "u-basic-9", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -8, "r": 3 },
+    { "unitId": "u-basic-10", "name": "Basic", "definitionId": "basic", "unitType": "BASIC", "q": -7, "r": -3 }
+  ]
+}

@@ -1,5 +1,7 @@
 package com.walnutt.web;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -21,8 +23,13 @@ import com.walnutt.game.Team;
 import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.ui.ActionChoice;
+import com.walnutt.ui.ConcurrentSetupHandler;
 import com.walnutt.ui.InputHandler;
 import com.walnutt.unit.Unit;
+import com.walnutt.web.dto.PlacementStateSnapshot;
+import com.walnutt.web.dto.PlacementUnitSnapshot;
+import com.walnutt.web.dto.PlayerDraftRoundSnapshot;
+import com.walnutt.web.dto.UnitDefinitionSnapshot;
 
 /**
  * InputHandler backed by the WS bridge instead of a terminal Scanner. Every
@@ -32,8 +39,17 @@ import com.walnutt.unit.Unit;
  * computes legality... the same prompt is effectively re-issued." Legality itself
  * (canUse/economy checks) stays TurnManager/Ability's job; this class only checks
  * that ids in the message actually resolve to something real for the right team.
+ *
+ * Also implements ConcurrentSetupHandler (see game/ConcurrentSetupFlow) - the
+ * draft-pick and placement-arrangement side of the newer, per-player-paced
+ * setup flow. choosePick/arrangePlacement are called from TWO DIFFERENT
+ * THREADS concurrently (one per team - ConcurrentSetupFlow runs each player's
+ * setup on its own dedicated thread), but since every per-team queue in
+ * `inbox` is only ever touched by that team's own thread plus the WS message
+ * thread offering into it, no extra synchronization is needed here beyond
+ * what the InputHandler methods already rely on.
  */
-public final class WebInputHandler implements InputHandler {
+public final class WebInputHandler implements InputHandler, ConcurrentSetupHandler {
     private final ChannelHub hub;
     private final UnitIdRegistry ids;
     private final Map<Team, BlockingQueue<JsonObject>> inbox = Map.of(
@@ -173,6 +189,160 @@ public final class WebInputHandler implements InputHandler {
             }
             hub.sendTo(team, JsonSupport.messageEnvelope("That tile isn't a legal placement."));
         }
+    }
+
+    // ---- ConcurrentSetupHandler ----
+
+    /**
+     * One player's own draft round - see API_CONTRACT.md's rewritten
+     * "draft_round" shape ({roundLabel, options}, no opponentOptions since
+     * each player now drafts at their own pace). Receiving this message
+     * doubles as the prompt to pick; the client responds with the same
+     * "pick" message shape the old flow used.
+     */
+    @Override
+    public UnitDefinition choosePick(GameState state, Player player, String roundLabel, List<UnitDefinition> options) {
+        Team team = player.getTeam();
+        List<UnitDefinitionSnapshot> optionSnapshots = options.stream()
+            .map(GameStateSnapshotMapper::toDefinitionSnapshot)
+            .toList();
+        String json = JsonSupport.envelope("draft_round", new PlayerDraftRoundSnapshot(roundLabel, optionSnapshots));
+        hub.cacheDraftRound(team, json);
+        hub.sendTo(team, json);
+
+        while (true) {
+            JsonObject msg = awaitTyped(team, "pick");
+            if (msg == null) {
+                continue;
+            }
+            String definitionId = optString(msg, "definitionId");
+            for (UnitDefinition option : options) {
+                if (Identifiers.normalize(option.name()).equals(definitionId)) {
+                    return option;
+                }
+            }
+            hub.sendTo(team, JsonSupport.messageEnvelope("That isn't one of your current draft options."));
+        }
+    }
+
+    /**
+     * Shows this player their default arrangement, then loops accepting
+     * swap/move edits (each pushing a fresh placement_state) until a confirm
+     * arrives, at which point a final placement_state (confirmed: true) is
+     * pushed and the working copy is returned. Deliberately never touches
+     * GameMap/Tile occupancy - ConcurrentSetupFlow commits the returned map
+     * to the real board itself once this call returns. The working copy is a
+     * local, mutable, per-call Map, so despite this method being invoked
+     * concurrently for both teams, there's no shared mutable state between
+     * the two calls beyond the (per-team) queue/channel plumbing already
+     * safe for concurrent use.
+     */
+    @Override
+    public Map<Unit, Position> arrangePlacement(GameState state, Player player, Map<Unit, Position> defaultArrangement) {
+        Team team = player.getTeam();
+        Map<Unit, Position> working = new LinkedHashMap<>(defaultArrangement);
+        pushPlacementState(team, player, working, false);
+
+        while (true) {
+            JsonObject msg = awaitTyped(team, "placement_edit");
+            if (msg == null) {
+                continue;
+            }
+            String kind = optString(msg, "kind");
+            if (kind == null) {
+                kind = "";
+            }
+            switch (kind) {
+                case "swap" -> {
+                    if (applyPlacementSwap(team, working, msg)) {
+                        pushPlacementState(team, player, working, false);
+                    }
+                }
+                case "move" -> {
+                    if (applyPlacementMove(state, team, working, msg)) {
+                        pushPlacementState(team, player, working, false);
+                    }
+                }
+                case "confirm" -> {
+                    pushPlacementState(team, player, working, true);
+                    return new LinkedHashMap<>(working);
+                }
+                default -> hub.sendTo(team, JsonSupport.messageEnvelope("Unrecognized placement edit kind."));
+            }
+        }
+    }
+
+    /** Exchanges two of this player's own working-copy positions. Returns false (and sends a rejection) if invalid. */
+    private boolean applyPlacementSwap(Team team, Map<Unit, Position> working, JsonObject msg) {
+        Unit unit = ids.resolve(optString(msg, "unitId"));
+        Unit target = ids.resolve(optString(msg, "targetUnitId"));
+        if (unit == null || target == null || !working.containsKey(unit) || !working.containsKey(target)) {
+            hub.sendTo(team, JsonSupport.messageEnvelope("That swap isn't valid - both units must be your own already-placed units."));
+            return false;
+        }
+        Position unitPos = working.get(unit);
+        Position targetPos = working.get(target);
+        working.put(unit, targetPos);
+        working.put(target, unitPos);
+        return true;
+    }
+
+    /**
+     * Relocates one of this player's own working-copy units to any real, walkable
+     * tile not already occupied by one of this player's OTHER working-copy units.
+     * Deliberately checks the working copy's own position set, not real GameMap
+     * occupancy - nothing has been committed to the real map yet at this point in
+     * the flow, so real-map occupancy would be meaningless here. Deliberately no
+     * zone-radius restriction either (see WebInputHandler's class doc / the task
+     * brief this was written against) - DefaultArrangement's own layout for 14
+     * units doesn't stay within a small fixed radius, so a separate "legal zone"
+     * bound would be inconsistent with where units already start.
+     */
+    private boolean applyPlacementMove(GameState state, Team team, Map<Unit, Position> working, JsonObject msg) {
+        Unit unit = ids.resolve(optString(msg, "unitId"));
+        if (unit == null || !working.containsKey(unit)) {
+            hub.sendTo(team, JsonSupport.messageEnvelope("That unit isn't yours to place."));
+            return false;
+        }
+        Integer q = optInt(msg, "q");
+        Integer r = optInt(msg, "r");
+        if (q == null || r == null) {
+            hub.sendTo(team, JsonSupport.messageEnvelope("Placement move requires q and r."));
+            return false;
+        }
+        Position target = new Position(q, r);
+        Tile tile = state.getMap().getTile(target);
+        if (tile == null || !tile.isWalkable()) {
+            hub.sendTo(team, JsonSupport.messageEnvelope("That tile isn't a legal placement target."));
+            return false;
+        }
+        for (Map.Entry<Unit, Position> entry : working.entrySet()) {
+            if (entry.getKey() != unit && target.equals(entry.getValue())) {
+                hub.sendTo(team, JsonSupport.messageEnvelope("That tile is already occupied by one of your own units."));
+                return false;
+            }
+        }
+        working.put(unit, target);
+        return true;
+    }
+
+    /** Pushes this player's own current working arrangement - fog of war, only ever this player's units. */
+    private void pushPlacementState(Team team, Player player, Map<Unit, Position> working, boolean confirmed) {
+        List<PlacementUnitSnapshot> unitSnapshots = new ArrayList<>();
+        for (Unit unit : player.getUnits()) {
+            Position pos = working.get(unit);
+            unitSnapshots.add(new PlacementUnitSnapshot(
+                ids.idFor(unit),
+                unit.getName(),
+                GameStateSnapshotMapper.definitionId(unit),
+                unit.getUnitType().name(),
+                pos.getQ(),
+                pos.getR()
+            ));
+        }
+        String json = JsonSupport.envelope("placement_state", new PlacementStateSnapshot(unitSnapshots, confirmed));
+        hub.cachePlacementState(team, json);
+        hub.sendTo(team, json);
     }
 
     private void sendPrompt(Team team, JsonObject payload) {

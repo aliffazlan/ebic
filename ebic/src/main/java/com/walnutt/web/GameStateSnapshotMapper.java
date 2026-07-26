@@ -6,6 +6,7 @@ import com.walnutt.ability.Ability;
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Position;
+import com.walnutt.status.Stat;
 import com.walnutt.status.StatusFlag;
 import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitType;
@@ -61,6 +62,9 @@ public final class GameStateSnapshotMapper {
             pos == null ? 0 : pos.getR(),
             unit.getHealth(),
             unit.getMaxHealth(),
+            (int) unit.getEffective(Stat.STRENGTH),
+            (int) unit.getEffective(Stat.AGILITY),
+            (int) unit.getEffective(Stat.INTELLIGENCE),
             unit.isDead(),
             unit.hasMovedThisTurn(),
             unit.hasAttackedThisTurn(),

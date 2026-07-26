@@ -16,6 +16,7 @@ import com.walnutt.game.Team;
 public final class ChannelHub {
     private final Map<Team, ClientChannel> channels = new ConcurrentHashMap<>();
     private final Map<Team, String> lastDraftRoundJson = new ConcurrentHashMap<>();
+    private final Map<Team, String> lastPlacementStateJson = new ConcurrentHashMap<>();
     private final Map<Team, String> lastPromptJson = new ConcurrentHashMap<>();
     private volatile String lastStateJson;
 
@@ -25,6 +26,10 @@ public final class ChannelHub {
         String draftJson = lastDraftRoundJson.get(team);
         if (draftJson != null) {
             channel.send(draftJson);
+        }
+        String placementJson = lastPlacementStateJson.get(team);
+        if (placementJson != null) {
+            channel.send(placementJson);
         }
         if (lastStateJson != null) {
             channel.send(lastStateJson);
@@ -58,6 +63,11 @@ public final class ChannelHub {
 
     public void cacheDraftRound(Team team, String json) {
         lastDraftRoundJson.put(team, json);
+    }
+
+    /** Same reconnect-replay rationale as cacheDraftRound - see register(). */
+    public void cachePlacementState(Team team, String json) {
+        lastPlacementStateJson.put(team, json);
     }
 
     public void cachePrompt(Team team, String json) {

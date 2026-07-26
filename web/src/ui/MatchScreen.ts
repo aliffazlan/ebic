@@ -96,6 +96,9 @@ export class MatchScreen implements Screen, MatchActions {
         this.store.setState({
           snapshot: msg.payload,
           gameOver: msg.payload.gameOver ? wasGameOver : null,
+          // A real "state" message means the match has begun for both
+          // players - placement is over, drop any lingering placement UI.
+          placementState: null,
         });
         break;
       }
@@ -104,6 +107,9 @@ export class MatchScreen implements Screen, MatchActions {
         break;
       case "draft_round":
         this.store.setState({ draftRound: msg.payload });
+        break;
+      case "placement_state":
+        this.store.setState({ placementState: msg.payload, selectedUnitId: null });
         break;
       case "prompt":
         this.store.setState({ prompt: msg.payload, selectedAbilityId: null });
@@ -120,8 +126,15 @@ export class MatchScreen implements Screen, MatchActions {
   private handleTileClick(coord: AxialCoord): void {
     const state = this.store.getState();
 
-    if (state.prompt?.kind === "placement") {
-      this.sendPlacement(coord.q, coord.r);
+    if (state.placementState) {
+      // No edits are accepted once this player has confirmed - just wait.
+      if (state.placementState.confirmed) return;
+      // Empty tile clicked with a unit selected: relocate it there. No
+      // artificial "zone" restriction client-side - let the click through
+      // and let the server validate/reject via a "message" push.
+      if (state.selectedUnitId) {
+        this.sendPlacementMove(state.selectedUnitId, coord.q, coord.r);
+      }
       return;
     }
 
@@ -137,8 +150,18 @@ export class MatchScreen implements Screen, MatchActions {
   private handleUnitClick(unit: UnitSnapshot): void {
     const state = this.store.getState();
 
-    if (state.prompt?.kind === "placement") {
-      // Placement only targets tiles; ignore unit clicks during placement.
+    if (state.placementState) {
+      if (state.placementState.confirmed) return;
+      if (state.selectedUnitId === unit.id) {
+        // Clicking the already-selected unit again cancels the selection.
+        this.selectUnit(null);
+        return;
+      }
+      if (state.selectedUnitId) {
+        this.sendPlacementSwap(state.selectedUnitId, unit.id);
+        return;
+      }
+      this.selectUnit(unit.id);
       return;
     }
 
@@ -190,8 +213,18 @@ export class MatchScreen implements Screen, MatchActions {
     this.store.setState({ draftRound: null });
   }
 
-  sendPlacement(q: number, r: number): void {
-    this.socket.send({ type: "placement", q, r });
+  sendPlacementSwap(unitId: string, targetUnitId: string): void {
+    this.socket.send({ type: "placement_edit", kind: "swap", unitId, targetUnitId });
+    this.store.setState({ selectedUnitId: null });
+  }
+
+  sendPlacementMove(unitId: string, q: number, r: number): void {
+    this.socket.send({ type: "placement_edit", kind: "move", unitId, q, r });
+    this.store.setState({ selectedUnitId: null });
+  }
+
+  confirmPlacement(): void {
+    this.socket.send({ type: "placement_edit", kind: "confirm" });
   }
 
   exitToLobby(): void {

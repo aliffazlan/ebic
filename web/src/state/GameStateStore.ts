@@ -2,6 +2,7 @@ import { Store } from "./Store";
 import type {
   DraftRoundSnapshot,
   GameStateSnapshot,
+  PlacementStateSnapshot,
   PromptPayload,
   Team,
 } from "../types/contract";
@@ -11,9 +12,13 @@ export interface MatchUiState {
   connected: boolean;
   snapshot: GameStateSnapshot | null;
   draftRound: DraftRoundSnapshot | null;
+  placementState: PlacementStateSnapshot | null;
   prompt: PromptPayload | null;
   messages: string[];
   gameOver: { winnerTeam: string; winnerName: string } | null;
+  // Dual-purpose: selected unit during the match (for ability targeting) and
+  // selected unit during placement (for swap/move) - the two modes never
+  // overlap in time, so one field covers both without any ambiguity.
   selectedUnitId: string | null;
   selectedAbilityId: string | null;
 }
@@ -28,6 +33,7 @@ export class GameStateStore extends Store<MatchUiState> {
       connected: false,
       snapshot: null,
       draftRound: null,
+      placementState: null,
       prompt: null,
       messages: [],
       gameOver: null,

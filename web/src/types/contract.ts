@@ -59,6 +59,10 @@ export interface UnitSnapshot {
   r: number;
   currentHp: number;
   maxHp: number;
+  // Effective (post-modifier) values, for the sidebar unit panel.
+  strength: number;
+  agility: number;
+  intelligence: number;
   dead: boolean;
   hasMovedThisTurn: boolean;
   hasAttackedThisTurn: boolean;
@@ -95,13 +99,14 @@ export interface UnitDefinitionSnapshot {
   abilities: string[];
 }
 
+// Draft and placement run independently per player (no more synchronized
+// "both players see this round together" moment) - see API_CONTRACT.md's
+// WebSocket section. `draft_round` now carries only this player's own
+// options, and receiving it doubles as the prompt to pick.
 export interface DraftRoundSnapshot {
-  roundLabel: string;
-  yourOptions: UnitDefinitionSnapshot[];
-  opponentOptions: UnitDefinitionSnapshot[];
+  roundLabel: string; // "Champion", "Elite 1/3", "Elite 2/3", "Elite 3/3"
+  options: UnitDefinitionSnapshot[];
 }
-
-export type PromptKind = "action" | "attribute" | "pick" | "placement";
 
 // Per unitId, per abilityId: which tiles/units are actually legal to target, so the
 // board can highlight them instead of accept-then-reject on a bad click. Only present
@@ -113,25 +118,45 @@ export interface LegalTargets {
 }
 export type LegalTargetsByUnit = Record<string, Record<string, LegalTargets>>;
 
-// The contract only pins down `kind` precisely for most fields; treat anything
-// beyond what's typed below as an open bag and be defensive about reading it.
-export interface PromptPayload {
-  kind: PromptKind;
-  legalTargets?: LegalTargetsByUnit; // present when kind === "action"
-  candidates?: { q: number; r: number }[]; // present when kind === "placement"
-  unitId?: string; // present when kind === "attribute" | "placement"
-  [key: string]: unknown;
+// "pick"/"placement" prompt kinds are gone - draft_round and placement_state
+// double as their own prompts now (see below). Only the in-match action loop
+// still uses this message.
+export type PromptPayload =
+  | { kind: "action"; team: Team; legalTargets: LegalTargetsByUnit }
+  | { kind: "attribute"; team: Team; unitId: string };
+
+// This player's own working placement arrangement only (fog of war - the
+// opponent's roster/positions are never sent here). Pushed once with the
+// server's default layout, then again after every accepted edit.
+export interface PlacementUnitSnapshot {
+  unitId: string;
+  name: string;
+  definitionId: string;
+  unitType: UnitType;
+  q: number;
+  r: number;
+}
+
+export interface PlacementStateSnapshot {
+  units: PlacementUnitSnapshot[];
+  confirmed: boolean;
 }
 
 export type ServerMessage =
   | { type: "state"; payload: GameStateSnapshot }
   | { type: "vfx"; payload: VfxEvent[] }
   | { type: "draft_round"; payload: DraftRoundSnapshot }
+  | { type: "placement_state"; payload: PlacementStateSnapshot }
   | { type: "prompt"; payload: PromptPayload }
   | { type: "message"; text: string }
   | { type: "game_over"; payload: { winnerTeam: string; winnerName: string } };
 
 // ---- WebSocket: client -> server ----
+
+export type PlacementEdit =
+  | { kind: "swap"; unitId: string; targetUnitId: string }
+  | { kind: "move"; unitId: string; q: number; r: number }
+  | { kind: "confirm" };
 
 export type ClientMessage =
   | { type: "action"; kind: "end_turn" }
@@ -147,4 +172,4 @@ export type ClientMessage =
     }
   | { type: "attribute"; value: Attribute }
   | { type: "pick"; definitionId: string }
-  | { type: "placement"; q: number; r: number };
+  | ({ type: "placement_edit" } & PlacementEdit);
