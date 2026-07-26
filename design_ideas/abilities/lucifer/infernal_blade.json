@@ -1,0 +1,8 @@
+{
+    "name": "Infernal Blade",
+    "type": "passive",
+    "description": "When this unit has a successful encounter, the target is cursed and is disarmed for %duration% turn(s). If the affected unit ends their turn adjacent to this unit, then the duration is paused. This effect can stack, extending the duration.",
+    "stats": {
+        "duration": 1
+    }
+}

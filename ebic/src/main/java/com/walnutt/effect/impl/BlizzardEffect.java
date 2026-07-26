@@ -1,0 +1,45 @@
+package com.walnutt.effect.impl;
+
+import com.walnutt.effect.Effect;
+import com.walnutt.event.DamageEvent;
+import com.walnutt.event.TurnStartEvent;
+import com.walnutt.game.GameState;
+import com.walnutt.status.EffectCategory;
+import com.walnutt.status.StatusFlag;
+import com.walnutt.unit.Unit;
+
+/** Yuki's Blizzard: rooted + damage per turn. Reused (with 0 damage) by the golem's Blizzard Fist/Snow Blast. */
+public class BlizzardEffect extends Effect {
+    private final Unit source;
+    private final int damagePerTurn;
+
+    public BlizzardEffect(Unit source, int duration, int damagePerTurn) {
+        super("Blizzard", duration);
+        this.source = source;
+        this.damagePerTurn = damagePerTurn;
+        this.flags.add(StatusFlag.ROOTED);
+        this.category = EffectCategory.DEBUFF;
+    }
+
+    @Override
+    public void onTurnStart(GameState state, TurnStartEvent event) {
+        if (getOwner() == null || isExpired() || event.team() != getOwner().getTeam()) {
+            return;
+        }
+        if (damagePerTurn <= 0) {
+            return;
+        }
+        getOwner().takeDamage(state, new DamageEvent(source, getOwner(), damagePerTurn));
+    }
+
+    /** "If the target is already affected by blizzard, the duration is increased." */
+    public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn) {
+        for (Effect effect : target.getEffects()) {
+            if (effect instanceof BlizzardEffect existing) {
+                existing.extendDuration(duration);
+                return;
+            }
+        }
+        target.addEffect(new BlizzardEffect(source, duration, damagePerTurn));
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "name": "Lucifer",
+    "type": "elite",
+    "max_hp": 800,
+    "strength": 80,
+    "agility": 30,
+    "intelligence" : 20,
+    "abilities": [
+        "doom", "infernal_blade"
+    ]
+}

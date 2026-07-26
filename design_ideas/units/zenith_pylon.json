@@ -1,0 +1,11 @@
+{
+    "name": "Pylon",
+    "type": "basic",
+    "max_hp": 200,
+    "strength": 0,
+    "agility": 0,
+    "intelligence": 0,
+    "abilities": [
+        "pylon_beam"
+    ]
+}

@@ -1,0 +1,10 @@
+{
+    "name": "Decay",
+    "type": "passive",
+    "description": "At the start of every turn, steals %health_steal% max health and health, as well as %str_steal% strength from all adjacent units, including allied and enemy units.",
+    "stats": {
+        "radius": 1,
+        "health_steal": 5,
+        "bonus_increase": 2
+    }
+}

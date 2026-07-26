@@ -1,0 +1,9 @@
+{
+    "name": "Poison Sting",
+    "type": "passive",
+    "description": "When this unit attacks, it applies poison for %duration% turns. Poison deals %dmg_per_duration% damage for every turn left of the debuff. If already poisoned, the duration increases instead.",
+    "stats": {
+        "duration": 3,
+        "dmg_per_duration": 4
+    }
+}

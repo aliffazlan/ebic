@@ -1,0 +1,11 @@
+{
+    "name": "Harbinger",
+    "type": "champion",
+    "max_hp": 1400,
+    "strength": 70,
+    "agility": 30,
+    "intelligence" : 80,
+    "abilities": [
+        "oblivion_confinement", "sanity_eclipse", "objurgation"
+    ]
+}

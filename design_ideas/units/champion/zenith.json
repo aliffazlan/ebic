@@ -1,0 +1,11 @@
+{
+    "name": "Zenith",
+    "type": "champion",
+    "max_hp": 950,
+    "strength": 15,
+    "agility": 60,
+    "intelligence" : 74,
+    "abilities": [
+        "orbital_beam", "pylon", "dislocation"
+    ]
+}

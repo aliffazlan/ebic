@@ -1,0 +1,11 @@
+{
+    "name": "Snow Golem",
+    "type": "elite",
+    "max_hp": 1000,
+    "strength": 60,
+    "agility": 40,
+    "intelligence" : 15,
+    "abilities": [
+        "blizzard_fist", "snow_blast"
+    ]
+}

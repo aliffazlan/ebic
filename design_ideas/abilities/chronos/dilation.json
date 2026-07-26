@@ -1,0 +1,11 @@
+{
+    "name": "Dilation",
+    "type": "active",
+    "description": "Activates a dilation field around this unit for %duration% turns. Adjacent enemy units have their ability cooldowns paused, buff durations tick down twice as fast, and debuff durations tick down twice as slow.",
+    "stats": {
+        "cooldown": 7,
+        "duration": 4,
+        "range": 1,
+        "time_modifier": 0.5
+    }
+}

@@ -1,0 +1,9 @@
+{
+    "name": "Objurgation",
+    "type": "passive",
+    "description": "If this unit recieves fatal damage, all of it's intellgence is consumed and %int_to_hp% is turned into HP. This effect can only happen once every %cooldown% turns.",
+    "stats": {
+        "cooldown": 3,
+        "int_to_hp": 0.8
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "name": "Doom",
+    "type": "active",
+    "description": "Curses an enemy unit, and prevents it from using abilities. Deals %base_dmg% per turn, with the damage increasing by %dmg_increase% every turn until the effect wears off. The effect lasts until the affected unit kills another unit.",
+    "stats": {
+        "cooldown": 11,
+        "cast_range": 1,
+        "base_dmg": 20,
+        "dmg_increase": 20
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "name": "Mercurial",
+    "type": "elite",
+    "max_hp": 810,
+    "strength": 40,
+    "agility": 40,
+    "intelligence" : 30,
+    "abilities": [
+        "dispersion", "manifestation"
+    ]
+}

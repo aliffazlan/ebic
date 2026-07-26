@@ -1,0 +1,11 @@
+{
+    "name": "Yuki",
+    "type": "elite",
+    "max_hp": 450,
+    "strength": 15,
+    "agility": 20,
+    "intelligence" : 40,
+    "abilities": [
+        "blizzard", "snow_golem"
+    ]
+}

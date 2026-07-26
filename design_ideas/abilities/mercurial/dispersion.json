@@ -1,0 +1,9 @@
+{
+    "name": "Dispersion",
+    "type": "passive",
+    "description": "Absorbs and reflects %dmg_reflect% % of damage taken to surrounding enemy units.",
+    "stats": {
+        "radius": 1,
+        "dmg_reflect": 0.25
+    }
+}

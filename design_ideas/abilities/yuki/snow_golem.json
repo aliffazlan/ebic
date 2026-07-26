@@ -1,0 +1,9 @@
+{
+    "name": "Snow Golem",
+    "type": "active",
+    "description": "Summons a powerful snow golem at an empty tile. The golem has the Blizzard Fists ability. Only one golem can be summoned at a time.",
+    "stats": {
+        "cooldown": 16,
+        "cast_range": 1
+    }
+}

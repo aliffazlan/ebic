@@ -1,0 +1,11 @@
+{
+    "name": "Lanaya",
+    "type": "elite",
+    "max_hp": 600,
+    "strength": 30,
+    "agility": 120,
+    "intelligence" : 70,
+    "abilities": [
+        "psychic_projection", "refraction"
+    ]
+}

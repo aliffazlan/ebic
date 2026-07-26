@@ -1,0 +1,9 @@
+{
+    "name": "Frostbite",
+    "type": "passive",
+    "description": "Whenever this unit deals damage, the affected unit recieves a frostbite debuff for %duration% turns. Whilst affected, the unit cannot recieve any form of healing, and if their health drops below %kill_threshold% %, they will instantly shatter and die.",
+    "stats": {
+        "duration": 2,
+        "kill_threshold": 0.1
+    }
+}

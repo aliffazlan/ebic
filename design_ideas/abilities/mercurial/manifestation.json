@@ -1,0 +1,10 @@
+{
+    "name": "Manifestation",
+    "type": "active",
+    "description": "Moves to any free tile on the map, and applies a debuff to adjacent enemy units that reduces damage output by %dmg_reduction%, and silences for %duration% turns.",
+    "stats": {
+        "cooldown": 5,
+        "dmg_reduction": 0.5,
+        "duration": 2
+    }
+}

@@ -1,0 +1,9 @@
+{
+    "name": "Counterstrike",
+    "type": "passive",
+    "description": "When taking damage from an attack, immediately perform a counter attack, with %damage_reduction% % less damage but %lifesteal% % lifesteal.",
+    "stats": {
+        "damage_reduction": 0.5,
+        "lifesteal": 1
+    }
+}

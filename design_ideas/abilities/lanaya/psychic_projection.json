@@ -1,0 +1,10 @@
+{
+    "name": "Pyschic Projection",
+    "type": "active",
+    "description": "Creates an invulernable clone of this unit that lasts %duration% turns. The clone can attack and move around, but does not take any damage. While the clone exists, the caster is stunned and cannot act.",
+    "stats": {
+        "cooldown": 6,
+        "cast_range": 4,
+        "duration": 3
+    }
+}

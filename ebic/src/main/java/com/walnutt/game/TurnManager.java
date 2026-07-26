@@ -1,0 +1,61 @@
+package com.walnutt.game;
+
+import com.walnutt.ability.Ability;
+import com.walnutt.ability.target.Target;
+import com.walnutt.event.AbilityCastEvent;
+import com.walnutt.event.TurnEndEvent;
+import com.walnutt.event.TurnStartEvent;
+import com.walnutt.ui.ActionChoice;
+import com.walnutt.ui.InputHandler;
+import com.walnutt.ui.Renderer;
+import com.walnutt.unit.Unit;
+
+/**
+ * Drives one player's turn. The game is player-turn based, not unit-turn based:
+ * player gets 3 moves, moves don't carry over, each owned unit resets its per-turn
+ * flags, and the player acts until they end their turn or the game ends.
+ */
+public class TurnManager {
+
+    public void takeTurn(GameState state, InputHandler input, Renderer renderer) {
+        Player player = state.getCurrentPlayer();
+
+        state.setRemainingMoves(3);
+        for (Unit unit : player.getUnits()) {
+            unit.startTurn(state);
+        }
+        state.getEventBus().publish(state, new TurnStartEvent(player.getTeam()));
+
+        while (!state.isGameOver()) {
+            renderer.render(state);
+
+            ActionChoice choice = input.chooseAction(state, player);
+            if (choice.isEndTurn()) {
+                break;
+            }
+
+            Ability ability = choice.getAbility();
+            Target target = choice.getTarget();
+
+            if (!ability.canUse(state, target)) {
+                renderer.renderMessage("That action isn't available right now.");
+                continue;
+            }
+
+            Unit user = choice.getUnit();
+            state.getEventBus().publish(state, new AbilityCastEvent(user, ability, target, AbilityCastEvent.Phase.PRE));
+            ability.onUse(state, target);
+            state.getEventBus().publish(state, new AbilityCastEvent(user, ability, target, AbilityCastEvent.Phase.POST));
+            state.checkWinCondition();
+        }
+
+        for (Unit unit : player.getUnits()) {
+            unit.endTurn(state);
+        }
+        state.getEventBus().publish(state, new TurnEndEvent(player.getTeam()));
+
+        if (!state.isGameOver()) {
+            state.switchCurrentPlayer();
+        }
+    }
+}

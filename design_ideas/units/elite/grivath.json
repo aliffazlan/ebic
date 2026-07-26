@@ -1,0 +1,11 @@
+{
+    "name": "Grivath",
+    "type": "elite",
+    "max_hp": 750,
+    "strength": 60,
+    "agility": 54,
+    "intelligence" : 48,
+    "abilities": [
+        "feast", "cripple"
+    ]
+}

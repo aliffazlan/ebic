@@ -1,0 +1,9 @@
+{
+    "name": "Energy Break",
+    "type": "passive",
+    "description": "Each strike burns the energy of Wei's opponent. Every encounter, the enemy unit will have all their active ability cooldowns increased by %cooldown_increase%. If this unit lands a successful attack, the cooldowns increase by %bonus_increase% instead. Cooldowns affected by this ability can go over their max cooldowns.",
+    "stats": {
+        "cooldown_increase": 1,
+        "bonus_increase": 3
+    }
+}

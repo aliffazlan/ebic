@@ -1,0 +1,11 @@
+{
+    "name": "Auroth",
+    "type": "elite",
+    "max_hp": 530,
+    "strength": 20,
+    "agility": 30,
+    "intelligence" : 70,
+    "abilities": [
+        "cold_embrace", "frostbite"
+    ]
+}

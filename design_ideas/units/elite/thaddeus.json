@@ -1,0 +1,11 @@
+{
+    "name": "Thaddeus",
+    "type": "elite",
+    "max_hp": 850,
+    "strength": 30,
+    "agility": 9,
+    "intelligence" : 20,
+    "abilities": [
+        "holy_shield", "selfless"
+    ]
+}

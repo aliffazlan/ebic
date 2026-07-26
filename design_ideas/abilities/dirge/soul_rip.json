@@ -1,0 +1,10 @@
+{
+    "name": "Soul Rip",
+    "type": "active",
+    "description": "Deals %str_multiplier% damage per difference in strength between this unit and the target unit. Can also target allied units to heal them instead.",
+    "stats": {
+        "cooldown": 3,
+        "cast_range": 2,
+        "str_multiplier": 0.5
+    }
+}

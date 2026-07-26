@@ -1,0 +1,11 @@
+{
+    "name": "Wei",
+    "type": "elite",
+    "max_hp": 650,
+    "strength": 30,
+    "agility": 90,
+    "intelligence" :20,
+    "abilities": [
+        "energy_break", "implosion"
+    ]
+}

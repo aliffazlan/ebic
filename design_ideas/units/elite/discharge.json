@@ -1,0 +1,11 @@
+{
+    "name": "Discharge",
+    "type": "elite",
+    "max_hp": 900,
+    "strength": 30,
+    "agility": 40,
+    "intelligence" : 10,
+    "abilities": [
+        "static_link", "eye_of_the_storm"
+    ]
+}

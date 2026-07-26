@@ -1,0 +1,8 @@
+{
+    "name": "Blizzard Fist",
+    "type": "passive",
+    "description": "On a successful attack, apply a shorter duration Blizzard debuff to the attacked target.",
+    "stats": {
+        "duration": 1
+    }
+}

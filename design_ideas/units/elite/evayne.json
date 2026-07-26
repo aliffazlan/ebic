@@ -1,0 +1,11 @@
+{
+    "name": "Evayne",
+    "type": "elite",
+    "max_hp": 480,
+    "strength": 15,
+    "agility": 120,
+    "intelligence" : 30,
+    "abilities": [
+        "cloak_and_dagger", "backstab"
+    ]
+}

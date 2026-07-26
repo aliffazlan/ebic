@@ -1,0 +1,13 @@
+{
+    "name": "Poison Bloom",
+    "type": "active",
+    "description": "Casts a deadly venom to the target unit, immediately adding %initial_poison% stacks of poison. For the next %duration% turns, the poison debuff duration will tick up instead of down. If the affected unit is attacked by Spitter, the duration is increased by %duration_increase%. If the unit dies under this effect, it will burst and poison nearby enemies equal to the amount of poison stacks it had just before it died." ,
+    "stats": {
+        "cooldown": 6,
+        "cast_range": 3,
+        "duration": 3,
+        "initial_poison": 10,
+        "duration_increase": 1,
+        "infect_radius": 1
+    }
+}

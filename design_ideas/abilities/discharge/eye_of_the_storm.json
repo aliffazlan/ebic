@@ -1,0 +1,11 @@
+{
+    "name": "Eye of the Storm",
+    "type": "passive",
+    "description": "At the start of every turn, a random adjacent enemy unit is struck by lightning, dealing %damage% damage, and applying a permenant stacking debuff that causes the target to take %bonus_damage% extra damage from all damage sources. An extra strike will always hit targets currently affected by Static Link.",
+    "stats": {
+        "count": 1,
+        "range": 1,
+        "damage": 2,
+        "bonus_damage": 2
+    }
+}

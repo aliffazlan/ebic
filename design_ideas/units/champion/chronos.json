@@ -1,0 +1,11 @@
+{
+    "name": "Chronos",
+    "type": "champion",
+    "max_hp": 1200,
+    "strength": 70,
+    "agility": 110,
+    "intelligence" : 60,
+    "abilities": [
+        "backtrack", "dilation", "timeless_strike"
+    ]
+}

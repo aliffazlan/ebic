@@ -1,0 +1,10 @@
+{
+    "name": "Backtrack",
+    "type": "active",
+    "description": "Dashes to an empty tile, and recovers all damage taken in the previous turn.",
+    "stats": {
+        "cooldown": 3,
+        "range": 3,
+        "backtrack_period": 1
+    }
+}

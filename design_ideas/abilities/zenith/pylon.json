@@ -1,0 +1,10 @@
+{
+    "name": "Pylon",
+    "type": "active",
+    "description": "Calls down an orbital pylon onto any tile on the map. Pylons are special units that do not occupy a tile, but can still be attacked. Whenever Zenith casts Orbital Beam, each pylon will also cast a beam on a random adjcaent enemy unit. If a pylon is destroyed, adjacent enemy units are stunned for %death_duration% turns and take %death_damage% damage.",
+    "stats": {
+        "cooldown": 4,
+        "death_damage": 50,
+        "death_duration": 1
+    }
+}

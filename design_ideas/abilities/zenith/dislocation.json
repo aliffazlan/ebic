@@ -1,0 +1,10 @@
+{
+    "name": "Dislocation",
+    "type": "active",
+    "description": "Teleports to a targetted pylon, and destroys it. After teleporting, this unit's current cooldowns are all reduced by 1 turn, and gains a %barrier_hp% HP barrier. Cannot teleport to a pylon with another unit on the same tile.",
+    "stats": {
+        "cooldown": 1,
+        "barrier_hp": "50",
+        "barrier_duration": 2
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "name": "Dirge",
+    "type": "elite",
+    "max_hp": 750,
+    "strength": 60,
+    "agility": 20,
+    "intelligence" : 45,
+    "abilities": [
+        "decay", "soul_rip"
+    ]
+}
