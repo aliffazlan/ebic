@@ -1,0 +1,134 @@
+{
+  "currentTeam": "PLAYER_ONE",
+  "remainingMoves": 2,
+  "gameOver": false,
+  "mapRadius": 5,
+  "units": [
+    {
+      "id": "u-valor",
+      "name": "Valor",
+      "definitionId": "valor",
+      "team": "PLAYER_ONE",
+      "unitType": "CHAMPION",
+      "q": -3,
+      "r": 0,
+      "currentHp": 420,
+      "maxHp": 500,
+      "dead": false,
+      "hasMovedThisTurn": false,
+      "hasAttackedThisTurn": false,
+      "statusFlags": [],
+      "abilities": [
+        { "id": "counterstrike", "name": "Counterstrike", "passive": true, "ready": true, "currentCooldown": 0, "maxCooldown": 0 },
+        { "id": "duel", "name": "Duel", "passive": false, "ready": true, "currentCooldown": 0, "maxCooldown": 3 },
+        { "id": "overwhelming_odds", "name": "Overwhelming Odds", "passive": false, "ready": false, "currentCooldown": 2, "maxCooldown": 4 }
+      ]
+    },
+    {
+      "id": "u-dirge",
+      "name": "Dirge",
+      "definitionId": "dirge",
+      "team": "PLAYER_ONE",
+      "unitType": "ELITE",
+      "q": -3,
+      "r": 1,
+      "currentHp": 150,
+      "maxHp": 220,
+      "dead": false,
+      "hasMovedThisTurn": true,
+      "hasAttackedThisTurn": false,
+      "statusFlags": ["HIDDEN"],
+      "abilities": [
+        { "id": "soul_rip", "name": "Soul Rip", "passive": false, "ready": true, "currentCooldown": 0, "maxCooldown": 3 },
+        { "id": "decay", "name": "Decay", "passive": true, "ready": true, "currentCooldown": 0, "maxCooldown": 0 }
+      ]
+    },
+    {
+      "id": "u-basic-1",
+      "name": "Basic",
+      "definitionId": "basic",
+      "team": "PLAYER_ONE",
+      "unitType": "BASIC",
+      "q": -2,
+      "r": -1,
+      "currentHp": 30,
+      "maxHp": 30,
+      "dead": false,
+      "hasMovedThisTurn": false,
+      "hasAttackedThisTurn": false,
+      "statusFlags": [],
+      "abilities": []
+    },
+    {
+      "id": "u-basic-2",
+      "name": "Basic",
+      "definitionId": "basic",
+      "team": "PLAYER_ONE",
+      "unitType": "BASIC",
+      "q": -2,
+      "r": 0,
+      "currentHp": 0,
+      "maxHp": 30,
+      "dead": true,
+      "hasMovedThisTurn": false,
+      "hasAttackedThisTurn": false,
+      "statusFlags": [],
+      "abilities": []
+    },
+    {
+      "id": "u-harbinger",
+      "name": "Harbinger",
+      "definitionId": "harbinger",
+      "team": "PLAYER_TWO",
+      "unitType": "CHAMPION",
+      "q": 3,
+      "r": 0,
+      "currentHp": 480,
+      "maxHp": 480,
+      "dead": false,
+      "hasMovedThisTurn": false,
+      "hasAttackedThisTurn": false,
+      "statusFlags": ["STUNNED"],
+      "abilities": [
+        { "id": "objurgation", "name": "Objurgation", "passive": true, "ready": true, "currentCooldown": 0, "maxCooldown": 0 },
+        { "id": "oblivion_confinement", "name": "Oblivion Confinement", "passive": false, "ready": true, "currentCooldown": 0, "maxCooldown": 4 },
+        { "id": "sanitys_eclipse", "name": "Sanity's Eclipse", "passive": false, "ready": false, "currentCooldown": 3, "maxCooldown": 5 }
+      ]
+    },
+    {
+      "id": "u-evayne",
+      "name": "Evayne",
+      "definitionId": "evayne",
+      "team": "PLAYER_TWO",
+      "unitType": "ELITE",
+      "q": 3,
+      "r": -1,
+      "currentHp": 200,
+      "maxHp": 200,
+      "dead": false,
+      "hasMovedThisTurn": false,
+      "hasAttackedThisTurn": false,
+      "statusFlags": ["INVULNERABLE", "HIDDEN"],
+      "abilities": [
+        { "id": "backstab", "name": "Backstab", "passive": true, "ready": true, "currentCooldown": 0, "maxCooldown": 0 },
+        { "id": "cloak_and_dagger", "name": "Cloak and Dagger", "passive": false, "ready": true, "currentCooldown": 0, "maxCooldown": 5 }
+      ]
+    },
+    {
+      "id": "u-basic-3",
+      "name": "Basic",
+      "definitionId": "basic",
+      "team": "PLAYER_TWO",
+      "unitType": "BASIC",
+      "q": 2,
+      "r": 1,
+      "currentHp": 30,
+      "maxHp": 30,
+      "dead": false,
+      "hasMovedThisTurn": false,
+      "hasAttackedThisTurn": false,
+      "statusFlags": [],
+      "abilities": []
+    }
+  ]
+}
