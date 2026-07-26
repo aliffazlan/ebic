@@ -1,5 +1,7 @@
 package com.walnutt.game;
 
+import java.util.List;
+
 import com.walnutt.ability.Ability;
 import com.walnutt.ability.target.Target;
 import com.walnutt.event.AbilityCastEvent;
@@ -21,7 +23,10 @@ public class TurnManager {
         Player player = state.getCurrentPlayer();
 
         state.setRemainingMoves(3);
-        for (Unit unit : player.getUnits()) {
+        // Snapshot before iterating: startTurn/endTurn can expire an effect (e.g. Lanaya's
+        // Psychic Projection) whose onExpire removes a unit from this same list mid-loop,
+        // which would otherwise throw ConcurrentModificationException.
+        for (Unit unit : List.copyOf(player.getUnits())) {
             unit.startTurn(state);
         }
         state.getEventBus().publish(state, new TurnStartEvent(player.getTeam()));
@@ -49,7 +54,7 @@ public class TurnManager {
             state.checkWinCondition();
         }
 
-        for (Unit unit : player.getUnits()) {
+        for (Unit unit : List.copyOf(player.getUnits())) {
             unit.endTurn(state);
         }
         state.getEventBus().publish(state, new TurnEndEvent(player.getTeam()));
