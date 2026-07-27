@@ -1,6 +1,22 @@
 // WebSocket client for GET /ws/matches/:matchId (see API_CONTRACT.md).
 // The cookie carries auth at handshake time automatically; no token needed.
 // Dispatches incoming messages by `type` via a plain callback.
+//
+// Also owns two pieces of connection-resilience that didn't exist before and
+// were the root cause of a real bug (both players randomly getting stuck on
+// "Disconnected from match." with no way back in - see CLAUDE.md's Gotchas):
+//  - A periodic heartbeat ping, purely to keep the connection's traffic
+//    non-idle during a quiet stretch (a slow turn, an attribute encounter
+//    waiting on the other player) - the server's WS idle timeout is
+//    generous but finite (see WebServer.WS_IDLE_TIMEOUT), and with zero
+//    app-level traffic in either direction it could still be reached.
+//  - Auto-reconnect with backoff on any *unexpected* close (server idle
+//    timeout, network blip, laptop sleep) - never on a deliberate close()
+//    call (leaving the match / unmounting). The server already caches and
+//    replays the last state/prompt/draft_round/placement_state to any
+//    newly-registering channel for a team (ChannelHub.register), so a
+//    reconnect looks identical to a fresh connect from the server's side -
+//    this class just needed to actually attempt one.
 
 import type { ClientMessage, ServerMessage } from "../types/contract";
 
@@ -9,12 +25,25 @@ export interface GameSocketHandlers {
   onOpen?(): void;
   onClose?(event: CloseEvent): void;
   onError?(event: Event): void;
+  /** Fired each time a reconnect attempt is scheduled after an unexpected close. */
+  onReconnecting?(attempt: number, delayMs: number): void;
 }
+
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const RECONNECT_BASE_DELAY_MS = 1_000;
+const RECONNECT_MAX_DELAY_MS = 15_000;
 
 export class GameSocket {
   private ws: WebSocket | null = null;
   private readonly matchId: string;
   private readonly handlers: GameSocketHandlers;
+  private heartbeatTimer: number | null = null;
+  private reconnectTimer: number | null = null;
+  private reconnectAttempt = 0;
+  // Set only by close() - distinguishes "the app asked us to disconnect"
+  // (leaving the match, unmounting the screen) from "the socket dropped out
+  // from under us," which is the only case that should auto-reconnect.
+  private intentionalClose = false;
 
   constructor(matchId: string, handlers: GameSocketHandlers) {
     this.matchId = matchId;
@@ -22,12 +51,27 @@ export class GameSocket {
   }
 
   connect(): void {
+    this.intentionalClose = false;
+    this.openSocket();
+  }
+
+  private openSocket(): void {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${protocol}//${location.host}/ws/matches/${encodeURIComponent(this.matchId)}`;
     const ws = new WebSocket(url);
 
-    ws.onopen = () => this.handlers.onOpen?.();
-    ws.onclose = (event) => this.handlers.onClose?.(event);
+    ws.onopen = () => {
+      this.reconnectAttempt = 0;
+      this.startHeartbeat();
+      this.handlers.onOpen?.();
+    };
+    ws.onclose = (event) => {
+      this.stopHeartbeat();
+      this.handlers.onClose?.(event);
+      if (!this.intentionalClose) {
+        this.scheduleReconnect();
+      }
+    };
     ws.onerror = (event) => this.handlers.onError?.(event);
     ws.onmessage = (event) => {
       let parsed: ServerMessage;
@@ -43,6 +87,32 @@ export class GameSocket {
     this.ws = ws;
   }
 
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer !== null) return;
+    this.reconnectAttempt += 1;
+    const delay = Math.min(
+      RECONNECT_BASE_DELAY_MS * 2 ** (this.reconnectAttempt - 1),
+      RECONNECT_MAX_DELAY_MS,
+    );
+    this.handlers.onReconnecting?.(this.reconnectAttempt, delay);
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.openSocket();
+    }, delay);
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.heartbeatTimer = window.setInterval(() => this.send({ type: "ping" }), HEARTBEAT_INTERVAL_MS);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer !== null) {
+      window.clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
   send(msg: ClientMessage): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       console.warn("GameSocket: dropped message, socket not open", msg);
@@ -56,6 +126,12 @@ export class GameSocket {
   }
 
   close(): void {
+    this.intentionalClose = true;
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.stopHeartbeat();
     this.ws?.close();
     this.ws = null;
   }

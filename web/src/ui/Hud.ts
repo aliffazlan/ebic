@@ -94,6 +94,17 @@ export class Hud {
       turnBadge.textContent = isYourTurn ? "Your turn" : "Opponent's turn";
       badges.appendChild(turnBadge);
     }
+    if (!state.connected) {
+      // GameSocket auto-reconnects with backoff on any unexpected close (see
+      // its own comment for why) - this is the ongoing visual indicator
+      // while that's in flight; MatchScreen's message log gets a one-time
+      // "attempting to reconnect" line for the initial heads-up.
+      const reconnectBadge = document.createElement("span");
+      reconnectBadge.className = "badge turn-theirs";
+      reconnectBadge.style.marginLeft = "6px";
+      reconnectBadge.textContent = "Reconnecting…";
+      badges.appendChild(reconnectBadge);
+    }
     left.appendChild(badges);
     section.appendChild(left);
 

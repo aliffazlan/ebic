@@ -46,9 +46,18 @@ export class MatchScreen implements Screen, MatchActions {
       },
       onClose: () => {
         this.store.setState({ connected: false });
-        this.store.pushMessage("Disconnected from match.");
+        this.store.pushMessage("Disconnected from match - reconnecting...");
       },
       onError: () => this.store.pushMessage("Connection error."),
+      onReconnecting: (attempt) => {
+        // Only the first attempt gets its own message - a burst of "attempt
+        // N" lines during a longer outage would just be noise in the log;
+        // the top-bar "Reconnecting..." badge (driven by `connected`) is the
+        // ongoing indicator, this is just the initial heads-up.
+        if (attempt === 1) {
+          this.store.pushMessage("Connection lost, attempting to reconnect...");
+        }
+      },
     });
   }
 

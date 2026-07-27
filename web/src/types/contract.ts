@@ -188,6 +188,7 @@ export type PlacementEdit =
   | { kind: "confirm" };
 
 export type ClientMessage =
+  | { type: "ping" }
   | { type: "action"; kind: "end_turn" }
   | {
       type: "action";

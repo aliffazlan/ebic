@@ -2,6 +2,7 @@ package com.walnutt.web;
 
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
+import java.time.Duration;
 import java.util.Set;
 
 import com.google.gson.JsonElement;
@@ -32,6 +33,18 @@ public final class WebServer {
     private static final int SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
     /** Vite's default dev port. Adjust here (single source of truth) if the frontend's dev port changes. */
     private static final Set<String> ALLOWED_ORIGINS = Set.of("http://localhost:5173");
+    /**
+     * A real match can sit idle for a while (a player thinking through a turn, an
+     * attribute encounter waiting on the other side, someone stepping away) with no
+     * WS traffic in either direction - Jetty's own default WS idle timeout is far
+     * shorter than that and was silently closing sockets mid-match (client saw
+     * "Disconnected from match." with no way back in, since nothing sent traffic to
+     * reset the timer). Set generously long here as defense in depth; the client
+     * also now sends a periodic heartbeat (see GameSocket.ts) so idle timeout
+     * shouldn't be hit in practice at all during a connected, healthy session -
+     * this is the backstop for whatever traffic pattern doesn't anticipate.
+     */
+    private static final Duration WS_IDLE_TIMEOUT = Duration.ofMinutes(20);
 
     private final AuthService auth;
     private final MatchService matches;
@@ -42,7 +55,10 @@ public final class WebServer {
         this.auth = new AuthService(db);
         this.matches = new MatchService(db);
         this.sessions = new GameSessionManager(matches);
-        this.app = Javalin.create(cfg -> cfg.showJavalinBanner = false);
+        this.app = Javalin.create(cfg -> {
+            cfg.showJavalinBanner = false;
+            cfg.jetty.modifyWebSocketServletFactory(factory -> factory.setIdleTimeout(WS_IDLE_TIMEOUT));
+        });
         registerRoutes();
     }
 
@@ -225,8 +241,18 @@ public final class WebServer {
             ctx.send(JsonSupport.messageEnvelope("Malformed message - expected a JSON object."));
             return;
         }
+        JsonObject obj = parsed.getAsJsonObject();
+        // Client heartbeat (see GameSocket.ts) - purely to keep the connection's
+        // traffic non-idle during quiet stretches (see WS_IDLE_TIMEOUT above).
+        // Handled here, before it ever reaches WebInputHandler's per-team queue,
+        // since that queue only expects real game messages - offering a "ping"
+        // onto it would make whichever chooseX call is currently blocked reject
+        // it as "Not expecting a 'ping' message right now." for no reason.
+        if (obj.has("type") && obj.get("type").isJsonPrimitive() && "ping".equals(obj.get("type").getAsString())) {
+            return;
+        }
         try {
-            session.handleMessage(team, parsed.getAsJsonObject());
+            session.handleMessage(team, obj);
         } catch (RuntimeException e) {
             LOG.log(Level.WARNING, "Error handling WS message for match " + session.getMatchId(), e);
             ctx.send(JsonSupport.messageEnvelope("That message could not be processed."));
