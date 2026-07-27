@@ -19,13 +19,17 @@ import com.walnutt.unit.Unit;
  */
 public interface ConcurrentSetupHandler {
     /**
-     * One draft round for this player only (their own pre-allocated pair for this
-     * round - see ConcurrentSetupFlow's upfront allocation). Unlike the old
-     * DraftFlow/Renderer.renderDraftRound split, showing the options and blocking
-     * for the pick are the same call, since there's no cross-player synchronized
-     * reveal moment anymore.
+     * One draft round for this player (their own pre-allocated pair for this round -
+     * see ConcurrentSetupFlow's upfront allocation), plus the opponent's pair for the
+     * same round shown alongside for transparency (the whole pool is already decided
+     * at match start, so showing it costs nothing and needs no synchronization with
+     * the opponent's actual progress - they may not have reached this round yet).
+     * Unlike the old DraftFlow/Renderer.renderDraftRound split, showing the options
+     * and blocking for the pick are the same call, since there's no cross-player
+     * synchronized reveal moment anymore.
      */
-    UnitDefinition choosePick(GameState state, Player player, String roundLabel, List<UnitDefinition> options);
+    UnitDefinition choosePick(GameState state, Player player, String roundLabel,
+                               List<UnitDefinition> options, List<UnitDefinition> opponentOptions);
 
     /**
      * Shows this player their default arrangement (champion/elites/basics already

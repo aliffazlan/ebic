@@ -74,7 +74,7 @@ class TurnManagerEffectExpiryTest {
             }
 
             @Override
-            public Attribute chooseAttribute(GameState s, Unit unit) {
+            public Attribute chooseAttribute(GameState s, Unit unit, Unit opponent) {
                 return Attribute.STRENGTH;
             }
 

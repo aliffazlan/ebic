@@ -17,6 +17,7 @@ import com.walnutt.ability.target.TileTarget;
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.combat.Attribute;
 import com.walnutt.data.UnitDefinition;
+import com.walnutt.game.DefaultArrangement;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
@@ -29,6 +30,7 @@ import com.walnutt.unit.Unit;
 import com.walnutt.web.dto.PlacementStateSnapshot;
 import com.walnutt.web.dto.PlacementUnitSnapshot;
 import com.walnutt.web.dto.PlayerDraftRoundSnapshot;
+import com.walnutt.web.dto.TilePosition;
 import com.walnutt.web.dto.UnitDefinitionSnapshot;
 
 /**
@@ -50,6 +52,9 @@ import com.walnutt.web.dto.UnitDefinitionSnapshot;
  * what the InputHandler methods already rely on.
  */
 public final class WebInputHandler implements InputHandler, ConcurrentSetupHandler {
+    /** See computeLegalPlacementTiles's javadoc for why this value specifically. */
+    private static final int PLACEMENT_ZONE_RADIUS = 6;
+
     private final ChannelHub hub;
     private final UnitIdRegistry ids;
     private final Map<Team, BlockingQueue<JsonObject>> inbox = Map.of(
@@ -111,10 +116,11 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
     }
 
     @Override
-    public Attribute chooseAttribute(GameState state, Unit unit) {
+    public Attribute chooseAttribute(GameState state, Unit unit, Unit opponent) {
         Team team = unit.getTeam();
         JsonObject prompt = promptOf("attribute", team);
         prompt.addProperty("unitId", ids.idFor(unit));
+        prompt.addProperty("opponentUnitId", ids.idFor(opponent));
         sendPrompt(team, prompt);
 
         while (true) {
@@ -201,12 +207,17 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
      * "pick" message shape the old flow used.
      */
     @Override
-    public UnitDefinition choosePick(GameState state, Player player, String roundLabel, List<UnitDefinition> options) {
+    public UnitDefinition choosePick(GameState state, Player player, String roundLabel,
+                                      List<UnitDefinition> options, List<UnitDefinition> opponentOptions) {
         Team team = player.getTeam();
         List<UnitDefinitionSnapshot> optionSnapshots = options.stream()
             .map(GameStateSnapshotMapper::toDefinitionSnapshot)
             .toList();
-        String json = JsonSupport.envelope("draft_round", new PlayerDraftRoundSnapshot(roundLabel, optionSnapshots));
+        List<UnitDefinitionSnapshot> opponentOptionSnapshots = opponentOptions.stream()
+            .map(GameStateSnapshotMapper::toDefinitionSnapshot)
+            .toList();
+        String json = JsonSupport.envelope("draft_round",
+            new PlayerDraftRoundSnapshot(roundLabel, optionSnapshots, opponentOptionSnapshots));
         hub.cacheDraftRound(team, json);
         hub.sendTo(team, json);
 
@@ -241,7 +252,8 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
     public Map<Unit, Position> arrangePlacement(GameState state, Player player, Map<Unit, Position> defaultArrangement) {
         Team team = player.getTeam();
         Map<Unit, Position> working = new LinkedHashMap<>(defaultArrangement);
-        pushPlacementState(team, player, working, false);
+        List<TilePosition> legalTiles = computeLegalPlacementTiles(state, player);
+        pushPlacementState(team, player, working, false, legalTiles);
 
         while (true) {
             JsonObject msg = awaitTyped(team, "placement_edit");
@@ -255,21 +267,42 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             switch (kind) {
                 case "swap" -> {
                     if (applyPlacementSwap(team, working, msg)) {
-                        pushPlacementState(team, player, working, false);
+                        pushPlacementState(team, player, working, false, legalTiles);
                     }
                 }
                 case "move" -> {
-                    if (applyPlacementMove(state, team, working, msg)) {
-                        pushPlacementState(team, player, working, false);
+                    if (applyPlacementMove(state, player, team, working, msg)) {
+                        pushPlacementState(team, player, working, false, legalTiles);
                     }
                 }
                 case "confirm" -> {
-                    pushPlacementState(team, player, working, true);
+                    pushPlacementState(team, player, working, true, legalTiles);
                     return new LinkedHashMap<>(working);
                 }
                 default -> hub.sendTo(team, JsonSupport.messageEnvelope("Unrecognized placement edit kind."));
             }
         }
+    }
+
+    /**
+     * Every walkable tile within PLACEMENT_ZONE_RADIUS of this player's own
+     * DefaultArrangement anchor - the bound a "move" edit must stay inside, and
+     * what the client highlights. Generous relative to what DefaultArrangement
+     * itself actually uses (empirically its 14-unit layout never exceeds
+     * radius 3 from the anchor on a radius-8 map) so there's real room to
+     * rearrange, while still being unambiguously "this player's own corner" -
+     * opposite-corner anchors are 2x map radius apart, so even a radius-6 zone
+     * for both players can never overlap.
+     */
+    private List<TilePosition> computeLegalPlacementTiles(GameState state, Player player) {
+        Position anchor = DefaultArrangement.anchorFor(state, player);
+        List<TilePosition> tiles = new ArrayList<>();
+        for (Tile tile : state.getMap().getTilesInRadius(anchor, PLACEMENT_ZONE_RADIUS)) {
+            if (tile.isWalkable()) {
+                tiles.add(new TilePosition(tile.getPosition().getQ(), tile.getPosition().getR()));
+            }
+        }
+        return tiles;
     }
 
     /** Exchanges two of this player's own working-copy positions. Returns false (and sends a rejection) if invalid. */
@@ -289,16 +322,13 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
 
     /**
      * Relocates one of this player's own working-copy units to any real, walkable
-     * tile not already occupied by one of this player's OTHER working-copy units.
-     * Deliberately checks the working copy's own position set, not real GameMap
+     * tile within PLACEMENT_ZONE_RADIUS of this player's own anchor, not already
+     * occupied by one of this player's OTHER working-copy units. The occupancy
+     * check is against the working copy's own position set, not real GameMap
      * occupancy - nothing has been committed to the real map yet at this point in
-     * the flow, so real-map occupancy would be meaningless here. Deliberately no
-     * zone-radius restriction either (see WebInputHandler's class doc / the task
-     * brief this was written against) - DefaultArrangement's own layout for 14
-     * units doesn't stay within a small fixed radius, so a separate "legal zone"
-     * bound would be inconsistent with where units already start.
+     * the flow, so real-map occupancy would be meaningless here.
      */
-    private boolean applyPlacementMove(GameState state, Team team, Map<Unit, Position> working, JsonObject msg) {
+    private boolean applyPlacementMove(GameState state, Player player, Team team, Map<Unit, Position> working, JsonObject msg) {
         Unit unit = ids.resolve(optString(msg, "unitId"));
         if (unit == null || !working.containsKey(unit)) {
             hub.sendTo(team, JsonSupport.messageEnvelope("That unit isn't yours to place."));
@@ -316,6 +346,11 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             hub.sendTo(team, JsonSupport.messageEnvelope("That tile isn't a legal placement target."));
             return false;
         }
+        Position anchor = DefaultArrangement.anchorFor(state, player);
+        if (state.getMap().getDistance(anchor, target) > PLACEMENT_ZONE_RADIUS) {
+            hub.sendTo(team, JsonSupport.messageEnvelope("That tile is outside your placement area."));
+            return false;
+        }
         for (Map.Entry<Unit, Position> entry : working.entrySet()) {
             if (entry.getKey() != unit && target.equals(entry.getValue())) {
                 hub.sendTo(team, JsonSupport.messageEnvelope("That tile is already occupied by one of your own units."));
@@ -327,7 +362,7 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
     }
 
     /** Pushes this player's own current working arrangement - fog of war, only ever this player's units. */
-    private void pushPlacementState(Team team, Player player, Map<Unit, Position> working, boolean confirmed) {
+    private void pushPlacementState(Team team, Player player, Map<Unit, Position> working, boolean confirmed, List<TilePosition> legalTiles) {
         List<PlacementUnitSnapshot> unitSnapshots = new ArrayList<>();
         for (Unit unit : player.getUnits()) {
             Position pos = working.get(unit);
@@ -340,7 +375,7 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
                 pos.getR()
             ));
         }
-        String json = JsonSupport.envelope("placement_state", new PlacementStateSnapshot(unitSnapshots, confirmed));
+        String json = JsonSupport.envelope("placement_state", new PlacementStateSnapshot(unitSnapshots, confirmed, legalTiles));
         hub.cachePlacementState(team, json);
         hub.sendTo(team, json);
     }

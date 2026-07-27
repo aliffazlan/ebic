@@ -27,10 +27,15 @@ public final class DefaultArrangement {
     private DefaultArrangement() {
     }
 
+    /** The corner tile a player's whole default arrangement is built outward from - exposed so callers (e.g. the web bridge's placement-zone bound) don't have to duplicate this formula. */
+    public static Position anchorFor(GameState state, Player player) {
+        int radius = state.getMap().getRadius();
+        return player.getTeam() == Team.PLAYER_ONE ? new Position(-radius, 0) : new Position(radius, 0);
+    }
+
     public static Map<Unit, Position> compute(GameState state, Player player) {
         GameMap map = state.getMap();
-        int radius = map.getRadius();
-        Position anchor = player.getTeam() == Team.PLAYER_ONE ? new Position(-radius, 0) : new Position(radius, 0);
+        Position anchor = anchorFor(state, player);
 
         Map<Unit, Position> arrangement = new LinkedHashMap<>();
         Set<Position> used = new java.util.HashSet<>();

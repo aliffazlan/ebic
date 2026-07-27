@@ -17,7 +17,8 @@ import com.walnutt.unit.Unit;
 public interface InputHandler {
     ActionChoice chooseAction(GameState state, Player player);
 
-    Attribute chooseAttribute(GameState state, Unit unit);
+    /** {@code opponent} is the other party in this encounter (whichever of attacker/defender isn't {@code unit}) - a UI can use it to show/highlight both sides together. */
+    Attribute chooseAttribute(GameState state, Unit unit, Unit opponent);
 
     /** Draft phase: player picks one of the offered candidates. */
     UnitDefinition choosePick(GameState state, Player player, List<UnitDefinition> options);

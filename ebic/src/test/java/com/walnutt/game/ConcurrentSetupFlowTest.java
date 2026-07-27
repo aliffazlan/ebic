@@ -99,7 +99,8 @@ class ConcurrentSetupFlowTest {
     /** Always picks the first offered option and confirms the default arrangement unedited, instantly. */
     private static class InstantPickHandler implements ConcurrentSetupHandler {
         @Override
-        public UnitDefinition choosePick(GameState state, Player player, String roundLabel, List<UnitDefinition> options) {
+        public UnitDefinition choosePick(GameState state, Player player, String roundLabel,
+                                          List<UnitDefinition> options, List<UnitDefinition> opponentOptions) {
             return options.get(0);
         }
 
@@ -119,7 +120,8 @@ class ConcurrentSetupFlowTest {
         }
 
         @Override
-        public UnitDefinition choosePick(GameState state, Player player, String roundLabel, List<UnitDefinition> options) {
+        public UnitDefinition choosePick(GameState state, Player player, String roundLabel,
+                                          List<UnitDefinition> options, List<UnitDefinition> opponentOptions) {
             sleep();
             return options.get(0);
         }
@@ -149,7 +151,7 @@ class ConcurrentSetupFlowTest {
             }
 
             @Override
-            public com.walnutt.combat.Attribute chooseAttribute(GameState state, Unit unit) {
+            public com.walnutt.combat.Attribute chooseAttribute(GameState state, Unit unit, Unit opponent) {
                 return com.walnutt.combat.Attribute.STRENGTH;
             }
 

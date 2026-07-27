@@ -49,16 +49,19 @@ class WebInputHandlerTest {
         WebInputHandler input = new WebInputHandler(hub, ids);
 
         Unit defender = new ChampionUnit("Defender", Team.PLAYER_TWO, new UnitStats(10, 10, 10, 100));
+        Unit attacker = new ChampionUnit("Attacker", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100));
         String unitId = ids.idFor(defender);
+        String opponentId = ids.idFor(attacker);
 
         GameMap map = new GameMap(3);
         GameState state = new GameState(map, List.of(new Player("P1", Team.PLAYER_ONE), new Player("P2", Team.PLAYER_TWO)), new Random(1));
 
-        CompletableFuture<Attribute> future = CompletableFuture.supplyAsync(() -> input.chooseAttribute(state, defender));
+        CompletableFuture<Attribute> future = CompletableFuture.supplyAsync(() -> input.chooseAttribute(state, defender, attacker));
 
         waitUntil(() -> !p2Channel.getSent().isEmpty());
         assertTrue(p2Channel.getSent().get(0).contains("\"kind\":\"attribute\""));
         assertTrue(p2Channel.getSent().get(0).contains(unitId));
+        assertTrue(p2Channel.getSent().get(0).contains(opponentId), "opponentUnitId should be included so the client can highlight both sides");
         assertTrue(p1Channel.getSent().isEmpty(), "the prompt is for the defender's (team two's) side, not team one's");
 
         JsonObject response = new JsonObject();

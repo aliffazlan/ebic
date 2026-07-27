@@ -51,17 +51,22 @@ class WebInputHandlerConcurrentSetupTest {
             new UnitDefinition("Valor", "champion", 1100, 60, 50, 60, List.of()),
             new UnitDefinition("Harbinger", "champion", 900, 40, 40, 80, List.of())
         );
+        List<UnitDefinition> opponentOptions = List.of(
+            new UnitDefinition("Chronos", "champion", 1200, 70, 110, 60, List.of()),
+            new UnitDefinition("Zenith", "champion", 950, 15, 60, 74, List.of())
+        );
 
         CompletableFuture<UnitDefinition> future =
-            CompletableFuture.supplyAsync(() -> input.choosePick(state, p1, "Champion", options));
+            CompletableFuture.supplyAsync(() -> input.choosePick(state, p1, "Champion", options, opponentOptions));
         waitUntil(() -> !p1Channel.getSent().isEmpty());
 
         String sent = p1Channel.getSent().get(0);
         assertTrue(sent.contains("\"type\":\"draft_round\""));
         assertTrue(sent.contains("\"roundLabel\":\"Champion\""));
         assertTrue(sent.contains("\"options\""));
-        assertFalse(sent.contains("opponentOptions"), "the new solo draft_round shape has no opponentOptions");
-        assertTrue(p2Channel.getSent().isEmpty(), "the round is only for the player who's actually picking");
+        assertTrue(sent.contains("\"opponentOptions\""), "the opponent's same-round options should be shown for transparency");
+        assertTrue(sent.contains("Chronos"), "opponentOptions should carry the opponent's actual pre-allocated pair");
+        assertTrue(p2Channel.getSent().isEmpty(), "the round is only pushed to the player who's actually picking");
 
         JsonObject pick = new JsonObject();
         pick.addProperty("type", "pick");
@@ -85,9 +90,12 @@ class WebInputHandlerConcurrentSetupTest {
         List<UnitDefinition> options = List.of(
             new UnitDefinition("Valor", "champion", 1100, 60, 50, 60, List.of())
         );
+        List<UnitDefinition> opponentOptions = List.of(
+            new UnitDefinition("Chronos", "champion", 1200, 70, 110, 60, List.of())
+        );
 
         CompletableFuture<UnitDefinition> future =
-            CompletableFuture.supplyAsync(() -> input.choosePick(state, p1, "Champion", options));
+            CompletableFuture.supplyAsync(() -> input.choosePick(state, p1, "Champion", options, opponentOptions));
         waitUntil(() -> !channel.getSent().isEmpty());
 
         JsonObject badPick = new JsonObject();
@@ -144,6 +152,7 @@ class WebInputHandlerConcurrentSetupTest {
         assertTrue(initial.contains("\"type\":\"placement_state\""));
         assertTrue(initial.contains("\"confirmed\":false"));
         assertTrue(initial.contains(championId));
+        assertTrue(initial.contains("\"legalTiles\""), "legalTiles should be included so the client can highlight the placement zone");
         assertTrue(otherChannel.getSent().isEmpty(), "the opponent must never see this player's placement");
 
         // Swap champion and basicA.
@@ -197,6 +206,63 @@ class WebInputHandlerConcurrentSetupTest {
     }
 
     @Test
+    void arrangePlacement_rejectsAMoveOutsideThePlacementZone() throws Exception {
+        ChannelHub hub = new ChannelHub();
+        RecordingChannel channel = new RecordingChannel();
+        hub.register(Team.PLAYER_ONE, channel);
+        UnitIdRegistry ids = new UnitIdRegistry();
+        WebInputHandler input = new WebInputHandler(hub, ids);
+
+        // A big map so there's genuine "outside the zone" territory to test against -
+        // a small map (like the other test's radius 5) would have its whole surface
+        // within PLACEMENT_ZONE_RADIUS of the corner, which wouldn't exercise the check.
+        GameMap map = new GameMap(20);
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Unit champion = new ChampionUnit("Valor", Team.PLAYER_ONE, new UnitStats(60, 50, 60, 1100));
+        p1.addUnit(champion);
+        String championId = ids.idFor(champion);
+
+        GameState state = new GameState(map, List.of(p1, new Player("P2", Team.PLAYER_TWO)), new Random(1));
+
+        Map<Unit, Position> defaultArrangement = new LinkedHashMap<>();
+        defaultArrangement.put(champion, new Position(-20, 0)); // this player's actual corner anchor
+
+        CompletableFuture<Map<Unit, Position>> future =
+            CompletableFuture.supplyAsync(() -> input.arrangePlacement(state, p1, defaultArrangement));
+        waitUntil(() -> !channel.getSent().isEmpty());
+
+        // Center of the map, hexDistance 20 from the anchor - way outside any reasonable zone.
+        JsonObject farMove = new JsonObject();
+        farMove.addProperty("type", "placement_edit");
+        farMove.addProperty("kind", "move");
+        farMove.addProperty("unitId", championId);
+        farMove.addProperty("q", 0);
+        farMove.addProperty("r", 0);
+        input.offer(Team.PLAYER_ONE, farMove);
+        waitUntil(() -> channel.getSent().stream().anyMatch(s -> s.contains("outside your placement area")));
+        long placementPushesAfterReject = channel.getSent().stream().filter(s -> s.contains("\"type\":\"placement_state\"")).count();
+        assertEquals(1, placementPushesAfterReject, "an out-of-zone move must be rejected, not applied");
+
+        // A nearby move (still within the zone) should still work fine.
+        JsonObject nearMove = new JsonObject();
+        nearMove.addProperty("type", "placement_edit");
+        nearMove.addProperty("kind", "move");
+        nearMove.addProperty("unitId", championId);
+        nearMove.addProperty("q", -18);
+        nearMove.addProperty("r", 0);
+        input.offer(Team.PLAYER_ONE, nearMove);
+        waitUntil(() -> channel.getSent().stream().filter(s -> s.contains("\"type\":\"placement_state\"")).count() == 2);
+
+        JsonObject confirm = new JsonObject();
+        confirm.addProperty("type", "placement_edit");
+        confirm.addProperty("kind", "confirm");
+        input.offer(Team.PLAYER_ONE, confirm);
+
+        Map<Unit, Position> result = future.get(2, TimeUnit.SECONDS);
+        assertEquals(new Position(-18, 0), result.get(champion));
+    }
+
+    @Test
     void choosePickAndArrangePlacement_doNotSerializeAcrossTeams() throws Exception {
         ChannelHub hub = new ChannelHub();
         RecordingChannel p1Channel = new RecordingChannel();
@@ -218,9 +284,9 @@ class WebInputHandlerConcurrentSetupTest {
         // Both players' picks are started concurrently on their own background threads,
         // exactly like ConcurrentSetupFlow's two dedicated setup threads would call in.
         CompletableFuture<UnitDefinition> p1Future =
-            CompletableFuture.supplyAsync(() -> input.choosePick(state, p1, "Champion", options));
+            CompletableFuture.supplyAsync(() -> input.choosePick(state, p1, "Champion", options, options));
         CompletableFuture<UnitDefinition> p2Future =
-            CompletableFuture.supplyAsync(() -> input.choosePick(state, p2, "Champion", options));
+            CompletableFuture.supplyAsync(() -> input.choosePick(state, p2, "Champion", options, options));
         waitUntil(() -> !p1Channel.getSent().isEmpty() && !p2Channel.getSent().isEmpty());
 
         // Resolve only team TWO's pick. If this class accidentally shared a single

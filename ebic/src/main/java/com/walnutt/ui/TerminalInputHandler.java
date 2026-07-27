@@ -109,9 +109,9 @@ public class TerminalInputHandler implements InputHandler {
     }
 
     @Override
-    public Attribute chooseAttribute(GameState state, Unit unit) {
-        System.out.printf("%s (%s) choose an attribute: [0] Strength [1] Agility [2] Intelligence: ",
-            unit.getName(), unit.getTeam());
+    public Attribute chooseAttribute(GameState state, Unit unit, Unit opponent) {
+        System.out.printf("%s (%s) vs %s (%s) - choose an attribute: [0] Strength [1] Agility [2] Intelligence: ",
+            unit.getName(), unit.getTeam(), opponent.getName(), opponent.getTeam());
         String line = scanner.nextLine().trim();
         return switch (line) {
             case "1" -> Attribute.AGILITY;

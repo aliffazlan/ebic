@@ -47,9 +47,10 @@ public final class ConcurrentSetupFlow {
         List<Throwable> failures = Collections.synchronizedList(new ArrayList<>());
         for (Player player : state.getPlayers()) {
             List<List<UnitDefinition>> rounds = allocation.get(player.getTeam());
+            List<List<UnitDefinition>> opponentRounds = allocation.get(otherTeam(state, player.getTeam()));
             Thread thread = new Thread(() -> {
                 try {
-                    runOnePlayerSetup(state, player, rounds, handler);
+                    runOnePlayerSetup(state, player, rounds, opponentRounds, handler);
                 } catch (RuntimeException e) {
                     failures.add(e);
                 }
@@ -100,9 +101,9 @@ public final class ConcurrentSetupFlow {
     }
 
     private static void runOnePlayerSetup(GameState state, Player player, List<List<UnitDefinition>> rounds,
-                                           ConcurrentSetupHandler handler) {
+                                           List<List<UnitDefinition>> opponentRounds, ConcurrentSetupHandler handler) {
         for (int i = 0; i < rounds.size(); i++) {
-            UnitDefinition pick = handler.choosePick(state, player, ROUND_LABELS.get(i), rounds.get(i));
+            UnitDefinition pick = handler.choosePick(state, player, ROUND_LABELS.get(i), rounds.get(i), opponentRounds.get(i));
             player.addUnit(UnitFactory.createFromDefinition(pick, player.getTeam(), state.getAbilityDefinitions()));
         }
         for (int i = 1; i <= BASIC_COUNT; i++) {
@@ -121,6 +122,15 @@ public final class ConcurrentSetupFlow {
                 state.getMap().moveUnit(entry.getKey(), tile);
             }
         }
+    }
+
+    private static Team otherTeam(GameState state, Team team) {
+        for (Player player : state.getPlayers()) {
+            if (player.getTeam() != team) {
+                return player.getTeam();
+            }
+        }
+        throw new IllegalStateException("No opponent team found for " + team);
     }
 
     private static List<UnitDefinition> drawTwo(List<UnitDefinition> pool) {

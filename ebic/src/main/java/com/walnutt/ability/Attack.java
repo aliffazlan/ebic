@@ -41,8 +41,8 @@ public class Attack extends Ability {
     public void onUse(GameState state, Target target) {
         Unit defender = ((UnitTarget) target).getUnit();
 
-        Attribute attackerChoice = state.getInputHandler().chooseAttribute(state, owner);
-        Attribute defenderChoice = state.getInputHandler().chooseAttribute(state, defender);
+        Attribute attackerChoice = state.getInputHandler().chooseAttribute(state, owner, defender);
+        Attribute defenderChoice = state.getInputHandler().chooseAttribute(state, defender, owner);
 
         CombatEngine.performAttack(state, owner, defender, attackerChoice, defenderChoice);
 
