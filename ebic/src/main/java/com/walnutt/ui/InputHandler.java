@@ -20,6 +20,20 @@ public interface InputHandler {
     /** {@code opponent} is the other party in this encounter (whichever of attacker/defender isn't {@code unit}) - a UI can use it to show/highlight both sides together. */
     Attribute chooseAttribute(GameState state, Unit unit, Unit opponent);
 
+    /**
+     * Requests both sides' attribute picks for one encounter. Default is sequential
+     * (attacker asked, then defender) - correct for a single shared terminal, where
+     * there's no real "simultaneity" to offer anyway. A networked handler with two
+     * independent human seats (see WebInputHandler) should override this to request
+     * both picks concurrently, so neither player waits on the other's answer before
+     * even seeing the prompt.
+     */
+    default Attribute[] chooseAttributePair(GameState state, Unit attacker, Unit defender) {
+        Attribute attackerChoice = chooseAttribute(state, attacker, defender);
+        Attribute defenderChoice = chooseAttribute(state, defender, attacker);
+        return new Attribute[] { attackerChoice, defenderChoice };
+    }
+
     /** Draft phase: player picks one of the offered candidates. */
     UnitDefinition choosePick(GameState state, Player player, List<UnitDefinition> options);
 

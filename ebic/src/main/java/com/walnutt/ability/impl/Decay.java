@@ -42,7 +42,9 @@ public class Decay extends PassiveAbility {
             getOwner().addPermanentModifier(StatModifier.flat(Stat.MAX_HEALTH, healthSteal, this));
             victim.addPermanentModifier(StatModifier.flat(Stat.STRENGTH, -strengthSteal, this));
             getOwner().addPermanentModifier(StatModifier.flat(Stat.STRENGTH, strengthSteal, this));
-            victim.takeDamage(state, new DamageEvent(getOwner(), victim, healthSteal));
+            DamageEvent decayDamage = new DamageEvent(getOwner(), victim, healthSteal);
+            decayDamage.setCauseLabel("Decay");
+            victim.takeDamage(state, decayDamage);
         }
     }
 }

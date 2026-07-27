@@ -139,6 +139,32 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
         }
     }
 
+    /**
+     * Requests both sides' attribute picks concurrently (one thread per team) instead
+     * of the InputHandler default's sequential behavior - so both players see the
+     * encounter strobe/modal at the same moment rather than the defender only finding
+     * out after the attacker has already answered. Safe by the same reasoning as
+     * ConcurrentSetupFlow's thread-per-player setup: attacker and defender are always
+     * on different teams (Attack.canUse rejects same-team targets), so the two
+     * chooseAttribute calls only ever touch their own team's queue/channel.
+     */
+    @Override
+    public Attribute[] chooseAttributePair(GameState state, Unit attacker, Unit defender) {
+        Attribute[] results = new Attribute[2];
+        Thread attackerThread = new Thread(() -> results[0] = chooseAttribute(state, attacker, defender));
+        Thread defenderThread = new Thread(() -> results[1] = chooseAttribute(state, defender, attacker));
+        attackerThread.start();
+        defenderThread.start();
+        try {
+            attackerThread.join();
+            defenderThread.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for attribute choices", e);
+        }
+        return results;
+    }
+
     @Override
     public UnitDefinition choosePick(GameState state, Player player, List<UnitDefinition> options) {
         Team team = player.getTeam();

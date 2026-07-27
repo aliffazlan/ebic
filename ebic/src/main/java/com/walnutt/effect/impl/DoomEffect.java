@@ -20,7 +20,11 @@ public class DoomEffect extends Effect {
     private int currentDamage;
 
     public DoomEffect(Unit source, int baseDamage, int damageIncrease) {
-        super("Doom", Effect.PERMANENT);
+        super("Doom",
+            "A curse that silences its target and deals " + baseDamage + " damage at the start of each "
+                + "of its turns, increasing by " + damageIncrease + " every turn. Lasts until the "
+                + "cursed unit lands a kill.",
+            Effect.PERMANENT);
         this.source = source;
         this.currentDamage = baseDamage;
         this.damageIncrease = damageIncrease;
@@ -38,7 +42,9 @@ public class DoomEffect extends Effect {
         if (owner == null || isExpired() || owner.isDead() || event.team() != owner.getTeam()) {
             return;
         }
-        owner.takeDamage(state, new DamageEvent(source, owner, currentDamage));
+        DamageEvent damageEvent = new DamageEvent(source, owner, currentDamage);
+        damageEvent.setCauseLabel("Doom");
+        owner.takeDamage(state, damageEvent);
         currentDamage += damageIncrease;
     }
 

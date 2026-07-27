@@ -57,7 +57,9 @@ public class Implosion extends Ability {
             .sum();
         int damage = (int) Math.round(totalCooldown * damagePerCooldown);
         if (damage > 0) {
-            target.takeDamage(state, new DamageEvent(owner, target, damage));
+            DamageEvent event = new DamageEvent(owner, target, damage);
+            event.setCauseLabel("Implosion");
+            target.takeDamage(state, event);
         }
     }
 }

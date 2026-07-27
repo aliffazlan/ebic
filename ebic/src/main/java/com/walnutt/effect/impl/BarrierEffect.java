@@ -15,8 +15,8 @@ import com.walnutt.status.EffectCategory;
 public class BarrierEffect extends Effect {
     private int remainingBarrierHp;
 
-    public BarrierEffect(String name, int duration, int barrierHp) {
-        super(name, duration);
+    public BarrierEffect(String name, String description, int duration, int barrierHp) {
+        super(name, description, duration);
         this.remainingBarrierHp = barrierHp;
         this.category = EffectCategory.BUFF;
     }

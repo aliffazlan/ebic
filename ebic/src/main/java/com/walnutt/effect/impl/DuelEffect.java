@@ -26,7 +26,13 @@ public class DuelEffect extends Effect {
     private boolean resolved;
 
     public DuelEffect(Unit opponent, int duration, double duelBonus, double duelHealPercent, double winMultiplier) {
-        super("Duel", duration);
+        super("Duel",
+            "Locked in a forced duel: neither unit can act freely, and each is forced to attack the "
+                + "other at the end of its turn. The winner permanently gains " + duelBonus + " to all "
+                + "stats (x" + winMultiplier + " if the loser wasn't a Basic) and heals "
+                + Math.round(duelHealPercent * 100) + "% of max health. Separating the duelists early "
+                + "ends the duel with no reward.",
+            duration);
         this.opponent = opponent;
         this.duelBonus = duelBonus;
         this.duelHealPercent = duelHealPercent;

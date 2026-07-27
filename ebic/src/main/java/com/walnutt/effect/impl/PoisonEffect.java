@@ -13,7 +13,12 @@ public class PoisonEffect extends Effect {
     private final int damagePerTurnRemaining;
 
     public PoisonEffect(Unit source, int duration, int damagePerTurnRemaining) {
-        super("Poison", duration);
+        super("Poison",
+            "Deals poison damage at the start of each of the target's turns, scaling with the turns "
+                + "still remaining on the debuff (" + damagePerTurnRemaining + " damage x turns left). "
+                + "Reapplying while already poisoned extends the duration instead of stacking a new "
+                + "instance.",
+            duration);
         this.source = source;
         this.damagePerTurnRemaining = damagePerTurnRemaining;
         this.category = EffectCategory.DEBUFF;
@@ -36,7 +41,9 @@ public class PoisonEffect extends Effect {
         if (damage <= 0) {
             return;
         }
-        getOwner().takeDamage(state, new DamageEvent(source, getOwner(), damage));
+        DamageEvent damageEvent = new DamageEvent(source, getOwner(), damage);
+        damageEvent.setCauseLabel("Poison");
+        getOwner().takeDamage(state, damageEvent);
     }
 
     /** If the target is already poisoned, stack duration onto the existing instance instead of refreshing it. */

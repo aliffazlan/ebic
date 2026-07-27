@@ -18,6 +18,7 @@ public final class DamageEvent implements GameEvent, Cancellable {
     private Attribute defenderAttribute;
     private boolean bypassInvulnerability;
     private final List<String> logMessages = new ArrayList<>();
+    private String causeLabel;
 
     public DamageEvent(Unit source, Unit target, int damage) {
         this.source = source;
@@ -72,6 +73,15 @@ public final class DamageEvent implements GameEvent, Cancellable {
     /** Lets a source (Sanity's Eclipse, Cold Embrace/Frostbite's own DOT) punch through INVULNERABLE. */
     public void setBypassInvulnerability(boolean bypassInvulnerability) {
         this.bypassInvulnerability = bypassInvulnerability;
+    }
+
+    /** Human-readable source of this damage (e.g. "Attack", "Poison", "Counterstrike") for the combat log. Null if unset. */
+    public String getCauseLabel() {
+        return causeLabel;
+    }
+
+    public void setCauseLabel(String causeLabel) {
+        this.causeLabel = causeLabel;
     }
 
     public List<String> getLogMessages() {

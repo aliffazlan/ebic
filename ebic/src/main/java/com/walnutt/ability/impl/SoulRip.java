@@ -43,7 +43,9 @@ public class SoulRip extends Ability {
             if (other.getTeam() == owner.getTeam()) {
                 other.heal(state, amount);
             } else {
-                other.takeDamage(state, new DamageEvent(owner, other, amount));
+                DamageEvent event = new DamageEvent(owner, other, amount);
+                event.setCauseLabel("Soul Rip");
+                other.takeDamage(state, event);
             }
         }
 

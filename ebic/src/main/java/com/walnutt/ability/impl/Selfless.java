@@ -36,6 +36,8 @@ public class Selfless extends PassiveAbility {
             return;
         }
         event.modifyDamage(-redirected);
-        owner.takeDamage(state, new DamageEvent(event.getSource(), owner, redirected));
+        DamageEvent redirectedDamage = new DamageEvent(event.getSource(), owner, redirected);
+        redirectedDamage.setCauseLabel("Selfless");
+        owner.takeDamage(state, redirectedDamage);
     }
 }

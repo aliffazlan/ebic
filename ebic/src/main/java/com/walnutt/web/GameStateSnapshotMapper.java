@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.walnutt.ability.Ability;
 import com.walnutt.data.UnitDefinition;
+import com.walnutt.effect.Effect;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Position;
 import com.walnutt.status.Stat;
@@ -11,6 +12,7 @@ import com.walnutt.status.StatusFlag;
 import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitType;
 import com.walnutt.web.dto.AbilitySnapshot;
+import com.walnutt.web.dto.EffectSnapshot;
 import com.walnutt.web.dto.GameStateSnapshot;
 import com.walnutt.web.dto.UnitDefinitionSnapshot;
 import com.walnutt.web.dto.UnitSnapshot;
@@ -51,6 +53,9 @@ public final class GameStateSnapshotMapper {
             .filter(unit::hasStatus)
             .map(Enum::name)
             .toList();
+        List<EffectSnapshot> effects = unit.getEffects().stream()
+            .map(this::toEffectSnapshot)
+            .toList();
 
         return new UnitSnapshot(
             ids.idFor(unit),
@@ -69,7 +74,20 @@ public final class GameStateSnapshotMapper {
             unit.hasMovedThisTurn(),
             unit.hasAttackedThisTurn(),
             statusFlags,
-            abilities
+            abilities,
+            effects
+        );
+    }
+
+    private EffectSnapshot toEffectSnapshot(Effect effect) {
+        boolean permanent = effect.getRemainingTurns() >= Effect.PERMANENT;
+        return new EffectSnapshot(
+            effect.getName(),
+            effect.getDescription(),
+            effect.getCategory().name(),
+            permanent,
+            permanent ? 0 : effect.getRemainingTurns(),
+            effect.getStatusFlags().stream().map(Enum::name).toList()
         );
     }
 

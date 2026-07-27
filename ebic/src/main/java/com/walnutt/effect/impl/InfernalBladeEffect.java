@@ -18,7 +18,10 @@ public class InfernalBladeEffect extends Effect {
     private final Unit source;
 
     public InfernalBladeEffect(Unit source, int duration) {
-        super("Infernal Blade", duration);
+        super("Infernal Blade",
+            "A stacking curse that disarms the target. The countdown only ticks down on turns the "
+                + "cursed unit ends away from Lucifer - staying adjacent to him pauses it.",
+            duration);
         this.source = source;
         this.flags.add(StatusFlag.DISARMED);
         this.category = EffectCategory.DEBUFF;

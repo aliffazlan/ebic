@@ -41,6 +41,8 @@ public class Refraction extends PassiveAbility {
         Unit newTarget = redirectTarget.get();
         int amount = event.getDamage();
         event.cancel();
-        newTarget.takeDamage(state, new DamageEvent(event.getSource(), newTarget, amount));
+        DamageEvent redirected = new DamageEvent(event.getSource(), newTarget, amount);
+        redirected.setCauseLabel("Refraction");
+        newTarget.takeDamage(state, redirected);
     }
 }

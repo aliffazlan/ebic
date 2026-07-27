@@ -32,7 +32,11 @@ public class CloakEffect extends Effect {
     private final double damagePenalty;
 
     public CloakEffect(int duration, double damagePenalty) {
-        super("Cloak and Dagger", duration);
+        super("Cloak and Dagger",
+            "Evayne vanishes - hidden and invulnerable - occupying the tile she cast this on. Any enemy "
+                + "caught on that exact tile, now or later, is ambushed for reduced damage; she reappears "
+                + "on the nearest free tile once the effect ends.",
+            duration);
         this.damagePenalty = damagePenalty;
         this.flags.add(StatusFlag.HIDDEN);
         this.flags.add(StatusFlag.INVULNERABLE);
@@ -56,6 +60,7 @@ public class CloakEffect extends Effect {
     public void ambushAttack(GameState state, Unit target) {
         Encounter encounter = new WeightedEncounter(getOwner(), target);
         DamageEvent event = RESOLVER.resolve(state, encounter);
+        event.setCauseLabel("Cloak and Dagger");
         event.multiplyDamage(1 - damagePenalty);
         target.takeDamage(state, event);
     }

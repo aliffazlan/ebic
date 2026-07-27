@@ -24,7 +24,12 @@ public class StaticLinkEffect extends Effect {
     private DamageDealtModifierEffect targetDebuff;
 
     public StaticLinkEffect(Unit caster, Unit target, int damageStealPerTurn, int lingerDuration) {
-        super("Static Link", Effect.PERMANENT);
+        super("Static Link",
+            "A persistent link to the target: steals a growing amount of damage from it and grants a "
+                + "free attack against it at the end of each of Discharge's turns, until he ends a turn "
+                + "no longer adjacent to it (the drain/buff then lingers " + lingerDuration
+                + " more turn(s) before fading).",
+            Effect.PERMANENT);
         this.caster = caster;
         this.target = target;
         this.damageStealPerTurn = damageStealPerTurn;
@@ -46,8 +51,14 @@ public class StaticLinkEffect extends Effect {
             return;
         }
         if (casterBuff == null) {
-            casterBuff = new DamageDealtModifierEffect("Static Link Charge", Effect.PERMANENT, 0);
-            targetDebuff = new DamageDealtModifierEffect("Static Link Drain", Effect.PERMANENT, 0);
+            casterBuff = new DamageDealtModifierEffect("Static Link Charge",
+                "Increases Discharge's outgoing damage while Static Link drains the target; "
+                    + "grows every one of his turns and lingers briefly after the link breaks.",
+                Effect.PERMANENT, 0);
+            targetDebuff = new DamageDealtModifierEffect("Static Link Drain",
+                "Reduces the linked target's outgoing damage while Static Link is active; "
+                    + "grows every one of Discharge's turns and lingers briefly after the link breaks.",
+                Effect.PERMANENT, 0);
             caster.addEffect(casterBuff);
             target.addEffect(targetDebuff);
         }

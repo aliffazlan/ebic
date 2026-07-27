@@ -20,7 +20,12 @@ public class FeastEffect extends Effect {
     private final int rootDuration;
 
     public FeastEffect(int duration, int attacksPerTurn, double lifestealPercent, int rootDuration) {
-        super("Feast", duration);
+        super("Feast",
+            "Grivath is rooted in place but automatically makes " + attacksPerTurn + " free attacks "
+                + "against random adjacent enemies each of his turns, healing for "
+                + Math.round(lifestealPercent * 100) + "% of the damage dealt and rooting each victim "
+                + "for " + rootDuration + " turn(s) afterward.",
+            duration);
         this.attacksPerTurn = attacksPerTurn;
         this.lifestealPercent = lifestealPercent;
         this.rootDuration = rootDuration;

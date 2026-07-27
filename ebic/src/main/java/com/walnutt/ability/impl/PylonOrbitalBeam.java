@@ -29,6 +29,10 @@ public class PylonOrbitalBeam extends PassiveAbility {
 
         state.getMap().randomUnitInRadius(owner.getPosition(), radius,
                 u -> u.getTeam() != owner.getTeam() && !u.isDead(), state.getRandom())
-            .ifPresent(target -> target.takeDamage(state, new DamageEvent(owner, target, beam.getDamage())));
+            .ifPresent(target -> {
+                DamageEvent beamDamage = new DamageEvent(owner, target, beam.getDamage());
+                beamDamage.setCauseLabel("Pylon Orbital Beam");
+                target.takeDamage(state, beamDamage);
+            });
     }
 }

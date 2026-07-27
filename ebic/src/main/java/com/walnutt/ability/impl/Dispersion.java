@@ -33,7 +33,9 @@ public class Dispersion extends PassiveAbility {
 
         for (Unit enemy : state.getMap().getUnitsInRadius(owner.getPosition(), radius)) {
             if (enemy.getTeam() != owner.getTeam() && !enemy.isDead()) {
-                enemy.takeDamage(state, new DamageEvent(owner, enemy, reflected));
+                DamageEvent reflectDamage = new DamageEvent(owner, enemy, reflected);
+                reflectDamage.setCauseLabel("Dispersion");
+                enemy.takeDamage(state, reflectDamage);
             }
         }
     }

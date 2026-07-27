@@ -42,7 +42,9 @@ public class OverwhelmingOdds extends Ability {
             int damage = (int) Math.round(diff * diffDamage);
             for (Unit unit : unitsInArea) {
                 if (unit.getTeam() != owner.getTeam()) {
-                    unit.takeDamage(state, new DamageEvent(owner, unit, damage));
+                    DamageEvent event = new DamageEvent(owner, unit, damage);
+                    event.setCauseLabel("Overwhelming Odds");
+                    unit.takeDamage(state, event);
                 }
             }
         } else if (diff < 0) {

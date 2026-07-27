@@ -18,7 +18,11 @@ public class PsychicProjectionEffect extends Effect {
     private final Player player;
 
     public PsychicProjectionEffect(Unit clone, Player player, int duration) {
-        super("Psychic Projection", duration);
+        super("Psychic Projection",
+            "Stuns Lanaya for the duration while her invulnerable psychic clone acts independently on "
+                + "the battlefield; when the effect ends, the clone is removed from the board and from "
+                + "her roster.",
+            duration);
         this.clone = clone;
         this.player = player;
         this.flags.add(StatusFlag.STUNNED);

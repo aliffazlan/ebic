@@ -10,7 +10,10 @@ public class HolyShieldBarrierEffect extends BarrierEffect {
     private final int radius;
 
     public HolyShieldBarrierEffect(int duration, int barrierHp, int breakDamage, int radius) {
-        super("Holy Shield", duration, barrierHp);
+        super("Holy Shield",
+            "Absorbs up to " + barrierHp + " damage; if the barrier breaks before it expires, "
+                + "clears this unit's debuffs and blasts nearby enemies for " + breakDamage + " damage.",
+            duration, barrierHp);
         this.breakDamage = breakDamage;
         this.radius = radius;
     }
@@ -24,7 +27,9 @@ public class HolyShieldBarrierEffect extends BarrierEffect {
         owner.dispelDebuffs(state);
         for (Unit enemy : state.getMap().getUnitsInRadius(owner.getPosition(), radius)) {
             if (enemy.getTeam() != owner.getTeam() && !enemy.isDead()) {
-                enemy.takeDamage(state, new DamageEvent(owner, enemy, breakDamage));
+                DamageEvent event = new DamageEvent(owner, enemy, breakDamage);
+                event.setCauseLabel("Holy Shield");
+                enemy.takeDamage(state, event);
             }
         }
     }

@@ -73,6 +73,48 @@ class WebInputHandlerTest {
     }
 
     @Test
+    void chooseAttributePair_sendsBothPromptsBeforeEitherSideAnswers_provingSimultaneity() throws Exception {
+        ChannelHub hub = new ChannelHub();
+        RecordingChannel p1Channel = new RecordingChannel();
+        RecordingChannel p2Channel = new RecordingChannel();
+        hub.register(Team.PLAYER_ONE, p1Channel);
+        hub.register(Team.PLAYER_TWO, p2Channel);
+
+        UnitIdRegistry ids = new UnitIdRegistry();
+        WebInputHandler input = new WebInputHandler(hub, ids);
+
+        Unit attacker = new ChampionUnit("Attacker", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100));
+        Unit defender = new ChampionUnit("Defender", Team.PLAYER_TWO, new UnitStats(10, 10, 10, 100));
+
+        GameMap map = new GameMap(3);
+        GameState state = new GameState(map, List.of(new Player("P1", Team.PLAYER_ONE), new Player("P2", Team.PLAYER_TWO)), new Random(1));
+
+        CompletableFuture<Attribute[]> future = CompletableFuture.supplyAsync(
+            () -> input.chooseAttributePair(state, attacker, defender));
+
+        // Both teams' prompts must arrive before either team has answered - if the
+        // implementation were secretly sequential (attacker asked, blocked on, THEN
+        // defender asked), p2Channel would still be empty at this point.
+        waitUntil(() -> !p1Channel.getSent().isEmpty() && !p2Channel.getSent().isEmpty());
+        assertTrue(p1Channel.getSent().get(0).contains("\"kind\":\"attribute\""));
+        assertTrue(p2Channel.getSent().get(0).contains("\"kind\":\"attribute\""));
+
+        JsonObject attackerResponse = new JsonObject();
+        attackerResponse.addProperty("type", "attribute");
+        attackerResponse.addProperty("value", "STRENGTH");
+        input.offer(Team.PLAYER_ONE, attackerResponse);
+
+        JsonObject defenderResponse = new JsonObject();
+        defenderResponse.addProperty("type", "attribute");
+        defenderResponse.addProperty("value", "AGILITY");
+        input.offer(Team.PLAYER_TWO, defenderResponse);
+
+        Attribute[] result = future.get(2, TimeUnit.SECONDS);
+        assertEquals(Attribute.STRENGTH, result[0]);
+        assertEquals(Attribute.AGILITY, result[1]);
+    }
+
+    @Test
     void chooseAction_endTurn() throws Exception {
         ChannelHub hub = new ChannelHub();
         hub.register(Team.PLAYER_ONE, new RecordingChannel());

@@ -13,7 +13,10 @@ public class FrostbiteEffect extends Effect {
     private final double killThreshold;
 
     public FrostbiteEffect(Unit source, int duration, double killThreshold) {
-        super("Frostbite", duration);
+        super("Frostbite",
+            "Blocks all healing on the target for the duration; if its health ever drops below "
+                + Math.round(killThreshold * 100) + "% of max, it instantly shatters and dies.",
+            duration);
         this.source = source;
         this.killThreshold = killThreshold;
         this.flags.add(StatusFlag.IMMUNE_TO_HEALING);

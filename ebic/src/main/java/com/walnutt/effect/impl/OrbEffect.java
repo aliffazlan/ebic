@@ -21,7 +21,11 @@ public class OrbEffect extends Effect {
     private final double intDiffMultiplier;
 
     public OrbEffect(Unit caster, Position targetPosition, int delay, int radius, double intDiffMultiplier) {
-        super("Sanity's Eclipse (pending)", delay);
+        super("Sanity's Eclipse (pending)",
+            "A delayed psionic orb that detonates after " + delay + " turn(s), dealing damage to "
+                + "everyone in its blast radius equal to the difference between Harbinger's "
+                + "intelligence and each victim's. Bypasses invulnerability.",
+            delay);
         this.caster = caster;
         this.targetPosition = targetPosition;
         this.radius = radius;
@@ -42,6 +46,7 @@ public class OrbEffect extends Effect {
             }
             DamageEvent event = new DamageEvent(caster, unit, damage);
             event.setBypassInvulnerability(true);
+            event.setCauseLabel("Sanity's Eclipse");
             unit.takeDamage(state, event);
         }
     }

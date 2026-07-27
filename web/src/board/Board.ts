@@ -1,7 +1,7 @@
 // Hex board rendering: layered Containers (board tiles -> units -> vfx -> ui
 // overlay), driven by GameStateSnapshot pushed through GameStateStore.
 
-import { Application, Container, Graphics, Sprite, Text, Ticker } from "pixi.js";
+import { Application, Container, Graphics, Sprite, Ticker } from "pixi.js";
 import { type AxialCoord, axialToPixel, hexPolygonPoints } from "../hex/HexMath";
 import { UnitIconFactory } from "../units/UnitIconFactory";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
@@ -219,6 +219,7 @@ export class Board {
       hasAttackedThisTurn: false,
       statusFlags: [],
       abilities: [],
+      effects: [],
     }));
     void this.applySnapshot({ mapRadius: PLACEMENT_MAP_RADIUS, units: synthetic });
   }
@@ -261,16 +262,9 @@ export class Board {
       new Graphics().rect(-barWidth / 2, barY, barWidth * hpFraction, 5).fill({ color: hpColor }),
     );
 
-    if (unit.statusFlags.length > 0) {
-      const label = new Text({
-        text: unit.statusFlags.map((f) => f.slice(0, 4)).join(" "),
-        style: { fontSize: 8, fill: 0xfacc15, fontFamily: "sans-serif" },
-      });
-      label.anchor.set(0.5, 1);
-      label.position.set(0, -HEX_SIZE / 2 - 3);
-      container.addChild(label);
-    }
-
+    // Active-status display moved entirely into the sidebar effects list (see
+    // Hud.renderUnitPanel) - the board itself no longer renders floating
+    // status-flag text above units, just sprite + HP bar + strobe ring.
     container.alpha = unit.dead ? 0.3 : 1;
 
     const pos = axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE);

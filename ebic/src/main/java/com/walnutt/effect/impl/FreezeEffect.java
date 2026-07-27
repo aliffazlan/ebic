@@ -15,7 +15,11 @@ public class FreezeEffect extends Effect {
     private final boolean targetIsEnemy;
 
     public FreezeEffect(Unit caster, int duration, int amountPerTurn, boolean targetIsEnemy) {
-        super("Cold Embrace", duration);
+        super("Cold Embrace",
+            "Freezes the target - invulnerable but unable to act - for the duration. Deals "
+                + amountPerTurn + " damage each turn if the target is an enemy, or heals that much "
+                + "each turn if it's an ally.",
+            duration);
         this.caster = caster;
         this.amountPerTurn = amountPerTurn;
         this.targetIsEnemy = targetIsEnemy;
@@ -32,6 +36,7 @@ public class FreezeEffect extends Effect {
         if (targetIsEnemy) {
             DamageEvent damageEvent = new DamageEvent(caster, getOwner(), amountPerTurn);
             damageEvent.setBypassInvulnerability(true);
+            damageEvent.setCauseLabel("Cold Embrace");
             getOwner().takeDamage(state, damageEvent);
         } else {
             getOwner().heal(state, amountPerTurn);

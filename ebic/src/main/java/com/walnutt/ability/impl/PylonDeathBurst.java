@@ -31,7 +31,9 @@ public class PylonDeathBurst extends PassiveAbility {
         }
         for (Unit enemy : state.getMap().getAdjacentUnits(owner.getPosition(),
                 u -> u.getTeam() != owner.getTeam() && !u.isDead())) {
-            enemy.takeDamage(state, new DamageEvent(owner, enemy, deathDamage));
+            DamageEvent burstDamage = new DamageEvent(owner, enemy, deathDamage);
+            burstDamage.setCauseLabel("Pylon Collapse");
+            enemy.takeDamage(state, burstDamage);
             enemy.addEffect(new StatusEffect("Pylon Collapse Stun", deathDuration, StatusFlag.STUNNED));
         }
     }

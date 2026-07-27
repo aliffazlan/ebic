@@ -2,6 +2,7 @@ import type { GameStateStore, MatchUiState } from "../state/GameStateStore";
 import type {
   AbilitySnapshot,
   Attribute,
+  EffectSnapshot,
   PlacementUnitSnapshot,
   Team,
   UnitDefinitionSnapshot,
@@ -53,6 +54,7 @@ export class Hud {
     } else {
       this.hudHost.appendChild(this.renderUnitPanel(state, isYourTurn));
     }
+    this.hudHost.appendChild(this.renderCombatLog(state));
     this.hudHost.appendChild(this.renderMessageLog(state));
 
     // Modal overlays, highest priority first.
@@ -149,15 +151,13 @@ export class Hud {
     attrText.textContent = `STR ${unit.strength} · AGI ${unit.agility} · INT ${unit.intelligence}`;
     section.appendChild(attrText);
 
-    if (unit.statusFlags.length > 0) {
-      const statusRow = document.createElement("div");
-      for (const flag of unit.statusFlags) {
-        const chip = document.createElement("span");
-        chip.className = "status-chip";
-        chip.textContent = flag;
-        statusRow.appendChild(chip);
+    if (unit.effects.length > 0) {
+      const effectsRow = document.createElement("div");
+      effectsRow.className = "effects-list";
+      for (const effect of unit.effects) {
+        effectsRow.appendChild(this.renderEffectChip(effect));
       }
-      section.appendChild(statusRow);
+      section.appendChild(effectsRow);
     }
 
     const canAct = unit.team === state.yourTeam && isYourTurn && state.prompt?.kind !== "attribute";
@@ -233,6 +233,58 @@ export class Hud {
       this.actions.selectAbility(ability.id);
     });
     return btn;
+  }
+
+  /**
+   * One effect row for the sidebar unit panel - real effect name (not the
+   * raw StatusFlag names the board used to render), with a native `title`
+   * tooltip carrying the description plus this effect's own concrete
+   * StatusFlags (e.g. "Stunned" carries ["STUNNED"], a pure DOT like
+   * "Poison" may carry none at all) - see API_CONTRACT.md's "Effects
+   * sidebar" section for the exact wording guidance.
+   */
+  private renderEffectChip(effect: EffectSnapshot): HTMLElement {
+    const chip = document.createElement("span");
+    chip.className = `effect-chip effect-${effect.category.toLowerCase()}`;
+    chip.textContent = effect.name;
+
+    const duration = effect.permanent
+      ? "Permanent"
+      : `${effect.remainingTurns} turn${effect.remainingTurns === 1 ? "" : "s"} remaining`;
+    const tooltipLines = [effect.description, duration];
+    if (effect.statusFlags.length > 0) {
+      tooltipLines.push(`Flags: ${effect.statusFlags.join(", ")}`);
+    }
+    chip.title = tooltipLines.filter((line) => line.length > 0).join("\n");
+
+    return chip;
+  }
+
+  private renderCombatLog(state: MatchUiState): HTMLElement {
+    const section = document.createElement("div");
+    section.className = "hud-section combat-log-section";
+    const h3 = document.createElement("h3");
+    h3.textContent = "Combat log";
+    section.appendChild(h3);
+
+    const log = document.createElement("div");
+    log.className = "combat-log";
+    if (state.combatLog.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "hint";
+      empty.textContent = "No damage dealt yet.";
+      log.appendChild(empty);
+    } else {
+      for (const entry of state.combatLog) {
+        const line = document.createElement("div");
+        line.textContent = entry;
+        log.appendChild(line);
+      }
+    }
+    log.scrollTop = log.scrollHeight;
+    section.appendChild(log);
+
+    return section;
   }
 
   private renderMessageLog(state: MatchUiState): HTMLElement {
@@ -404,7 +456,7 @@ export class Hud {
     backdrop.appendChild(panel);
 
     const title = document.createElement("h2");
-    title.textContent = "Choose an attribute";
+    title.textContent = state.attributeSubmitted ? "Attribute chosen" : "Choose an attribute";
     panel.appendChild(title);
 
     // prompt.kind is narrowed to "attribute" by the caller (Hud.render); both
@@ -425,6 +477,19 @@ export class Hud {
 
     encounter.appendChild(this.renderEncounterCard(opponent, state.yourTeam));
     panel.appendChild(encounter);
+
+    // Once this client has sent its own attribute pick, keep the encounter
+    // card up but swap the pick buttons for a waiting message - the other
+    // side may not have answered yet, and there's no separate server signal
+    // for that beyond the absence of a superseding message (see
+    // API_CONTRACT.md's "Waiting for other player" state paragraph).
+    if (state.attributeSubmitted) {
+      const waiting = document.createElement("div");
+      waiting.className = "waiting-banner attribute-waiting-banner";
+      waiting.textContent = "Waiting for other player…";
+      panel.appendChild(waiting);
+      return backdrop;
+    }
 
     const row = document.createElement("div");
     row.className = "attribute-buttons";

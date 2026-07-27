@@ -13,8 +13,8 @@ import com.walnutt.status.EffectCategory;
 public class DamageTakenModifierEffect extends Effect {
     private int totalBonus;
 
-    public DamageTakenModifierEffect(String name, int duration, int initialBonus) {
-        super(name, duration);
+    public DamageTakenModifierEffect(String name, String description, int duration, int initialBonus) {
+        super(name, description, duration);
         this.totalBonus = initialBonus;
         updateCategory();
     }

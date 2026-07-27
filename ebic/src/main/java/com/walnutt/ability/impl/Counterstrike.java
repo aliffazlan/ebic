@@ -53,6 +53,7 @@ public class Counterstrike extends PassiveAbility {
 
         Encounter counter = new NormalEncounter(getOwner(), attacker, counterAttackerAttribute, counterDefenderAttribute);
         DamageEvent counterDamage = RESOLVER.resolve(state, counter);
+        counterDamage.setCauseLabel("Counterstrike");
         counterDamage.multiplyDamage(1 - damageReduction);
 
         int finalDamage = counterDamage.getDamage();

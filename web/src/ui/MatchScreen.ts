@@ -109,18 +109,35 @@ export class MatchScreen implements Screen, MatchActions {
   private handleMessage(msg: ServerMessage): void {
     switch (msg.type) {
       case "state": {
-        const wasGameOver = this.store.getState().gameOver;
+        const priorState = this.store.getState();
+        const wasGameOver = priorState.gameOver;
         this.store.setState({
           snapshot: msg.payload,
           gameOver: msg.payload.gameOver ? wasGameOver : null,
           // A real "state" message means the match has begun for both
           // players - placement is over, drop any lingering placement UI.
           placementState: null,
+          // A "state" push is one of the signals that an in-flight attribute
+          // encounter has resolved (see the "waiting for other player" state
+          // below) - defensive alongside the "vfx" case, which normally gets
+          // there first since vfx always precedes the state it reflects.
+          ...(priorState.prompt?.kind === "attribute" ? { prompt: null, attributeSubmitted: false } : {}),
         });
         break;
       }
       case "vfx":
         this.board?.playVfx(msg.payload);
+        this.store.appendCombatLog(msg.payload);
+        {
+          // The "attribute" prompt's own encounter resolving is signaled by
+          // the next vfx/state push, not by a fresh prompt necessarily aimed
+          // at this client (see API_CONTRACT.md's "waiting for other player"
+          // paragraph) - clear it here so the waiting-state modal closes.
+          const priorPrompt = this.store.getState().prompt;
+          if (priorPrompt?.kind === "attribute") {
+            this.store.setState({ prompt: null, attributeSubmitted: false });
+          }
+        }
         break;
       case "draft_round":
         this.store.setState({ draftRound: msg.payload });
@@ -144,13 +161,13 @@ export class MatchScreen implements Screen, MatchActions {
           // `prompt` yet, since that's what Hud uses to decide to render it.
           const payload = msg.payload;
           this.board?.strobeUnits([payload.unitId, payload.opponentUnitId]);
-          this.store.setState({ selectedAbilityId: null });
+          this.store.setState({ selectedAbilityId: null, attributeSubmitted: false });
           this.pendingAttributePromptTimer = window.setTimeout(() => {
             this.pendingAttributePromptTimer = null;
             this.store.setState({ prompt: payload });
           }, ATTRIBUTE_STROBE_MS);
         } else {
-          this.store.setState({ prompt: msg.payload, selectedAbilityId: null });
+          this.store.setState({ prompt: msg.payload, selectedAbilityId: null, attributeSubmitted: false });
         }
         break;
       }
@@ -256,10 +273,12 @@ export class MatchScreen implements Screen, MatchActions {
     // Real bug fix (see API_CONTRACT.md): a fresh `prompt` only gets pushed
     // to whichever team is next to act - after the *defender* answers, it's
     // not their turn, so nothing ever arrives to replace this stale
-    // `attribute` prompt and the modal would sit open forever. Clear it
-    // immediately and optimistically on send rather than waiting for a
-    // server round-trip that may never come.
-    this.store.setState({ prompt: null });
+    // `attribute` prompt. Keep the prompt (and its encounter card) up, but
+    // flip to the "waiting for other player" state rather than closing the
+    // modal outright - handleMessage clears both `prompt` and
+    // `attributeSubmitted` the moment a vfx/state/new-prompt message signals
+    // the encounter actually resolved.
+    this.store.setState({ attributeSubmitted: true });
   }
 
   sendPick(definitionId: string): void {

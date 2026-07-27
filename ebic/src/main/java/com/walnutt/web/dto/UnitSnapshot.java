@@ -19,6 +19,7 @@ public record UnitSnapshot(
     boolean hasMovedThisTurn,
     boolean hasAttackedThisTurn,
     List<String> statusFlags,
-    List<AbilitySnapshot> abilities
+    List<AbilitySnapshot> abilities,
+    List<EffectSnapshot> effects
 ) {
 }

@@ -13,8 +13,8 @@ import com.walnutt.status.EffectCategory;
 public class DamageDealtModifierEffect extends Effect {
     private int totalBonus;
 
-    public DamageDealtModifierEffect(String name, int duration, int initialBonus) {
-        super(name, duration);
+    public DamageDealtModifierEffect(String name, String description, int duration, int initialBonus) {
+        super(name, description, duration);
         this.totalBonus = initialBonus;
         this.category = initialBonus < 0 ? EffectCategory.DEBUFF : EffectCategory.BUFF;
     }

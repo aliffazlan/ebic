@@ -170,6 +170,13 @@ public class Game {
     }
 
     public void start() {
+        // Baseline render before the very first turn's own TurnStartEvent (which can
+        // trigger turn-1 passive combat, e.g. Dirge's Decay) - without this, a fresh
+        // client's first-ever "state" would already reflect post-combat HP with no
+        // prior snapshot to diff against, and any "vfx" flushed alongside that first
+        // turn's own render() call would have no known unit names to resolve (a real
+        // "Unknown takes N damage" bug observed once this way).
+        renderer.render(state);
         while (!state.isGameOver()) {
             turnManager.takeTurn(state, state.getInputHandler(), renderer);
         }

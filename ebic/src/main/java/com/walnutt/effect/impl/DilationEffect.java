@@ -18,7 +18,11 @@ public class DilationEffect extends Effect {
     private final int radius;
 
     public DilationEffect(int duration, int radius) {
-        super("Dilation", duration);
+        super("Dilation",
+            "A time-dilation field around Chronos: each of his turns, adjacent enemies have their "
+                + "ability cooldowns paused and their buffs tick down twice as fast while their debuffs "
+                + "tick down twice as slow, for 1 turn per pulse.",
+            duration);
         this.radius = radius;
     }
 

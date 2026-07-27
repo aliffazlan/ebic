@@ -39,7 +39,9 @@ public class OrbitalBeam extends Ability {
         if (target instanceof UnitTarget unitTarget) {
             Unit victim = unitTarget.getUnit();
             if (!victim.isDead()) {
-                victim.takeDamage(state, new DamageEvent(owner, victim, damage));
+                DamageEvent event = new DamageEvent(owner, victim, damage);
+                event.setCauseLabel("Orbital Beam");
+                victim.takeDamage(state, event);
             }
         }
 

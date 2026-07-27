@@ -12,15 +12,19 @@ import org.junit.jupiter.api.Test;
 
 import com.walnutt.ability.Attack;
 import com.walnutt.ability.Move;
+import com.walnutt.effect.Effect;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
 import com.walnutt.map.GameMap;
 import com.walnutt.map.Position;
+import com.walnutt.status.EffectCategory;
+import com.walnutt.status.StatusFlag;
 import com.walnutt.unit.BasicUnit;
 import com.walnutt.unit.ChampionUnit;
 import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitStats;
+import com.walnutt.web.dto.EffectSnapshot;
 import com.walnutt.web.dto.GameStateSnapshot;
 import com.walnutt.web.dto.UnitSnapshot;
 
@@ -89,6 +93,44 @@ class GameStateSnapshotMapperTest {
 
         assertEquals(first, second);
         assertEquals(unit, registry.resolve(first));
+    }
+
+    @Test
+    void mapsActiveEffectsWithNameDescriptionCategoryAndFlags() {
+        Unit unit = new ChampionUnit("Cursed", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100));
+        Effect stun = new Effect("Stunned", "Can't act this turn.", 2) {
+            {
+                category = EffectCategory.DEBUFF;
+                flags.add(StatusFlag.STUNNED);
+            }
+        };
+        unit.addEffect(stun);
+
+        GameStateSnapshotMapper mapper = new GameStateSnapshotMapper(new UnitIdRegistry());
+        UnitSnapshot snap = mapper.toUnitSnapshot(unit);
+
+        assertEquals(1, snap.effects().size());
+        EffectSnapshot effectSnap = snap.effects().get(0);
+        assertEquals("Stunned", effectSnap.name());
+        assertEquals("Can't act this turn.", effectSnap.description());
+        assertEquals("DEBUFF", effectSnap.category());
+        assertFalse(effectSnap.permanent());
+        assertEquals(2, effectSnap.remainingTurns());
+        assertTrue(effectSnap.statusFlags().contains("STUNNED"));
+    }
+
+    @Test
+    void permanentEffectIsFlaggedRatherThanExposingItsHugeRemainingTurnsNumber() {
+        Unit unit = new ChampionUnit("Doomed", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100));
+        Effect doom = new Effect("Doom", "Silenced until you land a kill.", Effect.PERMANENT) {
+        };
+        unit.addEffect(doom);
+
+        GameStateSnapshotMapper mapper = new GameStateSnapshotMapper(new UnitIdRegistry());
+        EffectSnapshot effectSnap = mapper.toUnitSnapshot(unit).effects().get(0);
+
+        assertTrue(effectSnap.permanent());
+        assertEquals(0, effectSnap.remainingTurns());
     }
 
     @Test

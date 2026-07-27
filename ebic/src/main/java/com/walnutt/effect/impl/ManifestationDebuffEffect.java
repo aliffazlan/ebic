@@ -11,7 +11,10 @@ public class ManifestationDebuffEffect extends Effect {
     private final double damageReduction;
 
     public ManifestationDebuffEffect(int duration, double damageReduction) {
-        super("Manifestation", duration);
+        super("Manifestation",
+            "Silences the target and reduces its outgoing damage by " + Math.round(damageReduction * 100)
+                + "% for the duration.",
+            duration);
         this.damageReduction = damageReduction;
         this.flags.add(StatusFlag.SILENCED);
         this.category = EffectCategory.DEBUFF;

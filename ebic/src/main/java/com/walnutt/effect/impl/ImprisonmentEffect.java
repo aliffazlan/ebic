@@ -14,7 +14,12 @@ public class ImprisonmentEffect extends Effect {
     private final double intStealPercent;
 
     public ImprisonmentEffect(Unit caster, int duration, double intStealPercent) {
-        super("Oblivion Confinement", duration);
+        super("Oblivion Confinement",
+            "Imprisons the target - stunned and invulnerable - for the duration, stealing "
+                + Math.round(intStealPercent * 100) + "% of its intelligence on application. If the "
+                + "target escapes when the effect expires naturally, another "
+                + Math.round(intStealPercent * 100) + "% is stolen.",
+            duration);
         this.caster = caster;
         this.intStealPercent = intStealPercent;
         this.flags.add(StatusFlag.STUNNED);

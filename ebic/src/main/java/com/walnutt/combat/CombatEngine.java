@@ -33,6 +33,9 @@ public final class CombatEngine {
         }
 
         DamageEvent event = RESOLVER.resolve(state, encounter);
+        if (event.getCauseLabel() == null) {
+            event.setCauseLabel("Attack");
+        }
         encounter.defender().takeDamage(state, event);
 
         state.getEventBus().publish(state, new PostAttackEvent(encounter.attacker(), encounter.defender(), event));

@@ -40,13 +40,18 @@ public class EyeOfTheStorm extends PassiveAbility {
     }
 
     private void strike(GameState state, Unit target) {
-        target.takeDamage(state, new DamageEvent(getOwner(), target, damage));
+        DamageEvent strike = new DamageEvent(getOwner(), target, damage);
+        strike.setCauseLabel("Eye of the Storm");
+        target.takeDamage(state, strike);
         if (target.isDead()) {
             return;
         }
         DamageTakenModifierEffect vulnerability = target.getActiveEffect(DamageTakenModifierEffect.class).orElse(null);
         if (vulnerability == null) {
-            vulnerability = new DamageTakenModifierEffect("Static Charge", Effect.PERMANENT, 0);
+            vulnerability = new DamageTakenModifierEffect("Static Charge",
+                "A permanently stacking vulnerability from Eye of the Storm: increases damage taken "
+                    + "from all sources by " + bonusDamage + " per stack.",
+                Effect.PERMANENT, 0);
             target.addEffect(vulnerability);
         }
         vulnerability.addStack(bonusDamage);

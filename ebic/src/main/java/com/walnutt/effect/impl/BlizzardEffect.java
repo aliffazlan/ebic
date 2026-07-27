@@ -14,7 +14,11 @@ public class BlizzardEffect extends Effect {
     private final int damagePerTurn;
 
     public BlizzardEffect(Unit source, int duration, int damagePerTurn) {
-        super("Blizzard", duration);
+        super("Blizzard",
+            "Roots the target in place and deals " + damagePerTurn + " damage at the start of each of "
+                + "its turns; casting Blizzard again while it's already active extends the duration "
+                + "instead of applying a second stack.",
+            duration);
         this.source = source;
         this.damagePerTurn = damagePerTurn;
         this.flags.add(StatusFlag.ROOTED);
@@ -29,7 +33,9 @@ public class BlizzardEffect extends Effect {
         if (damagePerTurn <= 0) {
             return;
         }
-        getOwner().takeDamage(state, new DamageEvent(source, getOwner(), damagePerTurn));
+        DamageEvent damageEvent = new DamageEvent(source, getOwner(), damagePerTurn);
+        damageEvent.setCauseLabel("Blizzard");
+        getOwner().takeDamage(state, damageEvent);
     }
 
     /** "If the target is already affected by blizzard, the duration is increased." */

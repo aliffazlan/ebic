@@ -59,7 +59,10 @@ public class Dislocation extends Ability {
                 ability.decreaseCooldown(1);
             }
         }
-        owner.addEffect(new BarrierEffect("Dislocation Barrier", barrierDuration, barrierHp));
+        owner.addEffect(new BarrierEffect("Dislocation Barrier",
+            "Absorbs up to " + barrierHp + " damage before it reaches Zenith's health, gained after "
+                + "teleporting to and destroying a pylon.",
+            barrierDuration, barrierHp));
 
         state.spendMoves(getMoveCost(state));
         resetToMax();

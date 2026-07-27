@@ -49,6 +49,17 @@ export interface AbilitySnapshot {
   maxCooldown: number;
 }
 
+// Active effect on a unit, for the sidebar effects list (replaces rendering
+// statusFlags directly - see API_CONTRACT.md's "Effects sidebar" section).
+export interface EffectSnapshot {
+  name: string;
+  description: string;
+  category: "BUFF" | "DEBUFF" | "NEUTRAL";
+  permanent: boolean;
+  remainingTurns: number;
+  statusFlags: string[];
+}
+
 export interface UnitSnapshot {
   id: string;
   name: string;
@@ -66,8 +77,11 @@ export interface UnitSnapshot {
   dead: boolean;
   hasMovedThisTurn: boolean;
   hasAttackedThisTurn: boolean;
+  // Kept for internal blocks-this-action checks, but the UI should no longer
+  // render these raw names directly - use `effects` below instead.
   statusFlags: string[];
   abilities: AbilitySnapshot[];
+  effects: EffectSnapshot[];
 }
 
 export interface GameStateSnapshot {
@@ -86,6 +100,9 @@ export interface VfxEvent {
   sourceUnitId: string | null;
   targetUnitId: string | null;
   amount: number | null;
+  // Only set on "damage" events - human-readable damage source for the
+  // combat log, e.g. "Attack", "Poison", "Counterstrike".
+  causeLabel: string | null;
 }
 
 export interface UnitDefinitionSnapshot {

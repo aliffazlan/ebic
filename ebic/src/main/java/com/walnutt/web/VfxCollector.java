@@ -46,6 +46,7 @@ public final class VfxCollector extends TriggerHandler {
             Identifiers.normalize(event.ability().getName()),
             event.user() == null ? null : ids.idFor(event.user()),
             targetId,
+            null,
             null
         ));
     }
@@ -58,19 +59,20 @@ public final class VfxCollector extends TriggerHandler {
             null,
             source == null ? null : ids.idFor(source),
             ids.idFor(event.target()),
-            event.damageEvent().getDamage()
+            event.damageEvent().getDamage(),
+            event.damageEvent().getCauseLabel()
         ));
     }
 
     @Override
     public void onDeath(GameState state, DeathEvent event) {
-        buffered.add(new VfxEvent("death", null, null, ids.idFor(event.unit()), null));
+        buffered.add(new VfxEvent("death", null, null, ids.idFor(event.unit()), null, null));
     }
 
     @Override
     public void onStatusApplied(GameState state, StatusAppliedEvent event) {
         String sourceId = event.source() instanceof Unit sourceUnit ? ids.idFor(sourceUnit) : null;
-        buffered.add(new VfxEvent("status_applied", null, sourceId, ids.idFor(event.unit()), null));
+        buffered.add(new VfxEvent("status_applied", null, sourceId, ids.idFor(event.unit()), null, null));
     }
 
     @Override
@@ -80,7 +82,8 @@ public final class VfxCollector extends TriggerHandler {
             null,
             event.getSource() == null ? null : ids.idFor(event.getSource()),
             ids.idFor(event.getTarget()),
-            event.getAmount()
+            event.getAmount(),
+            null
         ));
     }
 
