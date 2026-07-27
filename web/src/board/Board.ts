@@ -22,6 +22,7 @@ const STROBE_RING_COLOR = 0xf97316;
 // deltaMS-based timing, for consistency with that existing pattern.
 const STROBE_TOGGLE_FRAMES = 9; // ~150ms per on/off half-cycle
 const STROBE_TOTAL_FRAMES = 108; // ~1.8s total, within the ~1.5-2s target
+const MOVE_TWEEN_FRAMES = 20; // ~330ms at 60fps - short slide, not a full animation set piece
 
 // PlacementStateSnapshot carries no map radius (see API_CONTRACT.md) -
 // placement always happens before the first real GameStateSnapshot, which is
@@ -60,6 +61,10 @@ export class Board {
   // Tracked so destroy() can stop any in-flight strobe tickers rather than
   // leaving Ticker.shared calling back into a destroyed Board.
   private activeStrobeTicks = new Set<() => void>();
+  // Keyed by unitId (unlike activeStrobeTicks) so a second position update
+  // arriving mid-tween can look up and cancel the unit's own in-flight move
+  // tween rather than fighting it - see animateUnitMove.
+  private activeMoveTicks = new Map<string, () => void>();
 
   constructor(app: Application, store: GameStateStore, callbacks: BoardCallbacks) {
     this.app = app;
@@ -87,6 +92,8 @@ export class Board {
     this.unsubscribe();
     for (const tick of this.activeStrobeTicks) Ticker.shared.remove(tick);
     this.activeStrobeTicks.clear();
+    for (const tick of this.activeMoveTicks.values()) Ticker.shared.remove(tick);
+    this.activeMoveTicks.clear();
     this.root.destroy({ children: true });
   }
 
@@ -185,6 +192,11 @@ export class Board {
     }
     for (const [id, sprite] of this.unitSprites) {
       if (!seen.has(id)) {
+        const tick = this.activeMoveTicks.get(id);
+        if (tick) {
+          Ticker.shared.remove(tick);
+          this.activeMoveTicks.delete(id);
+        }
         sprite.destroy({ children: true });
         this.unitSprites.delete(id);
       }
@@ -225,6 +237,12 @@ export class Board {
   }
 
   private async upsertUnit(unit: UnitSnapshot): Promise<void> {
+    // Knowable before the lookup/creation branch below - covers both a
+    // unit's very first appearance and a fog-of-war reveal (the opponent's
+    // roster only ever appearing once the match actually starts). A reveal
+    // shouldn't slide in from some arbitrary prior spot, so this is the flag
+    // that decides "place immediately" vs "animate a slide" at the bottom.
+    const isNewUnit = !this.unitSprites.has(unit.id);
     let container = this.unitSprites.get(unit.id);
     if (!container) {
       container = new Container();
@@ -268,7 +286,53 @@ export class Board {
     container.alpha = unit.dead ? 0.3 : 1;
 
     const pos = axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE);
-    container.position.set(pos.x, pos.y);
+    if (isNewUnit) {
+      // First appearance / fog-of-war reveal - place immediately, no slide.
+      container.position.set(pos.x, pos.y);
+    } else if (container.position.x !== pos.x || container.position.y !== pos.y) {
+      // Generic "did this unit's position change" check - covers the plain
+      // Move ability, Backtrack, Dislocation, Cloak and Dagger's teleport,
+      // anything, since they all just result in a different q,r in the next
+      // snapshot. No ability-specific special-casing needed.
+      this.animateUnitMove(unit.id, container, pos);
+    }
+    // else: position is unchanged, leave it exactly where it is (including
+    // mid-tween, if a tween somehow lands on the same target - nothing to do).
+  }
+
+  /**
+   * Slides a unit's container from wherever it's currently visually sitting
+   * to `target`, using the same frame-counted Ticker.shared pattern
+   * strobeSprite already establishes in this file. If a tween for this unit
+   * is already in flight (a second position update arrived before the first
+   * finished), it's cancelled first and the new tween starts from the
+   * sprite's current (mid-tween) position rather than the old target, so the
+   * motion reads as continuous instead of snapping or fighting itself.
+   */
+  private animateUnitMove(unitId: string, container: Container, target: { x: number; y: number }): void {
+    const existingTick = this.activeMoveTicks.get(unitId);
+    if (existingTick) {
+      Ticker.shared.remove(existingTick);
+      this.activeMoveTicks.delete(unitId);
+    }
+
+    const start = { x: container.position.x, y: container.position.y };
+    const dx = target.x - start.x;
+    const dy = target.y - start.y;
+    let elapsed = 0;
+
+    const tick = () => {
+      elapsed += 1;
+      const t = Math.min(1, elapsed / MOVE_TWEEN_FRAMES);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      container.position.set(start.x + dx * eased, start.y + dy * eased);
+      if (t >= 1) {
+        Ticker.shared.remove(tick);
+        this.activeMoveTicks.delete(unitId);
+      }
+    };
+    this.activeMoveTicks.set(unitId, tick);
+    Ticker.shared.add(tick);
   }
 
   /**

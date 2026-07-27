@@ -26,6 +26,11 @@ public class BarrierEffect extends Effect {
     }
 
     @Override
+    public String getExtraInfo() {
+        return "Barrier: " + remainingBarrierHp + " HP remaining";
+    }
+
+    @Override
     public void onIncomingDamage(GameState state, DamageEvent event) {
         if (getOwner() == null || isExpired() || event.getTarget() != getOwner() || remainingBarrierHp <= 0) {
             return;

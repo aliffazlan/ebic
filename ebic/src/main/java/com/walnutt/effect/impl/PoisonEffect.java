@@ -33,6 +33,12 @@ public class PoisonEffect extends Effect {
     }
 
     @Override
+    public String getExtraInfo() {
+        int nextTick = damagePerTurnRemaining * getRemainingTurns();
+        return "Next tick: " + nextTick + " damage";
+    }
+
+    @Override
     public void onTurnStart(GameState state, TurnStartEvent event) {
         if (getOwner() == null || isExpired() || event.team() != getOwner().getTeam()) {
             return;

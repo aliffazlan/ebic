@@ -29,6 +29,16 @@ public class DamageDealtModifierEffect extends Effect {
     }
 
     @Override
+    public String getExtraInfo() {
+        if (totalBonus == 0) {
+            return null;
+        }
+        return totalBonus > 0
+            ? "Currently dealing +" + totalBonus + " damage"
+            : "Currently dealing " + totalBonus + " less damage";
+    }
+
+    @Override
     public void onIncomingDamage(GameState state, DamageEvent event) {
         if (getOwner() == null || isExpired() || event.getSource() != getOwner() || totalBonus == 0) {
             return;

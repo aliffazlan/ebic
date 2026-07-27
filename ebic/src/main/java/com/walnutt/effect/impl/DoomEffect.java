@@ -37,6 +37,11 @@ public class DoomEffect extends Effect {
     }
 
     @Override
+    public String getExtraInfo() {
+        return "Next hit: " + currentDamage + " damage";
+    }
+
+    @Override
     public void onTurnStart(GameState state, TurnStartEvent event) {
         Unit owner = getOwner();
         if (owner == null || isExpired() || owner.isDead() || event.team() != owner.getTeam()) {

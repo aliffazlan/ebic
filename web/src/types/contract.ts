@@ -58,6 +58,10 @@ export interface EffectSnapshot {
   permanent: boolean;
   remainingTurns: number;
   statusFlags: string[];
+  // Dynamic per-instance state not captured by the static description, e.g.
+  // "Next hit: 12 damage" (Doom), "Barrier: 8 HP remaining" - null when the
+  // effect has nothing dynamic to add.
+  extraInfo: string | null;
 }
 
 export interface UnitSnapshot {

@@ -117,6 +117,24 @@ class GameStateSnapshotMapperTest {
         assertFalse(effectSnap.permanent());
         assertEquals(2, effectSnap.remainingTurns());
         assertTrue(effectSnap.statusFlags().contains("STUNNED"));
+        assertEquals(null, effectSnap.extraInfo(), "a plain effect with no dynamic state overrides nothing, extraInfo stays null");
+    }
+
+    @Test
+    void mapsExtraInfoForEffectsWithDynamicRuntimeState() {
+        Unit unit = new ChampionUnit("Cursed", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100));
+        Effect stacking = new Effect("Stacking Curse", "Grows stronger each stack.", 3) {
+            @Override
+            public String getExtraInfo() {
+                return "Next hit: 12 damage";
+            }
+        };
+        unit.addEffect(stacking);
+
+        GameStateSnapshotMapper mapper = new GameStateSnapshotMapper(new UnitIdRegistry());
+        EffectSnapshot effectSnap = mapper.toUnitSnapshot(unit).effects().get(0);
+
+        assertEquals("Next hit: 12 damage", effectSnap.extraInfo());
     }
 
     @Test

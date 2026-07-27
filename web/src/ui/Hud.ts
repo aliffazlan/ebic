@@ -19,22 +19,35 @@ export class Hud {
   private matchId: string;
   private store: GameStateStore;
   private actions: MatchActions;
+  // A single persistent tooltip element, appended to <body> once rather than
+  // recreated inside render()'s hudHost.innerHTML = "" churn - render() wipes
+  // and rebuilds the whole sidebar on every store update, which would tear
+  // down a tooltip element living inside it mid-hover.
+  private tooltipEl: HTMLDivElement;
 
   constructor(hudHost: HTMLElement, matchId: string, store: GameStateStore, actions: MatchActions) {
     this.hudHost = hudHost;
     this.matchId = matchId;
     this.store = store;
     this.actions = actions;
+    this.tooltipEl = document.createElement("div");
+    this.tooltipEl.className = "effect-tooltip";
+    document.body.appendChild(this.tooltipEl);
     this.unsubscribe = this.store.subscribe((state) => this.render(state));
   }
 
   destroy(): void {
     this.unsubscribe();
     this.hudHost.innerHTML = "";
+    this.tooltipEl.remove();
   }
 
   private render(state: MatchUiState): void {
     this.hudHost.innerHTML = "";
+    // The chip that was being hovered (if any) just got destroyed by the
+    // innerHTML wipe above, so its mouseleave will never fire - hide
+    // explicitly rather than leaving a stale tooltip stuck on screen.
+    this.hideTooltip();
 
     this.hudHost.appendChild(this.renderTopBar(state));
 
@@ -248,51 +261,128 @@ export class Hud {
 
   /**
    * One effect row for the sidebar unit panel - real effect name (not the
-   * raw StatusFlag names the board used to render), with a native `title`
-   * tooltip carrying the description plus this effect's own concrete
-   * StatusFlags (e.g. "Stunned" carries ["STUNNED"], a pure DOT like
-   * "Poison" may carry none at all) - see API_CONTRACT.md's "Effects
-   * sidebar" section for the exact wording guidance.
+   * raw StatusFlag names the board used to render), with a custom hover
+   * tooltip (not a native `title` - inconsistent cross-browser newline
+   * rendering, no styling, slow to appear) carrying the description, turns
+   * remaining, dynamic per-instance state (extraInfo, e.g. "Next hit: 12
+   * damage"), and this effect's own concrete StatusFlags - see
+   * API_CONTRACT.md's "Effects sidebar" section for the wording guidance.
    */
   private renderEffectChip(effect: EffectSnapshot): HTMLElement {
     const chip = document.createElement("span");
     chip.className = `effect-chip effect-${effect.category.toLowerCase()}`;
     chip.textContent = effect.name;
 
-    const duration = effect.permanent
-      ? "Permanent"
-      : `${effect.remainingTurns} turn${effect.remainingTurns === 1 ? "" : "s"} remaining`;
-    const tooltipLines = [effect.description, duration];
-    if (effect.statusFlags.length > 0) {
-      tooltipLines.push(`Flags: ${effect.statusFlags.join(", ")}`);
-    }
-    chip.title = tooltipLines.filter((line) => line.length > 0).join("\n");
+    chip.addEventListener("mouseenter", (e) => this.showEffectTooltip(effect, e as MouseEvent));
+    chip.addEventListener("mousemove", (e) => this.positionTooltip(e as MouseEvent));
+    chip.addEventListener("mouseleave", () => this.hideTooltip());
 
     return chip;
+  }
+
+  private showEffectTooltip(effect: EffectSnapshot, event: MouseEvent): void {
+    this.tooltipEl.innerHTML = "";
+
+    const title = document.createElement("div");
+    title.className = "effect-tooltip-title";
+    title.textContent = effect.name;
+    this.tooltipEl.appendChild(title);
+
+    const desc = document.createElement("div");
+    desc.textContent = effect.description;
+    this.tooltipEl.appendChild(desc);
+
+    const duration = document.createElement("div");
+    duration.className = "effect-tooltip-meta";
+    duration.textContent = effect.permanent
+      ? "Permanent"
+      : `${effect.remainingTurns} turn${effect.remainingTurns === 1 ? "" : "s"} remaining`;
+    this.tooltipEl.appendChild(duration);
+
+    if (effect.extraInfo) {
+      const extra = document.createElement("div");
+      extra.className = "effect-tooltip-meta";
+      extra.textContent = effect.extraInfo;
+      this.tooltipEl.appendChild(extra);
+    }
+
+    if (effect.statusFlags.length > 0) {
+      const flags = document.createElement("div");
+      flags.className = "effect-tooltip-meta";
+      flags.textContent = `Flags: ${effect.statusFlags.join(", ")}`;
+      this.tooltipEl.appendChild(flags);
+    }
+
+    this.tooltipEl.classList.add("visible");
+    this.positionTooltip(event);
+  }
+
+  private positionTooltip(event: MouseEvent): void {
+    const offset = 14;
+    this.tooltipEl.style.left = `${event.clientX + offset}px`;
+    this.tooltipEl.style.top = `${event.clientY + offset}px`;
+  }
+
+  private hideTooltip(): void {
+    this.tooltipEl.classList.remove("visible");
   }
 
   private renderCombatLog(state: MatchUiState): HTMLElement {
     const section = document.createElement("div");
     section.className = "hud-section combat-log-section";
+
+    const header = document.createElement("div");
+    header.className = "combat-log-header";
     const h3 = document.createElement("h3");
     h3.textContent = "Combat log";
-    section.appendChild(h3);
+    header.appendChild(h3);
+
+    // One page per full round (Player One's turn through the end of Player
+    // Two's turn) - see GameStateStore.startNewCombatLogPageIfRoundJustCompleted.
+    const pageCount = state.combatLogPages.length;
+    const pager = document.createElement("div");
+    pager.className = "combat-log-pager";
+
+    const prevBtn = document.createElement("button");
+    prevBtn.textContent = "‹";
+    prevBtn.disabled = state.viewedLogPage <= 0;
+    prevBtn.addEventListener("click", () => this.store.viewCombatLogPage(-1));
+    pager.appendChild(prevBtn);
+
+    const pageLabel = document.createElement("span");
+    pageLabel.className = "hint";
+    pageLabel.textContent = `Turn ${state.viewedLogPage + 1} / ${pageCount}`;
+    pager.appendChild(pageLabel);
+
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "›";
+    nextBtn.disabled = state.viewedLogPage >= pageCount - 1;
+    nextBtn.addEventListener("click", () => this.store.viewCombatLogPage(1));
+    pager.appendChild(nextBtn);
+
+    header.appendChild(pager);
+    section.appendChild(header);
 
     const log = document.createElement("div");
     log.className = "combat-log";
-    if (state.combatLog.length === 0) {
+    const pageLines = state.combatLogPages[state.viewedLogPage] ?? [];
+    if (pageLines.length === 0) {
       const empty = document.createElement("div");
       empty.className = "hint";
       empty.textContent = "No damage dealt yet.";
       log.appendChild(empty);
     } else {
-      for (const entry of state.combatLog) {
+      for (const entry of pageLines) {
         const line = document.createElement("div");
         line.textContent = entry;
         log.appendChild(line);
       }
     }
-    log.scrollTop = log.scrollHeight;
+    // Only auto-scroll to the bottom when looking at the latest page - an
+    // older page the user deliberately navigated back to shouldn't jump.
+    if (state.viewedLogPage === pageCount - 1) {
+      log.scrollTop = log.scrollHeight;
+    }
     section.appendChild(log);
 
     return section;

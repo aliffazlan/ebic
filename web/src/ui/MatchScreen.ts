@@ -120,6 +120,11 @@ export class MatchScreen implements Screen, MatchActions {
       case "state": {
         const priorState = this.store.getState();
         const wasGameOver = priorState.gameOver;
+        // Detect a PLAYER_TWO -> PLAYER_ONE transition (one full round just
+        // completed) before applying the new snapshot - see the store
+        // method's own doc comment for why the very first "state" message
+        // doesn't count.
+        this.store.startNewCombatLogPageIfRoundJustCompleted(msg.payload.currentTeam);
         this.store.setState({
           snapshot: msg.payload,
           gameOver: msg.payload.gameOver ? wasGameOver : null,

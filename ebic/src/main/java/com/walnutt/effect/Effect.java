@@ -125,6 +125,19 @@ public abstract class Effect extends TriggerHandler {
         return flags;
     }
 
+    /**
+     * Optional player-facing summary of this effect's current *dynamic* state -
+     * things that change turn to turn and so can't be baked into the static
+     * {@link #getDescription()} text (Doom's next hit growing, Eye of the Storm's
+     * accumulated vulnerability stack, a barrier's remaining HP, ...). Default
+     * null (nothing extra to show); only effects with real per-instance runtime
+     * state worth surfacing override this - a plain duration/flag effect like
+     * Stunned has nothing dynamic to add beyond what's already shown.
+     */
+    public String getExtraInfo() {
+        return null;
+    }
+
     public List<StatModifier> getStatModifiers() {
         return modifiers;
     }

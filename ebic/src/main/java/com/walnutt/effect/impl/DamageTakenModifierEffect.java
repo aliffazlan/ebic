@@ -28,6 +28,16 @@ public class DamageTakenModifierEffect extends Effect {
         updateCategory();
     }
 
+    @Override
+    public String getExtraInfo() {
+        if (totalBonus == 0) {
+            return null;
+        }
+        return totalBonus > 0
+            ? "Currently taking +" + totalBonus + " damage from all sources"
+            : "Currently taking " + totalBonus + " less damage from all sources";
+    }
+
     private void updateCategory() {
         category = totalBonus > 0 ? EffectCategory.DEBUFF : totalBonus < 0 ? EffectCategory.BUFF : EffectCategory.NEUTRAL;
     }

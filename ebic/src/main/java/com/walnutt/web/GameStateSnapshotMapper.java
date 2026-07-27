@@ -87,7 +87,8 @@ public final class GameStateSnapshotMapper {
             effect.getCategory().name(),
             permanent,
             permanent ? 0 : effect.getRemainingTurns(),
-            effect.getStatusFlags().stream().map(Enum::name).toList()
+            effect.getStatusFlags().stream().map(Enum::name).toList(),
+            effect.getExtraInfo()
         );
     }
 

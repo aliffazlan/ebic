@@ -286,7 +286,7 @@ input {
   border-radius: 4px;
   padding: 2px 7px;
   font-size: 11px;
-  cursor: default;
+  cursor: help;
   border: 1px solid transparent;
 }
 .effect-chip.effect-buff {
@@ -305,10 +305,69 @@ input {
   border-color: #334155;
 }
 
+/* ---- effect hover tooltip (replaces native `title`) ---- */
+
+.effect-tooltip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 260px;
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease;
+}
+.effect-tooltip.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.effect-tooltip-title {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.effect-tooltip-meta {
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
 /* ---- combat log ---- */
 
 .combat-log-section {
   flex: 0 0 auto;
+}
+
+.combat-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.combat-log-header h3 {
+  margin: 0;
+}
+
+.combat-log-pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.combat-log-pager button {
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.combat-log-pager .hint {
+  white-space: nowrap;
 }
 
 .combat-log {
