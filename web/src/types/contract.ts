@@ -102,10 +102,14 @@ export interface UnitDefinitionSnapshot {
 // Draft and placement run independently per player (no more synchronized
 // "both players see this round together" moment) - see API_CONTRACT.md's
 // WebSocket section. `draft_round` now carries only this player's own
-// options, and receiving it doubles as the prompt to pick.
+// options, and receiving it doubles as the prompt to pick. `opponentOptions`
+// is the opponent's same-round options shown alongside for transparency -
+// the whole pool is already decided the moment both players join, so this
+// needs no synchronization with the opponent's actual progress.
 export interface DraftRoundSnapshot {
   roundLabel: string; // "Champion", "Elite 1/3", "Elite 2/3", "Elite 3/3"
   options: UnitDefinitionSnapshot[];
+  opponentOptions: UnitDefinitionSnapshot[];
 }
 
 // Per unitId, per abilityId: which tiles/units are actually legal to target, so the
@@ -120,10 +124,14 @@ export type LegalTargetsByUnit = Record<string, Record<string, LegalTargets>>;
 
 // "pick"/"placement" prompt kinds are gone - draft_round and placement_state
 // double as their own prompts now (see below). Only the in-match action loop
-// still uses this message.
+// still uses this message. The `attribute` prompt is also the encounter
+// trigger: it carries both `unitId` (whose choice this is) and
+// `opponentUnitId` (the other party) so the client can look up both
+// UnitSnapshots (already in the last "state" message, no fog of war once
+// combat has started) and render the full encounter - see API_CONTRACT.md.
 export type PromptPayload =
   | { kind: "action"; team: Team; legalTargets: LegalTargetsByUnit }
-  | { kind: "attribute"; team: Team; unitId: string };
+  | { kind: "attribute"; team: Team; unitId: string; opponentUnitId: string };
 
 // This player's own working placement arrangement only (fog of war - the
 // opponent's roster/positions are never sent here). Pushed once with the
@@ -137,9 +145,13 @@ export interface PlacementUnitSnapshot {
   r: number;
 }
 
+// `legalTiles` is the full set of tiles a `move` edit may target - constant
+// for the whole placement phase, included on every push purely so the client
+// can highlight the zone without a separate request.
 export interface PlacementStateSnapshot {
   units: PlacementUnitSnapshot[];
   confirmed: boolean;
+  legalTiles: { q: number; r: number }[];
 }
 
 export type ServerMessage =

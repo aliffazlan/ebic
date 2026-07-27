@@ -16,6 +16,12 @@ const TILE_HOVER = 0x334155;
 const SELECTED_RING_COLOR = 0xfacc15;
 const LEGAL_TILE_COLOR = 0x4ade80;
 const LEGAL_UNIT_RING_COLOR = 0x4ade80;
+const STROBE_RING_COLOR = 0xf97316;
+// Frame counts assume Ticker.shared's default ~60fps - matches the
+// frame-counting style already used in ParticleBurst.ts rather than
+// deltaMS-based timing, for consistency with that existing pattern.
+const STROBE_TOGGLE_FRAMES = 9; // ~150ms per on/off half-cycle
+const STROBE_TOTAL_FRAMES = 108; // ~1.8s total, within the ~1.5-2s target
 
 // PlacementStateSnapshot carries no map radius (see API_CONTRACT.md) -
 // placement always happens before the first real GameStateSnapshot, which is
@@ -35,6 +41,12 @@ export class Board {
   readonly boardLayer = new Container();
   readonly unitsLayer = new Container();
   readonly vfxLayer = new Container();
+  // Pre-encounter strobe rings live in their own layer, separate from
+  // uiLayer, because refreshHighlights() unconditionally clears uiLayer on
+  // every store update (selection changes, message log pushes, etc.) - a
+  // strobe needs to keep animating across those without being wiped
+  // mid-flash by an unrelated state change.
+  readonly strobeLayer = new Container();
   readonly uiLayer = new Container();
 
   private iconFactory: UnitIconFactory;
@@ -45,13 +57,16 @@ export class Board {
   private app: Application;
   private store: GameStateStore;
   private callbacks: BoardCallbacks;
+  // Tracked so destroy() can stop any in-flight strobe tickers rather than
+  // leaving Ticker.shared calling back into a destroyed Board.
+  private activeStrobeTicks = new Set<() => void>();
 
   constructor(app: Application, store: GameStateStore, callbacks: BoardCallbacks) {
     this.app = app;
     this.store = store;
     this.callbacks = callbacks;
     this.iconFactory = new UnitIconFactory(app.renderer);
-    this.root.addChild(this.boardLayer, this.unitsLayer, this.vfxLayer, this.uiLayer);
+    this.root.addChild(this.boardLayer, this.unitsLayer, this.vfxLayer, this.strobeLayer, this.uiLayer);
     this.recenter();
 
     this.unsubscribe = this.store.subscribe((state) => {
@@ -70,6 +85,8 @@ export class Board {
 
   destroy(): void {
     this.unsubscribe();
+    for (const tick of this.activeStrobeTicks) Ticker.shared.remove(tick);
+    this.activeStrobeTicks.clear();
     this.root.destroy({ children: true });
   }
 
@@ -86,6 +103,42 @@ export class Board {
         color: colorForVfxType(event.type),
       });
     }
+  }
+
+  /**
+   * Flashes an on/off ring around each given unit's sprite for ~1.5-2s -
+   * played on receiving an "attribute" prompt, before the attribute-choice
+   * modal appears, so the two units in the encounter are visibly called out
+   * on the board first. See API_CONTRACT.md's explanation of why the
+   * `attribute` prompt's arrival is itself the earliest available signal for
+   * "encounter starting." A unit missing from the current snapshot (shouldn't
+   * happen - both ids come from the last real state push) is silently
+   * skipped rather than erroring.
+   */
+  strobeUnits(unitIds: string[]): void {
+    for (const unitId of new Set(unitIds)) {
+      const sprite = this.unitSprites.get(unitId);
+      if (sprite) this.strobeSprite(sprite);
+    }
+  }
+
+  private strobeSprite(sprite: Container): void {
+    const ring = new Graphics().circle(0, 0, HEX_SIZE * 0.85).stroke({ width: 4, color: STROBE_RING_COLOR });
+    ring.position.copyFrom(sprite.position);
+    this.strobeLayer.addChild(ring);
+
+    let elapsed = 0;
+    const tick = () => {
+      elapsed += 1;
+      ring.visible = Math.floor(elapsed / STROBE_TOGGLE_FRAMES) % 2 === 0;
+      if (elapsed >= STROBE_TOTAL_FRAMES) {
+        Ticker.shared.remove(tick);
+        this.activeStrobeTicks.delete(tick);
+        ring.destroy();
+      }
+    };
+    this.activeStrobeTicks.add(tick);
+    Ticker.shared.add(tick);
   }
 
   private ensureMap(radius: number): void {
@@ -225,17 +278,30 @@ export class Board {
   }
 
   /**
-   * Draws (a) a ring around the currently-selected unit - doubles as the
-   * placement-mode selection indicator, since selectedUnitId is reused for
-   * both - and (b) once a unit+ability is selected during the match proper,
-   * a highlight over every tile/unit in the matching "action" prompt's
-   * legalTargets entry, straight from Ability.getLegalTargets on the server.
-   * Placement's `move` edit has no client-side legality precomputation (see
-   * API_CONTRACT.md) - any empty tile click is sent through and the server
-   * accepts or rejects it, so there's nothing to highlight there.
+   * Draws (a) the placement-phase legal-move zone (PlacementStateSnapshot's
+   * `legalTiles`, constant for the whole phase), (b) a ring around the
+   * currently-selected unit - doubles as the placement-mode selection
+   * indicator, since selectedUnitId is reused for both - and (c) once a
+   * unit+ability is selected during the match proper, a highlight over every
+   * tile/unit in the matching "action" prompt's legalTargets entry, straight
+   * from Ability.getLegalTargets on the server. Placement's `move` edit still
+   * has no client-side legality *validation* (see API_CONTRACT.md) - a click
+   * outside the highlighted zone is still sent through and the server
+   * accepts or rejects it - the zone highlight here is purely informational.
    */
   private refreshHighlights(state: MatchUiState): void {
     this.uiLayer.removeChildren();
+
+    // Placement's legal zone is constant for the whole phase (see
+    // API_CONTRACT.md's PlacementStateSnapshot.legalTiles) - highlight it
+    // with the same green tile overlay used for ability legal targets so
+    // players don't have to trial-and-error find the boundary. Purely
+    // informational: the server still validates/rejects `move` edits itself.
+    if (state.placementState && !state.placementState.confirmed) {
+      for (const tile of state.placementState.legalTiles) {
+        this.highlightTile(tile.q, tile.r);
+      }
+    }
 
     if (state.selectedUnitId) {
       const sprite = this.unitSprites.get(state.selectedUnitId);

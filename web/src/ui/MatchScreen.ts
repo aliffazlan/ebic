@@ -8,6 +8,14 @@ import type { Attribute, ServerMessage, Team, UnitSnapshot } from "../types/cont
 import type { MatchActions } from "./MatchActions";
 import type { Screen } from "./Screen";
 
+// How long the pre-encounter strobe plays on the board before the attribute
+// modal actually appears - see API_CONTRACT.md's explanation of the
+// encounter-trigger/strobe design. Kept in the ~1.5-2s range the brief asked
+// for; matches (loosely, doesn't need to be exact) Board's own frame-counted
+// STROBE_TOTAL_FRAMES so the ring visually finishes right around when the
+// modal shows up.
+const ATTRIBUTE_STROBE_MS = 1800;
+
 export class MatchScreen implements Screen, MatchActions {
   private container: HTMLDivElement | null = null;
   private app: Application | null = null;
@@ -18,6 +26,11 @@ export class MatchScreen implements Screen, MatchActions {
   private resizeListener = () => this.handleResize();
   private root: HTMLElement;
   private matchId: string;
+  // Tracks the delayed "show the attribute modal after the strobe"
+  // setTimeout so a newer prompt (or unmount) can cancel a stale one -
+  // otherwise a fast second attribute prompt could have its immediate strobe
+  // clobbered a moment later by an earlier prompt's delayed setState.
+  private pendingAttributePromptTimer: number | null = null;
   private onExit: () => void;
 
   constructor(root: HTMLElement, matchId: string, yourTeam: Team, onExit: () => void) {
@@ -64,6 +77,10 @@ export class MatchScreen implements Screen, MatchActions {
 
   unmount(): void {
     window.removeEventListener("resize", this.resizeListener);
+    if (this.pendingAttributePromptTimer !== null) {
+      window.clearTimeout(this.pendingAttributePromptTimer);
+      this.pendingAttributePromptTimer = null;
+    }
     this.socket.close();
     this.hud?.destroy();
     this.board?.destroy();
@@ -111,9 +128,32 @@ export class MatchScreen implements Screen, MatchActions {
       case "placement_state":
         this.store.setState({ placementState: msg.payload, selectedUnitId: null });
         break;
-      case "prompt":
-        this.store.setState({ prompt: msg.payload, selectedAbilityId: null });
+      case "prompt": {
+        // Any freshly arriving prompt supersedes an in-flight delayed one
+        // (see the field comment on pendingAttributePromptTimer).
+        if (this.pendingAttributePromptTimer !== null) {
+          window.clearTimeout(this.pendingAttributePromptTimer);
+          this.pendingAttributePromptTimer = null;
+        }
+
+        if (msg.payload.kind === "attribute") {
+          // The `attribute` prompt doubles as the encounter trigger (see
+          // API_CONTRACT.md) - both units are already in the last "state"
+          // snapshot, no fog of war once combat has started. Strobe them on
+          // the board first, THEN show the attribute modal - don't set
+          // `prompt` yet, since that's what Hud uses to decide to render it.
+          const payload = msg.payload;
+          this.board?.strobeUnits([payload.unitId, payload.opponentUnitId]);
+          this.store.setState({ selectedAbilityId: null });
+          this.pendingAttributePromptTimer = window.setTimeout(() => {
+            this.pendingAttributePromptTimer = null;
+            this.store.setState({ prompt: payload });
+          }, ATTRIBUTE_STROBE_MS);
+        } else {
+          this.store.setState({ prompt: msg.payload, selectedAbilityId: null });
+        }
         break;
+      }
       case "message":
         this.store.pushMessage(msg.text);
         break;
@@ -197,15 +237,29 @@ export class MatchScreen implements Screen, MatchActions {
       ...(target?.q !== undefined ? { q: target.q } : {}),
       ...(target?.r !== undefined ? { r: target.r } : {}),
     });
-    this.store.setState({ selectedAbilityId: null });
+    // Optimistic local clear rather than waiting for a fresh prompt to
+    // arrive and overwrite it - see the comment on sendAttribute below, the
+    // same "a fresh prompt only reaches whoever's next to act" gap applies
+    // here too (a cast that ends this player's turn leaves the stale
+    // "action" prompt's legalTargets sitting in state with nothing to
+    // refresh it until this player's next turn).
+    this.store.setState({ selectedAbilityId: null, prompt: null });
   }
 
   endTurn(): void {
     this.socket.send({ type: "action", kind: "end_turn" });
+    this.store.setState({ prompt: null });
   }
 
   sendAttribute(value: Attribute): void {
     this.socket.send({ type: "attribute", value });
+    // Real bug fix (see API_CONTRACT.md): a fresh `prompt` only gets pushed
+    // to whichever team is next to act - after the *defender* answers, it's
+    // not their turn, so nothing ever arrives to replace this stale
+    // `attribute` prompt and the modal would sit open forever. Clear it
+    // immediately and optimistically on send rather than waiting for a
+    // server round-trip that may never come.
+    this.store.setState({ prompt: null });
   }
 
   sendPick(definitionId: string): void {

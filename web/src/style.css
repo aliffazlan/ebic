@@ -328,6 +328,25 @@ input {
   overflow-y: auto;
 }
 
+.draft-columns {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.draft-column {
+  flex: 1;
+  min-width: 200px;
+}
+
+.draft-column h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .draft-cards {
   display: flex;
   gap: 12px;
@@ -366,10 +385,55 @@ input {
   color: #cbd5e1;
 }
 
+.attribute-modal-panel {
+  min-width: 380px;
+}
+
+.encounter-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.encounter-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 14px 10px;
+  text-align: center;
+}
+
+.encounter-card .hp-bar-outer {
+  width: 100%;
+}
+
+.encounter-card-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.encounter-vs {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f97316;
+}
+
+.unit-portrait-glyph {
+  pointer-events: none;
+}
+
 .attribute-buttons {
   display: flex;
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 16px;
 }
 .attribute-buttons button {
   flex: 1;

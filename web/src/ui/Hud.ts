@@ -3,9 +3,12 @@ import type {
   AbilitySnapshot,
   Attribute,
   PlacementUnitSnapshot,
+  Team,
   UnitDefinitionSnapshot,
+  UnitSnapshot,
 } from "../types/contract";
 import type { MatchActions } from "./MatchActions";
+import { renderUnitPortrait } from "../units/UnitPortrait";
 
 const ATTRIBUTES: Attribute[] = ["STRENGTH", "AGILITY", "INTELLIGENCE"];
 
@@ -60,7 +63,7 @@ export class Hud {
       // API_CONTRACT.md, there's no separate "pick" prompt kind anymore.
       this.hudHost.appendChild(this.renderDraftModal(state));
     } else if (state.prompt?.kind === "attribute") {
-      this.hudHost.appendChild(this.renderAttributeModal());
+      this.hudHost.appendChild(this.renderAttributeModal(state));
     }
   }
 
@@ -256,22 +259,47 @@ export class Hud {
     title.textContent = state.draftRound!.roundLabel;
     panel.appendChild(title);
 
-    // Each player now drafts through their own rounds at their own pace, so
-    // there's no more opponent-options column to show alongside these - see
+    // Each player drafts through their own rounds at their own pace (no
+    // synchronized reveal moment anymore), but the opponent's same-round
+    // options are still shown alongside for transparency - the whole pool is
+    // already decided the moment both players join, so this needs no
+    // synchronization with the opponent's actual progress. See
     // API_CONTRACT.md's draft_round section.
-    const cards = document.createElement("div");
-    cards.className = "draft-cards";
-    for (const def of state.draftRound!.options) {
-      cards.appendChild(this.renderUnitCard(def));
-    }
-    panel.appendChild(cards);
+    const columns = document.createElement("div");
+    columns.className = "draft-columns";
+    panel.appendChild(columns);
+
+    columns.appendChild(this.renderDraftColumn("Your options", state.draftRound!.options, true));
+    columns.appendChild(
+      this.renderDraftColumn("Opponent options", state.draftRound!.opponentOptions, false),
+    );
 
     return backdrop;
   }
 
-  private renderUnitCard(def: UnitDefinitionSnapshot): HTMLElement {
+  private renderDraftColumn(
+    heading: string,
+    options: UnitDefinitionSnapshot[],
+    clickable: boolean,
+  ): HTMLElement {
+    const col = document.createElement("div");
+    col.className = "draft-column";
+    const h4 = document.createElement("h4");
+    h4.textContent = heading;
+    col.appendChild(h4);
+
+    const cards = document.createElement("div");
+    cards.className = "draft-cards";
+    for (const def of options) {
+      cards.appendChild(this.renderUnitCard(def, clickable));
+    }
+    col.appendChild(cards);
+    return col;
+  }
+
+  private renderUnitCard(def: UnitDefinitionSnapshot, clickable: boolean): HTMLElement {
     const card = document.createElement("div");
-    card.className = "unit-card clickable";
+    card.className = clickable ? "unit-card clickable" : "unit-card";
 
     const name = document.createElement("h5");
     name.textContent = def.name;
@@ -292,7 +320,9 @@ export class Hud {
     abilities.textContent = def.abilities.join(", ");
     card.appendChild(abilities);
 
-    card.addEventListener("click", () => this.actions.sendPick(def.definitionId));
+    if (clickable) {
+      card.addEventListener("click", () => this.actions.sendPick(def.definitionId));
+    }
     return card;
   }
 
@@ -365,17 +395,36 @@ export class Hud {
     return row;
   }
 
-  private renderAttributeModal(): HTMLElement {
+  private renderAttributeModal(state: MatchUiState): HTMLElement {
     const backdrop = document.createElement("div");
     backdrop.className = "modal-backdrop";
 
     const panel = document.createElement("div");
-    panel.className = "modal-panel";
+    panel.className = "modal-panel attribute-modal-panel";
     backdrop.appendChild(panel);
 
     const title = document.createElement("h2");
     title.textContent = "Choose an attribute";
     panel.appendChild(title);
+
+    // prompt.kind is narrowed to "attribute" by the caller (Hud.render); both
+    // ids resolve against the last "state" message's units - no fog of war
+    // once combat has started, see API_CONTRACT.md.
+    const prompt = state.prompt as { kind: "attribute"; unitId: string; opponentUnitId: string };
+    const self = this.store.findUnit(prompt.unitId);
+    const opponent = this.store.findUnit(prompt.opponentUnitId);
+
+    const encounter = document.createElement("div");
+    encounter.className = "encounter-row";
+    encounter.appendChild(this.renderEncounterCard(self, state.yourTeam));
+
+    const vs = document.createElement("div");
+    vs.className = "encounter-vs";
+    vs.textContent = "VS";
+    encounter.appendChild(vs);
+
+    encounter.appendChild(this.renderEncounterCard(opponent, state.yourTeam));
+    panel.appendChild(encounter);
 
     const row = document.createElement("div");
     row.className = "attribute-buttons";
@@ -389,6 +438,55 @@ export class Hud {
     panel.appendChild(row);
 
     return backdrop;
+  }
+
+  private renderEncounterCard(unit: UnitSnapshot | null, yourTeam: Team): HTMLElement {
+    const card = document.createElement("div");
+    card.className = "encounter-card";
+
+    if (!unit) {
+      // Shouldn't happen in practice (both ids come straight from the last
+      // real state snapshot), but degrade gracefully rather than throw.
+      card.textContent = "Unknown unit";
+      return card;
+    }
+
+    card.appendChild(
+      renderUnitPortrait(
+        { definitionId: unit.definitionId, team: unit.team, unitType: unit.unitType, name: unit.name },
+        72,
+      ),
+    );
+
+    const name = document.createElement("div");
+    name.className = "encounter-card-name";
+    name.textContent = unit.name;
+    card.appendChild(name);
+
+    const sub = document.createElement("div");
+    sub.className = "hint";
+    sub.textContent = `${unit.unitType} · ${unit.team === yourTeam ? "Yours" : "Enemy"}`;
+    card.appendChild(sub);
+
+    const hpOuter = document.createElement("div");
+    hpOuter.className = "hp-bar-outer";
+    const hpInner = document.createElement("div");
+    hpInner.className = "hp-bar-inner";
+    hpInner.style.width = `${unit.maxHp > 0 ? Math.max(0, (unit.currentHp / unit.maxHp) * 100) : 0}%`;
+    hpOuter.appendChild(hpInner);
+    card.appendChild(hpOuter);
+
+    const hpText = document.createElement("div");
+    hpText.className = "hint";
+    hpText.textContent = `${unit.currentHp} / ${unit.maxHp} HP`;
+    card.appendChild(hpText);
+
+    const attrText = document.createElement("div");
+    attrText.className = "hint";
+    attrText.textContent = `STR ${unit.strength} · AGI ${unit.agility} · INT ${unit.intelligence}`;
+    card.appendChild(attrText);
+
+    return card;
   }
 
   private renderGameOverModal(state: MatchUiState): HTMLElement {
