@@ -40,4 +40,28 @@ public final class JsonSupport {
     public static JsonElement parse(String json) {
         return com.google.gson.JsonParser.parseString(json);
     }
+
+    /** Null-safe string field lookup - missing key, JSON null, or a non-string value all yield null rather than throwing. */
+    public static String optString(JsonObject obj, String key) {
+        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return obj.get(key).getAsString();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Null-safe int field lookup - missing key, JSON null, or a non-numeric value all yield null rather than throwing. */
+    public static Integer optInt(JsonObject obj, String key) {
+        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return obj.get(key).getAsInt();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
 }

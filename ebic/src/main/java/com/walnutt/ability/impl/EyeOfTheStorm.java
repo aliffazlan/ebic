@@ -16,7 +16,7 @@ public class EyeOfTheStorm extends PassiveAbility {
     private final int bonusDamage;
 
     public EyeOfTheStorm(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.damage = definition.getInt("damage", 2);
         this.bonusDamage = definition.getInt("bonus_damage", 2);
     }

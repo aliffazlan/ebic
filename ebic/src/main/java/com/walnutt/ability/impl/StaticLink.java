@@ -14,7 +14,7 @@ public class StaticLink extends Ability {
     private final int lingerDuration;
 
     public StaticLink(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 7));
         setRange(definition.getInt("cast_range", 1));
         this.damageSteal = definition.getInt("dmg_steal", 5);
@@ -23,7 +23,7 @@ public class StaticLink extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof UnitTarget unitTarget)) {
@@ -32,7 +32,7 @@ public class StaticLink extends Ability {
         Unit other = unitTarget.getUnit();
         return !other.isDead()
             && other.getTeam() != owner.getTeam()
-            && state.getMap().getDistance(owner.getPosition(), other.getPosition()) <= getRange();
+            && isInRange(state, other.getPosition());
     }
 
     @Override

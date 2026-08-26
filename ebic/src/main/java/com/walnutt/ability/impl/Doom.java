@@ -14,7 +14,7 @@ public class Doom extends Ability {
     private final int damageIncrease;
 
     public Doom(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 11));
         setRange(definition.getInt("cast_range", 1));
         this.baseDamage = definition.getInt("base_dmg", 20);
@@ -23,7 +23,7 @@ public class Doom extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof UnitTarget unitTarget)) {
@@ -33,7 +33,7 @@ public class Doom extends Ability {
         return !other.isDead()
             && other.getTeam() != owner.getTeam()
             && other.getActiveEffect(DoomEffect.class).isEmpty()
-            && state.getMap().getDistance(owner.getPosition(), other.getPosition()) <= getRange();
+            && isInRange(state, other.getPosition());
     }
 
     @Override

@@ -11,7 +11,7 @@ public class Backstab extends PassiveAbility {
     private final double damageBonusPerAgility;
 
     public Backstab(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.damageBonusPerAgility = definition.getDouble("dmg_bonus", 0.4);
     }
 

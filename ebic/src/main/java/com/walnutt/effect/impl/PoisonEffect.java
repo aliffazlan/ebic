@@ -54,12 +54,8 @@ public class PoisonEffect extends Effect {
 
     /** If the target is already poisoned, stack duration onto the existing instance instead of refreshing it. */
     public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn) {
-        for (Effect effect : target.getEffects()) {
-            if (effect instanceof PoisonEffect existing) {
-                existing.extendDuration(duration);
-                return;
-            }
-        }
-        target.addEffect(new PoisonEffect(source, duration, damagePerTurn));
+        target.getActiveEffect(PoisonEffect.class).ifPresentOrElse(
+            existing -> existing.extendDuration(duration),
+            () -> target.addEffect(new PoisonEffect(source, duration, damagePerTurn)));
     }
 }

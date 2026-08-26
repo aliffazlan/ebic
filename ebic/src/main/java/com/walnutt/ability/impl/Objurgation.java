@@ -13,7 +13,7 @@ public class Objurgation extends PassiveAbility {
     private final double intelligenceToHealth;
 
     public Objurgation(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         setMaxCooldown(definition.getInt("cooldown", 3));
         this.intelligenceToHealth = definition.getDouble("int_to_hp", 0.8);
     }

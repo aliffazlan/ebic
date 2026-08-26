@@ -40,12 +40,8 @@ public class BlizzardEffect extends Effect {
 
     /** "If the target is already affected by blizzard, the duration is increased." */
     public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn) {
-        for (Effect effect : target.getEffects()) {
-            if (effect instanceof BlizzardEffect existing) {
-                existing.extendDuration(duration);
-                return;
-            }
-        }
-        target.addEffect(new BlizzardEffect(source, duration, damagePerTurn));
+        target.getActiveEffect(BlizzardEffect.class).ifPresentOrElse(
+            existing -> existing.extendDuration(duration),
+            () -> target.addEffect(new BlizzardEffect(source, duration, damagePerTurn)));
     }
 }

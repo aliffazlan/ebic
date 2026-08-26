@@ -13,7 +13,7 @@ public class Dispersion extends PassiveAbility {
     private final double reflectPercent;
 
     public Dispersion(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.radius = definition.getInt("radius", 1);
         this.reflectPercent = definition.getDouble("dmg_reflect", 0.25);
     }

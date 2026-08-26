@@ -25,7 +25,7 @@ public class TimelessStrike extends PassiveAbility {
     private int depth;
 
     public TimelessStrike(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.stunDurationPerHit = definition.getInt("duration", 1);
     }
 

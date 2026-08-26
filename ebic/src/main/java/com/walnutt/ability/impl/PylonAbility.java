@@ -23,7 +23,7 @@ public class PylonAbility extends Ability {
     private final int deathDuration;
 
     public PylonAbility(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 4));
         this.deathDamage = definition.getInt("death_damage", 50);
         this.deathDuration = definition.getInt("death_duration", 1);
@@ -31,9 +31,7 @@ public class PylonAbility extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        return super.canUse(state, target)
-            && state.canSpendMoves(getMoveCost(state))
-            && target instanceof TileTarget;
+        return super.canUse(state, target) && target instanceof TileTarget;
     }
 
     @Override

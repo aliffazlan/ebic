@@ -14,7 +14,7 @@ public class ColdEmbrace extends Ability {
     private final int amountPerTurn;
 
     public ColdEmbrace(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 6));
         setRange(definition.getInt("cast_range", 4));
         this.duration = definition.getInt("duration", 3);
@@ -23,14 +23,14 @@ public class ColdEmbrace extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof UnitTarget unitTarget)) {
             return false;
         }
         Unit other = unitTarget.getUnit();
-        return !other.isDead() && state.getMap().getDistance(owner.getPosition(), other.getPosition()) <= getRange();
+        return !other.isDead() && isInRange(state, other.getPosition());
     }
 
     @Override

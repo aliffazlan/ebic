@@ -1,8 +1,10 @@
 package com.walnutt.web;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
+import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
@@ -25,12 +27,21 @@ public final class WebRenderer implements Renderer {
     private final GameStateSnapshotMapper mapper;
     private final VfxCollector vfx;
     private final Consumer<GameState> onGameOver;
+    // Set once by GameSession right after the match's GameState is created (this
+    // renderer is constructed before that, so it can't be a constructor param) -
+    // only renderDraftRound needs it, for the legacy hotseat/terminal DraftFlow
+    // path (see GameStateSnapshotMapper.toDefinitionSnapshot's own doc comment).
+    private Map<String, AbilityDefinition> abilityDefinitions = Map.of();
 
     public WebRenderer(ChannelHub hub, GameStateSnapshotMapper mapper, VfxCollector vfx, Consumer<GameState> onGameOver) {
         this.hub = hub;
         this.mapper = mapper;
         this.vfx = vfx;
         this.onGameOver = onGameOver;
+    }
+
+    public void setAbilityDefinitions(Map<String, AbilityDefinition> abilityDefinitions) {
+        this.abilityDefinitions = abilityDefinitions;
     }
 
     @Override
@@ -65,8 +76,10 @@ public final class WebRenderer implements Renderer {
     @Override
     public void renderDraftRound(String roundLabel, Player playerOne, List<UnitDefinition> playerOneOptions,
                                   Player playerTwo, List<UnitDefinition> playerTwoOptions) {
-        List<UnitDefinitionSnapshot> p1 = playerOneOptions.stream().map(GameStateSnapshotMapper::toDefinitionSnapshot).toList();
-        List<UnitDefinitionSnapshot> p2 = playerTwoOptions.stream().map(GameStateSnapshotMapper::toDefinitionSnapshot).toList();
+        List<UnitDefinitionSnapshot> p1 = playerOneOptions.stream()
+            .map(def -> GameStateSnapshotMapper.toDefinitionSnapshot(def, abilityDefinitions)).toList();
+        List<UnitDefinitionSnapshot> p2 = playerTwoOptions.stream()
+            .map(def -> GameStateSnapshotMapper.toDefinitionSnapshot(def, abilityDefinitions)).toList();
 
         sendDraftRound(Team.PLAYER_ONE, roundLabel, p1, p2);
         sendDraftRound(Team.PLAYER_TWO, roundLabel, p2, p1);

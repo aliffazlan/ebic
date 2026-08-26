@@ -43,10 +43,25 @@ export interface ApiErrorBody {
 export interface AbilitySnapshot {
   id: string;
   name: string;
+  // Human-readable, fully-resolved text (every %stat_key% placeholder already
+  // substituted server-side) - shown on hover, see "Ability tooltips" in
+  // API_CONTRACT.md.
+  description: string;
   passive: boolean;
   ready: boolean;
   currentCooldown: number;
   maxCooldown: number;
+}
+
+// Static ability info for a not-yet-drafted unit (draft/opponent-options cards) -
+// no live match instance yet, so no ready/currentCooldown, just the nominal
+// cooldown (or passive) worth showing before picking.
+export interface AbilityPreviewSnapshot {
+  id: string;
+  name: string;
+  description: string;
+  passive: boolean;
+  cooldown: number;
 }
 
 // Active effect on a unit, for the sidebar effects list (replaces rendering
@@ -117,7 +132,7 @@ export interface UnitDefinitionSnapshot {
   strength: number;
   agility: number;
   intelligence: number;
-  abilities: string[];
+  abilities: AbilityPreviewSnapshot[];
 }
 
 // Draft and placement run independently per player (no more synchronized

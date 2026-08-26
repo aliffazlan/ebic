@@ -27,7 +27,7 @@ public class Counterstrike extends PassiveAbility {
     private final double lifesteal;
 
     public Counterstrike(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.damageReduction = definition.getDouble("damage_reduction", 0.5);
         this.lifesteal = definition.getDouble("lifesteal", 1.0);
     }

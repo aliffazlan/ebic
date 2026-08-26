@@ -12,7 +12,7 @@ public class Selfless extends PassiveAbility {
     private final double redirectPercent;
 
     public Selfless(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.radius = definition.getInt("radius", 1);
         this.redirectPercent = definition.getDouble("redirect_dmg", 0.25);
     }

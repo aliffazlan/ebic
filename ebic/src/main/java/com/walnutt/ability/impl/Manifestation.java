@@ -15,7 +15,7 @@ public class Manifestation extends Ability {
     private final int duration;
 
     public Manifestation(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 5));
         this.damageReduction = definition.getDouble("dmg_reduction", 0.5);
         this.duration = definition.getInt("duration", 2);
@@ -23,7 +23,7 @@ public class Manifestation extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof TileTarget tileTarget)) {

@@ -14,7 +14,7 @@ public class SoulRip extends Ability {
     private final double strengthMultiplier;
 
     public SoulRip(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 3));
         setRange(definition.getInt("cast_range", 2));
         this.strengthMultiplier = definition.getDouble("str_multiplier", 0.5);
@@ -22,7 +22,7 @@ public class SoulRip extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof UnitTarget unitTarget)) {
@@ -30,7 +30,7 @@ public class SoulRip extends Ability {
         }
         Unit other = unitTarget.getUnit();
         return !other.isDead()
-            && state.getMap().getDistance(owner.getPosition(), other.getPosition()) <= getRange();
+            && isInRange(state, other.getPosition());
     }
 
     @Override

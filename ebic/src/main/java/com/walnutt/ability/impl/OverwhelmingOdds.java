@@ -17,7 +17,7 @@ public class OverwhelmingOdds extends Ability {
     private final double diffHeal;
 
     public OverwhelmingOdds(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 5));
         this.radius = definition.getInt("radius", 2);
         this.diffDamage = definition.getDouble("diff_dmg", 20);
@@ -26,9 +26,7 @@ public class OverwhelmingOdds extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        return super.canUse(state, target)
-            && state.canSpendMoves(getMoveCost(state))
-            && target instanceof NoTarget;
+        return super.canUse(state, target) && target instanceof NoTarget;
     }
 
     @Override

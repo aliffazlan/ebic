@@ -15,7 +15,7 @@ public class SanityEclipse extends Ability {
     private final double intDiffMultiplier;
 
     public SanityEclipse(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 9));
         setRange(definition.getInt("cast_range", 4));
         this.delay = definition.getInt("delay", 1);
@@ -25,13 +25,13 @@ public class SanityEclipse extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof TileTarget tileTarget)) {
             return false;
         }
-        return state.getMap().getDistance(owner.getPosition(), tileTarget.getTile().getPosition()) <= getRange();
+        return isInRange(state, tileTarget.getTile().getPosition());
     }
 
     @Override

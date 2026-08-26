@@ -23,7 +23,7 @@ public class Decay extends PassiveAbility {
     private final int strengthSteal;
 
     public Decay(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.radius = definition.getInt("radius", 1);
         this.healthSteal = definition.getInt("health_steal", 5);
         this.strengthSteal = definition.getInt("str_steal", definition.getInt("bonus_increase", 2));

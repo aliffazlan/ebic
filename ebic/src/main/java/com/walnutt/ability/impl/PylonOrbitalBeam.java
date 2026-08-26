@@ -13,7 +13,7 @@ public class PylonOrbitalBeam extends PassiveAbility {
     private final int radius;
 
     public PylonOrbitalBeam(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.radius = definition.getInt("radius", 1);
     }
 

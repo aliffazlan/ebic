@@ -16,7 +16,7 @@ public class HolyShield extends Ability {
     private final int radius;
 
     public HolyShield(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 4));
         setRange(definition.getInt("cast_range", 2));
         this.duration = definition.getInt("duration", 3);
@@ -27,7 +27,7 @@ public class HolyShield extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof UnitTarget unitTarget)) {
@@ -36,7 +36,7 @@ public class HolyShield extends Ability {
         Unit ally = unitTarget.getUnit();
         return !ally.isDead()
             && ally.getTeam() == owner.getTeam()
-            && state.getMap().getDistance(owner.getPosition(), ally.getPosition()) <= getRange();
+            && isInRange(state, ally.getPosition());
     }
 
     @Override

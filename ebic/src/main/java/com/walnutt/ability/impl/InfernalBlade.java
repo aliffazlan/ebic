@@ -12,7 +12,7 @@ public class InfernalBlade extends PassiveAbility {
     private final int duration;
 
     public InfernalBlade(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.duration = definition.getInt("duration", 1);
     }
 

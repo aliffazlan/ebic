@@ -14,7 +14,7 @@ public class Cripple extends PassiveAbility {
     private final int dmgToStat;
 
     public Cripple(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.damageReduction = definition.getDouble("damage_reduction", 0.5);
         this.dmgToStat = definition.getInt("dmg_to_stat", 3);
     }

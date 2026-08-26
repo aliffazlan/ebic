@@ -13,7 +13,7 @@ public class SnowBlast extends PassiveAbility {
     private final int radius;
 
     public SnowBlast(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.duration = definition.getInt("duration", 4);
         this.radius = definition.getInt("radius", 1);
     }

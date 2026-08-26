@@ -101,12 +101,20 @@ public abstract class Ability extends TriggerHandler {
     }
 
     /**
-     * Baseline economy/readiness checks shared by every active ability. Subclasses
-     * should call {@code super.canUse(state, target)} and AND it with their own
+     * Baseline economy/readiness checks shared by every active ability - including
+     * the move-point cost, so subclasses no longer need their own separate
+     * {@code state.canSpendMoves(getMoveCost(state))} check. Subclasses should call
+     * {@code super.canUse(state, target)} and AND it with their own
      * target-shape/range checks.
      */
     public boolean canUse(GameState state, Target target) {
-        return !isPassive && isReady() && owner != null && !owner.isBlockedFrom(ActionKind.ABILITY);
+        return !isPassive && isReady() && owner != null && !owner.isBlockedFrom(ActionKind.ABILITY)
+            && state.canSpendMoves(getMoveCost(state));
+    }
+
+    /** True if {@code position} is within this ability's range of its owner - the range check every targeted ability needs. */
+    protected final boolean isInRange(GameState state, Position position) {
+        return state.getMap().getDistance(owner.getPosition(), position) <= range;
     }
 
     /**

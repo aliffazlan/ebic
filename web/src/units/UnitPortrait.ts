@@ -22,18 +22,27 @@ const TYPE_RING_COLORS: Record<UnitType, string> = {
 
 export interface PortraitInfo {
   definitionId: string;
-  team: Team;
+  // Omitted for a not-yet-drafted candidate (draft cards) - there's no owning
+  // team yet, so the badge falls back to a neutral background instead of
+  // guessing one.
+  team?: Team;
   unitType: UnitType;
   name: string;
 }
 
-export function renderUnitPortrait(info: PortraitInfo, size = 72): HTMLElement {
+const NEUTRAL_BG = "#0f172a";
+
+export function renderUnitPortrait(
+  info: PortraitInfo,
+  size = 72,
+  shape: "circle" | "square" = "circle",
+): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "unit-portrait";
   wrap.style.width = `${size}px`;
   wrap.style.height = `${size}px`;
-  wrap.style.borderRadius = "50%";
-  wrap.style.background = TEAM_COLORS[info.team] ?? "#999999";
+  wrap.style.borderRadius = shape === "circle" ? "50%" : "12px";
+  wrap.style.background = info.team ? (TEAM_COLORS[info.team] ?? "#999999") : NEUTRAL_BG;
   wrap.style.border = `3px solid ${TYPE_RING_COLORS[info.unitType] ?? "#ffffff"}`;
   wrap.style.position = "relative";
   wrap.style.flexShrink = "0";

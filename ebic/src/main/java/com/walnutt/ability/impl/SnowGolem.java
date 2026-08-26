@@ -19,21 +19,21 @@ public class SnowGolem extends Ability {
     private Unit activeGolem;
 
     public SnowGolem(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 16));
         setRange(definition.getInt("cast_range", 1));
     }
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof TileTarget tileTarget)) {
             return false;
         }
         Tile tile = tileTarget.getTile();
-        return tile.isWalkable() && state.getMap().getDistance(owner.getPosition(), tile.getPosition()) <= getRange();
+        return tile.isWalkable() && isInRange(state, tile.getPosition());
     }
 
     @Override

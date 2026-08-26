@@ -15,7 +15,7 @@ public class Refraction extends PassiveAbility {
     private int usesRemainingThisTurn;
 
     public Refraction(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.maxCount = definition.getInt("count", 1);
     }
 

@@ -20,7 +20,7 @@ public class CloakAndDagger extends Ability {
     private final double damagePenalty;
 
     public CloakAndDagger(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 5));
         setRange(definition.getInt("cast_range", 2));
         this.duration = definition.getInt("duration", 2);
@@ -29,13 +29,13 @@ public class CloakAndDagger extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof TileTarget tileTarget)) {
             return false;
         }
-        return state.getMap().getDistance(owner.getPosition(), tileTarget.getTile().getPosition()) <= getRange();
+        return isInRange(state, tileTarget.getTile().getPosition());
     }
 
     @Override

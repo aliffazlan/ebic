@@ -84,7 +84,7 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             if (msg == null) {
                 continue;
             }
-            String kind = optString(msg, "kind");
+            String kind = JsonSupport.optString(msg, "kind");
             if ("end_turn".equals(kind)) {
                 hub.clearPrompt(team);
                 return ActionChoice.endTurn();
@@ -94,12 +94,12 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
                 continue;
             }
 
-            Unit unit = ids.resolve(optString(msg, "unitId"));
+            Unit unit = ids.resolve(JsonSupport.optString(msg, "unitId"));
             if (unit == null || unit.getTeam() != team) {
                 hub.sendTo(team, JsonSupport.messageEnvelope("That unit isn't yours to control."));
                 continue;
             }
-            Ability ability = findAbility(unit, optString(msg, "abilityId"));
+            Ability ability = findAbility(unit, JsonSupport.optString(msg, "abilityId"));
             if (ability == null) {
                 hub.sendTo(team, JsonSupport.messageEnvelope("That unit doesn't have that ability."));
                 continue;
@@ -128,7 +128,7 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             if (msg == null) {
                 continue;
             }
-            String value = optString(msg, "value");
+            String value = JsonSupport.optString(msg, "value");
             try {
                 Attribute attribute = Attribute.valueOf(value);
                 hub.clearPrompt(team);
@@ -175,7 +175,7 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             if (msg == null) {
                 continue;
             }
-            String definitionId = optString(msg, "definitionId");
+            String definitionId = JsonSupport.optString(msg, "definitionId");
             for (UnitDefinition option : options) {
                 if (Identifiers.normalize(option.name()).equals(definitionId)) {
                     hub.clearPrompt(team);
@@ -206,8 +206,8 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             if (msg == null) {
                 continue;
             }
-            Integer q = optInt(msg, "q");
-            Integer r = optInt(msg, "r");
+            Integer q = JsonSupport.optInt(msg, "q");
+            Integer r = JsonSupport.optInt(msg, "r");
             if (q == null || r == null) {
                 hub.sendTo(team, JsonSupport.messageEnvelope("Placement requires q and r."));
                 continue;
@@ -237,10 +237,10 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
                                       List<UnitDefinition> options, List<UnitDefinition> opponentOptions) {
         Team team = player.getTeam();
         List<UnitDefinitionSnapshot> optionSnapshots = options.stream()
-            .map(GameStateSnapshotMapper::toDefinitionSnapshot)
+            .map(def -> GameStateSnapshotMapper.toDefinitionSnapshot(def, state.getAbilityDefinitions()))
             .toList();
         List<UnitDefinitionSnapshot> opponentOptionSnapshots = opponentOptions.stream()
-            .map(GameStateSnapshotMapper::toDefinitionSnapshot)
+            .map(def -> GameStateSnapshotMapper.toDefinitionSnapshot(def, state.getAbilityDefinitions()))
             .toList();
         String json = JsonSupport.envelope("draft_round",
             new PlayerDraftRoundSnapshot(roundLabel, optionSnapshots, opponentOptionSnapshots));
@@ -252,7 +252,7 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             if (msg == null) {
                 continue;
             }
-            String definitionId = optString(msg, "definitionId");
+            String definitionId = JsonSupport.optString(msg, "definitionId");
             for (UnitDefinition option : options) {
                 if (Identifiers.normalize(option.name()).equals(definitionId)) {
                     return option;
@@ -286,7 +286,7 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             if (msg == null) {
                 continue;
             }
-            String kind = optString(msg, "kind");
+            String kind = JsonSupport.optString(msg, "kind");
             if (kind == null) {
                 kind = "";
             }
@@ -333,8 +333,8 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
 
     /** Exchanges two of this player's own working-copy positions. Returns false (and sends a rejection) if invalid. */
     private boolean applyPlacementSwap(Team team, Map<Unit, Position> working, JsonObject msg) {
-        Unit unit = ids.resolve(optString(msg, "unitId"));
-        Unit target = ids.resolve(optString(msg, "targetUnitId"));
+        Unit unit = ids.resolve(JsonSupport.optString(msg, "unitId"));
+        Unit target = ids.resolve(JsonSupport.optString(msg, "targetUnitId"));
         if (unit == null || target == null || !working.containsKey(unit) || !working.containsKey(target)) {
             hub.sendTo(team, JsonSupport.messageEnvelope("That swap isn't valid - both units must be your own already-placed units."));
             return false;
@@ -355,13 +355,13 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
      * the flow, so real-map occupancy would be meaningless here.
      */
     private boolean applyPlacementMove(GameState state, Player player, Team team, Map<Unit, Position> working, JsonObject msg) {
-        Unit unit = ids.resolve(optString(msg, "unitId"));
+        Unit unit = ids.resolve(JsonSupport.optString(msg, "unitId"));
         if (unit == null || !working.containsKey(unit)) {
             hub.sendTo(team, JsonSupport.messageEnvelope("That unit isn't yours to place."));
             return false;
         }
-        Integer q = optInt(msg, "q");
-        Integer r = optInt(msg, "r");
+        Integer q = JsonSupport.optInt(msg, "q");
+        Integer r = JsonSupport.optInt(msg, "r");
         if (q == null || r == null) {
             hub.sendTo(team, JsonSupport.messageEnvelope("Placement move requires q and r."));
             return false;
@@ -478,7 +478,7 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
     private JsonObject awaitTyped(Team team, String expectedType) {
         try {
             JsonObject msg = inbox.get(team).take();
-            String type = optString(msg, "type");
+            String type = JsonSupport.optString(msg, "type");
             if (!expectedType.equals(type)) {
                 hub.sendTo(team, JsonSupport.messageEnvelope("Not expecting a '" + type + "' message right now."));
                 return null;
@@ -503,19 +503,19 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
     }
 
     private Target resolveTarget(GameState state, JsonObject msg) {
-        String kind = optString(msg, "targetKind");
+        String kind = JsonSupport.optString(msg, "targetKind");
         if (kind == null) {
             return new NoTarget();
         }
         return switch (kind) {
             case "none" -> new NoTarget();
             case "unit" -> {
-                Unit target = ids.resolve(optString(msg, "targetUnitId"));
+                Unit target = ids.resolve(JsonSupport.optString(msg, "targetUnitId"));
                 yield target == null ? null : new UnitTarget(target);
             }
             case "tile" -> {
-                Integer q = optInt(msg, "q");
-                Integer r = optInt(msg, "r");
+                Integer q = JsonSupport.optInt(msg, "q");
+                Integer r = JsonSupport.optInt(msg, "r");
                 if (q == null || r == null) {
                     yield null;
                 }
@@ -524,27 +524,5 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             }
             default -> null;
         };
-    }
-
-    private String optString(JsonObject obj, String key) {
-        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
-            return null;
-        }
-        try {
-            return obj.get(key).getAsString();
-        } catch (RuntimeException e) {
-            return null;
-        }
-    }
-
-    private Integer optInt(JsonObject obj, String key) {
-        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
-            return null;
-        }
-        try {
-            return obj.get(key).getAsInt();
-        } catch (RuntimeException e) {
-            return null;
-        }
     }
 }

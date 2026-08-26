@@ -15,7 +15,7 @@ public class OrbitalBeam extends Ability {
     private final int damage;
 
     public OrbitalBeam(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 2));
         setRange(definition.getInt("cast_range", 5));
         this.damage = definition.getInt("damage", 40);
@@ -27,11 +27,11 @@ public class OrbitalBeam extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         Position targetPosition = resolvePosition(target);
-        return targetPosition != null && state.getMap().getDistance(owner.getPosition(), targetPosition) <= getRange();
+        return targetPosition != null && isInRange(state, targetPosition);
     }
 
     @Override

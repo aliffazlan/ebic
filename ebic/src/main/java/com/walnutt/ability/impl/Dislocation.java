@@ -16,7 +16,7 @@ public class Dislocation extends Ability {
     private final int barrierDuration;
 
     public Dislocation(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 1));
         this.barrierHp = definition.getInt("barrier_hp", 50);
         this.barrierDuration = definition.getInt("barrier_duration", 2);
@@ -24,7 +24,7 @@ public class Dislocation extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof UnitTarget unitTarget)) {

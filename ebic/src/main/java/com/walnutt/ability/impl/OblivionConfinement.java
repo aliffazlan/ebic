@@ -14,7 +14,7 @@ public class OblivionConfinement extends Ability {
     private final double intStealPercent;
 
     public OblivionConfinement(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 3));
         setRange(definition.getInt("cast_range", 2));
         this.duration = definition.getInt("duration", 1);
@@ -23,7 +23,7 @@ public class OblivionConfinement extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof UnitTarget unitTarget)) {
@@ -32,7 +32,7 @@ public class OblivionConfinement extends Ability {
         Unit other = unitTarget.getUnit();
         return !other.isDead()
             && other.getTeam() != owner.getTeam()
-            && state.getMap().getDistance(owner.getPosition(), other.getPosition()) <= getRange();
+            && isInRange(state, other.getPosition());
     }
 
     @Override

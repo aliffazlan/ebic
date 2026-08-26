@@ -8,6 +8,8 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import com.walnutt.ability.Attack;
+import com.walnutt.ability.Move;
 import com.walnutt.combat.Attribute;
 import com.walnutt.combat.CombatEngine;
 import com.walnutt.data.AbilityDefinition;
@@ -32,6 +34,10 @@ class EnergyBreakTest {
             Map.of("cooldown", 3.0, "cast_range", 2.0, "str_multiplier", 0.5)));
         enemy.addAbility(enemyAbility);
         enemyAbility.resetToMax(); // simulate an ability already sitting at its max cooldown (3)
+        Move enemyMove = new Move();
+        Attack enemyAttack = new Attack();
+        enemy.addAbility(enemyMove);
+        enemy.addAbility(enemyAttack);
 
         Player p1 = new Player("P1", Team.PLAYER_ONE);
         Player p2 = new Player("P2", Team.PLAYER_TWO);
@@ -49,5 +55,9 @@ class EnergyBreakTest {
         // A miss (defender wins the matchup) still applies the baseline cooldown_increase (1).
         CombatEngine.performAttack(state, wei, enemy, Attribute.STRENGTH, Attribute.AGILITY);
         assertEquals(7, enemyAbility.getCurrentCooldown());
+
+        // Move/Attack are basic actions, not "abilities" in the balance sense - Energy Break must not touch them.
+        assertEquals(0, enemyMove.getCurrentCooldown());
+        assertEquals(0, enemyAttack.getCurrentCooldown());
     }
 }

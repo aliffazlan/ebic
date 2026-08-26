@@ -13,7 +13,7 @@ public class Dilation extends Ability {
     private final int radius;
 
     public Dilation(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 7));
         this.duration = definition.getInt("duration", 4);
         this.radius = definition.getInt("range", 1);
@@ -21,9 +21,7 @@ public class Dilation extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        return super.canUse(state, target)
-            && state.canSpendMoves(getMoveCost(state))
-            && target instanceof NoTarget;
+        return super.canUse(state, target) && target instanceof NoTarget;
     }
 
     @Override

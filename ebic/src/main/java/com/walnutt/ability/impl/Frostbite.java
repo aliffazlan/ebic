@@ -1,8 +1,9 @@
 package com.walnutt.ability.impl;
 
+import java.util.Optional;
+
 import com.walnutt.ability.PassiveAbility;
 import com.walnutt.data.AbilityDefinition;
-import com.walnutt.effect.Effect;
 import com.walnutt.effect.impl.FrostbiteEffect;
 import com.walnutt.event.DamageEvent;
 import com.walnutt.game.GameState;
@@ -14,7 +15,7 @@ public class Frostbite extends PassiveAbility {
     private final double killThreshold;
 
     public Frostbite(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.duration = definition.getInt("duration", 2);
         this.killThreshold = definition.getDouble("kill_threshold", 0.1);
     }
@@ -25,15 +26,9 @@ public class Frostbite extends PassiveAbility {
             return;
         }
         Unit target = event.getTarget();
-        FrostbiteEffect existing = null;
-        for (Effect effect : target.getEffects()) {
-            if (effect instanceof FrostbiteEffect frostbiteEffect) {
-                existing = frostbiteEffect;
-                break;
-            }
-        }
-        if (existing != null) {
-            existing.setRemainingTurns(duration);
+        Optional<FrostbiteEffect> existing = target.getActiveEffect(FrostbiteEffect.class);
+        if (existing.isPresent()) {
+            existing.get().setRemainingTurns(duration);
         } else {
             target.addEffect(new FrostbiteEffect(getOwner(), duration, killThreshold));
         }

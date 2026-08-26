@@ -54,4 +54,34 @@ class SanityEclipseTest {
 
         assertEquals(200 - 60, target.getHealth()); // (80 - 20) * 1.0 = 60, despite target being invulnerable
     }
+
+    @Test
+    void doesNotDamageAlliesCaughtInTheBlast() {
+        Unit caster = new BasicUnit("Harbinger", Team.PLAYER_ONE, new UnitStats(0, 0, 80, 100));
+        SanityEclipse ability = new SanityEclipse(new AbilityDefinition("Sanity's Eclipse", "active", "desc",
+            Map.of("cooldown", 9.0, "cast_range", 4.0, "delay", 1.0, "radius", 1.0, "int_diff_dmg", 1.0)));
+        caster.addAbility(ability);
+        Unit ally = new BasicUnit("Ally", Team.PLAYER_ONE, new UnitStats(0, 0, 20, 200));
+        Unit enemy = new BasicUnit("Enemy", Team.PLAYER_TWO, new UnitStats(0, 0, 20, 200));
+
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        p1.addUnit(caster);
+        p1.addUnit(ally);
+        p2.addUnit(enemy);
+        GameMap map = new GameMap(5);
+        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+        state.setRemainingMoves(3);
+        map.moveUnit(caster, map.getTile(new Position(0, 0)));
+        map.moveUnit(ally, map.getTile(new Position(3, 0)));
+        map.moveUnit(enemy, map.getTile(new Position(3, 1))); // adjacent to ally, both in blast radius
+
+        TileTarget tileTarget = new TileTarget(map.getTile(ally.getPosition()));
+        assertTrue(ability.canUse(state, tileTarget));
+        ability.onUse(state, tileTarget);
+        caster.endTurn(state);
+
+        assertEquals(200, ally.getHealth(), "allies caught in the blast must take no damage");
+        assertEquals(200 - 60, enemy.getHealth(), "the enemy in the same blast still takes the int-diff damage");
+    }
 }

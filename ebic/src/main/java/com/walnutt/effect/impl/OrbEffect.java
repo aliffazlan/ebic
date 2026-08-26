@@ -39,6 +39,9 @@ public class OrbEffect extends Effect {
         }
         int casterIntelligence = caster.getAttributeValue(Attribute.INTELLIGENCE);
         for (Unit unit : state.getMap().getUnitsInRadius(targetPosition, radius)) {
+            if (unit.getTeam() == caster.getTeam() || unit.isDead()) {
+                continue;
+            }
             int diff = casterIntelligence - unit.getAttributeValue(Attribute.INTELLIGENCE);
             int damage = (int) Math.round(Math.max(0, diff) * intDiffMultiplier);
             if (damage <= 0) {

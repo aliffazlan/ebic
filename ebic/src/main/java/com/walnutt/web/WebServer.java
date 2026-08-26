@@ -98,8 +98,8 @@ public final class WebServer {
 
     private void handleRegister(Context ctx) {
         JsonObject body = readJsonBody(ctx);
-        String username = optString(body, "username");
-        String password = optString(body, "password");
+        String username = JsonSupport.optString(body, "username");
+        String password = JsonSupport.optString(body, "password");
         AuthService.SessionResult result = auth.register(username, password);
         setSessionCookie(ctx, result.token());
         JsonObject payload = new JsonObject();
@@ -110,8 +110,8 @@ public final class WebServer {
 
     private void handleLogin(Context ctx) {
         JsonObject body = readJsonBody(ctx);
-        String username = optString(body, "username");
-        String password = optString(body, "password");
+        String username = JsonSupport.optString(body, "username");
+        String password = JsonSupport.optString(body, "password");
         AuthService.SessionResult result = auth.login(username, password, clientIp(ctx));
         setSessionCookie(ctx, result.token());
         JsonObject payload = new JsonObject();
@@ -148,7 +148,7 @@ public final class WebServer {
     private void handleJoinMatch(Context ctx) {
         AuthService.AuthedUser user = requireAuth(ctx);
         JsonObject body = readJsonBody(ctx);
-        String joinCode = optString(body, "joinCode");
+        String joinCode = JsonSupport.optString(body, "joinCode");
         MatchService.MatchSummary summary = matches.joinMatch(user.userId(), joinCode);
         JsonObject payload = new JsonObject();
         payload.addProperty("matchId", summary.matchId());
@@ -296,17 +296,6 @@ public final class WebServer {
             return parsed.getAsJsonObject();
         } catch (JsonSyntaxException e) {
             throw new ApiException(400, "malformed JSON body");
-        }
-    }
-
-    private String optString(JsonObject obj, String key) {
-        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
-            return null;
-        }
-        try {
-            return obj.get(key).getAsString();
-        } catch (RuntimeException e) {
-            return null;
         }
     }
 

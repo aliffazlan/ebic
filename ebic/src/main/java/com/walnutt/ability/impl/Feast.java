@@ -16,7 +16,7 @@ public class Feast extends Ability {
     private final int rootDuration;
 
     public Feast(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 7));
         setRange(definition.getInt("cast_range", 3));
         this.duration = definition.getInt("duration", 3);
@@ -27,14 +27,14 @@ public class Feast extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof TileTarget tileTarget)) {
             return false;
         }
         Tile tile = tileTarget.getTile();
-        return tile.isWalkable() && state.getMap().getDistance(owner.getPosition(), tile.getPosition()) <= getRange();
+        return tile.isWalkable() && isInRange(state, tile.getPosition());
     }
 
     @Override

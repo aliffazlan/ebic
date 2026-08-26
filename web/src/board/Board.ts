@@ -49,6 +49,12 @@ export class Board {
   // mid-flash by an unrelated state change.
   readonly strobeLayer = new Container();
   readonly uiLayer = new Container();
+  // Sits above everything else so a stack picker's icons are always
+  // clickable, and is never touched by refreshHighlights()'s uiLayer wipe -
+  // same reasoning as strobeLayer, this needs to survive unrelated state
+  // updates (e.g. a new snapshot arriving) without being torn down mid-pick,
+  // it's only ever rebuilt by renderStackPicker() itself.
+  readonly stackPickerLayer = new Container();
 
   private iconFactory: UnitIconFactory;
   private tileGraphics = new Map<string, Graphics>();
@@ -65,13 +71,35 @@ export class Board {
   // arriving mid-tween can look up and cancel the unit's own in-flight move
   // tween rather than fighting it - see animateUnitMove.
   private activeMoveTicks = new Map<string, () => void>();
+  // The latest full unit list (from a real snapshot or a synthesized
+  // placement one) - kept so a unit click handler can resolve the *current*
+  // UnitSnapshot for its tile instead of the one captured when its container
+  // was first created, and so a tile with more than one occupant can be
+  // detected at all (see upsertUnit's pointertap handler and
+  // renderStackPicker).
+  private currentUnits: UnitSnapshot[] = [];
+  // Which tile's stack picker (if any) is currently open - a stacked tile
+  // (more than one unit sharing a q,r, which only normal per-tile occupancy
+  // rules would otherwise prevent - see CLAUDE.md's tile-stacking abilities)
+  // hides every occupant but the front-most one from clicks, since Pixi hit
+  // testing only ever returns the topmost overlapping display object. This
+  // renders a small row of individually-clickable icons above the tile so
+  // every occupant becomes reachable.
+  private stackPickerTile: AxialCoord | null = null;
 
   constructor(app: Application, store: GameStateStore, callbacks: BoardCallbacks) {
     this.app = app;
     this.store = store;
     this.callbacks = callbacks;
     this.iconFactory = new UnitIconFactory(app.renderer);
-    this.root.addChild(this.boardLayer, this.unitsLayer, this.vfxLayer, this.strobeLayer, this.uiLayer);
+    this.root.addChild(
+      this.boardLayer,
+      this.unitsLayer,
+      this.vfxLayer,
+      this.strobeLayer,
+      this.uiLayer,
+      this.stackPickerLayer,
+    );
     this.recenter();
 
     this.unsubscribe = this.store.subscribe((state) => {
@@ -178,12 +206,16 @@ export class Board {
     g.on("pointerout", () => {
       g.clear().poly(points).fill({ color: TILE_FILL }).stroke({ width: 1, color: TILE_STROKE });
     });
-    g.on("pointertap", () => this.callbacks.onTileClick(coord));
+    g.on("pointertap", () => {
+      this.closeStackPicker();
+      this.callbacks.onTileClick(coord);
+    });
     return g;
   }
 
   private async applySnapshot(snapshot: { mapRadius: number; units: UnitSnapshot[] }): Promise<void> {
     this.ensureMap(snapshot.mapRadius);
+    this.currentUnits = snapshot.units;
 
     const seen = new Set<string>();
     for (const unit of snapshot.units) {
@@ -201,6 +233,11 @@ export class Board {
         this.unitSprites.delete(id);
       }
     }
+    // The stack composition (or its existence at all) may have just changed
+    // (a stacked unit died, moved away, etc.) - re-render so a stale picker
+    // never lingers, and closes itself automatically once fewer than 2
+    // occupants remain.
+    this.renderStackPicker();
   }
 
   /**
@@ -248,9 +285,24 @@ export class Board {
       container = new Container();
       container.eventMode = "static";
       container.cursor = "pointer";
+      const unitId = unit.id;
       container.on("pointertap", (e) => {
         e.stopPropagation();
-        this.callbacks.onUnitClick(unit);
+        // Resolve the *current* unit and its tile-mates fresh from the last
+        // snapshot rather than relying on `unit`, which is only ever the
+        // object this container was first created with (a stale reference
+        // on every snapshot after the first, since a new UnitSnapshot object
+        // arrives every time) - id/team never change so callers relying on
+        // just those were unaffected before, but current HP/status wasn't.
+        const current = this.currentUnits.find((u) => u.id === unitId);
+        if (!current) return;
+        const stack = this.currentUnits.filter((u) => !u.dead && u.q === current.q && u.r === current.r);
+        if (stack.length > 1) {
+          this.toggleStackPicker({ q: current.q, r: current.r });
+        } else {
+          this.closeStackPicker();
+          this.callbacks.onUnitClick(current);
+        }
       });
       this.unitsLayer.addChild(container);
       this.unitSprites.set(unit.id, container);
@@ -395,5 +447,94 @@ export class Board {
       .stroke({ width: 2, color: LEGAL_TILE_COLOR, alpha: 0.8 });
     highlight.position.set(center.x, center.y);
     this.uiLayer.addChild(highlight);
+  }
+
+  /** Opens the picker for `tile` if it's not already open there, otherwise closes it (a second click dismisses it). */
+  private toggleStackPicker(tile: AxialCoord): void {
+    if (this.stackPickerTile && this.stackPickerTile.q === tile.q && this.stackPickerTile.r === tile.r) {
+      this.stackPickerTile = null;
+    } else {
+      this.stackPickerTile = tile;
+    }
+    this.renderStackPicker();
+  }
+
+  private closeStackPicker(): void {
+    if (!this.stackPickerTile) return;
+    this.stackPickerTile = null;
+    this.renderStackPicker();
+  }
+
+  /**
+   * Draws a row of individually-clickable icons, one per unit currently
+   * sharing `stackPickerTile`, floating just above that tile - the only way
+   * to reach anything but the front-most occupant, since overlapping display
+   * objects only ever hit-test to whichever one is on top. Rebuilt from
+   * scratch on every call (cheap - at most a handful of icons) rather than
+   * diffed, mirroring uiLayer/refreshHighlights' own "clear and redraw"
+   * approach elsewhere in this file.
+   */
+  private renderStackPicker(): void {
+    this.stackPickerLayer.removeChildren();
+    if (!this.stackPickerTile) return;
+
+    const tile = this.stackPickerTile;
+    const units = this.currentUnits.filter((u) => !u.dead && u.q === tile.q && u.r === tile.r);
+    if (units.length < 2) {
+      // The stack no longer exists (a unit died/moved away since this was
+      // opened) - nothing to show, and nothing left to pick between.
+      this.stackPickerTile = null;
+      return;
+    }
+
+    const center = axialToPixel(tile, HEX_SIZE);
+    const iconSize = HEX_SIZE * 0.9;
+    const spacing = iconSize + 8;
+    const startX = center.x - (spacing * (units.length - 1)) / 2;
+    const y = center.y - HEX_SIZE * 1.7;
+
+    const panel = new Container();
+    panel.addChild(
+      new Graphics()
+        .roundRect(startX - iconSize / 2 - 8, y - iconSize / 2 - 8, spacing * (units.length - 1) + iconSize + 16, iconSize + 16, 8)
+        .fill({ color: 0x0f172a, alpha: 0.92 })
+        .stroke({ width: 1, color: 0x334155 }),
+    );
+    this.stackPickerLayer.addChild(panel);
+
+    void this.populateStackPickerIcons(panel, units, startX, y, spacing, iconSize);
+  }
+
+  private async populateStackPickerIcons(
+    panel: Container,
+    units: UnitSnapshot[],
+    startX: number,
+    y: number,
+    spacing: number,
+    iconSize: number,
+  ): Promise<void> {
+    for (let i = 0; i < units.length; i++) {
+      const unit = units[i];
+      const x = startX + i * spacing;
+      const texture = await this.iconFactory.getTexture(unit.definitionId, unit.team, unit.unitType, unit.name.charAt(0));
+
+      const ring = new Graphics().circle(0, 0, iconSize / 2 + 3).stroke({ width: 2, color: SELECTED_RING_COLOR });
+      ring.position.set(x, y);
+      panel.addChild(ring);
+
+      const sprite = new Sprite(texture);
+      sprite.anchor.set(0.5);
+      sprite.width = iconSize;
+      sprite.height = iconSize;
+      sprite.position.set(x, y);
+      sprite.eventMode = "static";
+      sprite.cursor = "pointer";
+      sprite.on("pointertap", (e) => {
+        e.stopPropagation();
+        this.closeStackPicker();
+        this.callbacks.onUnitClick(unit);
+      });
+      panel.addChild(sprite);
+    }
   }
 }

@@ -14,7 +14,7 @@ public class Blizzard extends Ability {
     private final int damage;
 
     public Blizzard(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 4));
         setRange(definition.getInt("cast_range", 3));
         this.duration = definition.getInt("duration", 2);
@@ -23,14 +23,14 @@ public class Blizzard extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (!(target instanceof UnitTarget unitTarget)) {
             return false;
         }
         Unit other = unitTarget.getUnit();
-        return !other.isDead() && state.getMap().getDistance(owner.getPosition(), other.getPosition()) <= getRange();
+        return !other.isDead() && isInRange(state, other.getPosition());
     }
 
     @Override

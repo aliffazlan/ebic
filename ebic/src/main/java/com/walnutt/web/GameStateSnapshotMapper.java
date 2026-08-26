@@ -1,8 +1,10 @@
 package com.walnutt.web;
 
 import java.util.List;
+import java.util.Map;
 
 import com.walnutt.ability.Ability;
+import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.effect.Effect;
 import com.walnutt.game.GameState;
@@ -11,6 +13,7 @@ import com.walnutt.status.Stat;
 import com.walnutt.status.StatusFlag;
 import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitType;
+import com.walnutt.web.dto.AbilityPreviewSnapshot;
 import com.walnutt.web.dto.AbilitySnapshot;
 import com.walnutt.web.dto.EffectSnapshot;
 import com.walnutt.web.dto.GameStateSnapshot;
@@ -96,6 +99,7 @@ public final class GameStateSnapshotMapper {
         return new AbilitySnapshot(
             Identifiers.normalize(ability.getName()),
             ability.getName(),
+            ability.getDescription(),
             ability.isPassive(),
             ability.isReady(),
             ability.getCurrentCooldown(),
@@ -107,7 +111,19 @@ public final class GameStateSnapshotMapper {
         return unit.getUnitType() == UnitType.BASIC ? "basic" : Identifiers.normalize(unit.getName());
     }
 
-    public static UnitDefinitionSnapshot toDefinitionSnapshot(UnitDefinition def) {
+    /**
+     * `abilityDefs` is state.getAbilityDefinitions() from whichever GameState the
+     * caller has in scope (WebInputHandler.choosePick receives it directly;
+     * WebRenderer.renderDraftRound doesn't, so it's fed the same map separately -
+     * see GameSession, which populates both from the one GameState right after
+     * construction). Missing lookups (shouldn't happen - every drafted unit's own
+     * abilities{} list is expected to resolve, per CLAUDE.md's "every unit's ability
+     * ids wired into AbilityFactory") fall back to just the bare id, no crash.
+     */
+    public static UnitDefinitionSnapshot toDefinitionSnapshot(UnitDefinition def, Map<String, AbilityDefinition> abilityDefs) {
+        List<AbilityPreviewSnapshot> abilities = def.abilities().stream()
+            .map(id -> toAbilityPreviewSnapshot(id, abilityDefs.get(id)))
+            .toList();
         return new UnitDefinitionSnapshot(
             Identifiers.normalize(def.name()),
             def.name(),
@@ -116,7 +132,14 @@ public final class GameStateSnapshotMapper {
             def.strength(),
             def.agility(),
             def.intelligence(),
-            def.abilities()
+            abilities
         );
+    }
+
+    private static AbilityPreviewSnapshot toAbilityPreviewSnapshot(String id, AbilityDefinition def) {
+        if (def == null) {
+            return new AbilityPreviewSnapshot(id, id, "", false, 0);
+        }
+        return new AbilityPreviewSnapshot(id, def.name(), def.formattedDescription(), def.isPassive(), def.getInt("cooldown", 0));
     }
 }

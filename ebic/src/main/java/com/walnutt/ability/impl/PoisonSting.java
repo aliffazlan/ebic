@@ -13,7 +13,7 @@ public class PoisonSting extends PassiveAbility {
     private final int damagePerTurnRemaining;
 
     public PoisonSting(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.duration = definition.getInt("duration", 3);
         this.damagePerTurnRemaining = definition.getInt("dmg_per_duration", 4);
     }

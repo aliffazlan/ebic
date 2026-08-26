@@ -46,12 +46,8 @@ public class InfernalBladeEffect extends Effect {
 
     /** If the target is already cursed, stack duration onto the existing instance instead of refreshing it. */
     public static void applyOrExtend(Unit target, Unit source, int duration) {
-        for (Effect effect : target.getEffects()) {
-            if (effect instanceof InfernalBladeEffect existing) {
-                existing.extendDuration(duration);
-                return;
-            }
-        }
-        target.addEffect(new InfernalBladeEffect(source, duration));
+        target.getActiveEffect(InfernalBladeEffect.class).ifPresentOrElse(
+            existing -> existing.extendDuration(duration),
+            () -> target.addEffect(new InfernalBladeEffect(source, duration)));
     }
 }

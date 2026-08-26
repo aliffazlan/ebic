@@ -17,7 +17,7 @@ public class Duel extends Ability {
     private final double winMultiplier;
 
     public Duel(AbilityDefinition definition) {
-        super(definition.name(), definition.description(), false);
+        super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 10));
         setRange(definition.getInt("cast_range", 1));
         this.duration = definition.getInt("duration", 4);
@@ -28,7 +28,7 @@ public class Duel extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (!super.canUse(state, target) || !state.canSpendMoves(getMoveCost(state))) {
+        if (!super.canUse(state, target)) {
             return false;
         }
         if (owner.hasStatus(StatusFlag.DUELING)) {
@@ -41,7 +41,7 @@ public class Duel extends Ability {
         return !other.isDead()
             && other.getTeam() != owner.getTeam()
             && !other.hasStatus(StatusFlag.DUELING)
-            && state.getMap().getDistance(owner.getPosition(), other.getPosition()) <= getRange();
+            && isInRange(state, other.getPosition());
     }
 
     @Override

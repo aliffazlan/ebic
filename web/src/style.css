@@ -305,9 +305,10 @@ input {
   border-color: #334155;
 }
 
-/* ---- effect hover tooltip (replaces native `title`) ---- */
+/* ---- shared hover tooltip (replaces native `title`) - effect chips, ---- */
+/* ---- ability buttons/chips both in-match and at draft time           ---- */
 
-.effect-tooltip {
+.hover-tooltip {
   position: fixed;
   z-index: 1000;
   max-width: 260px;
@@ -324,20 +325,24 @@ input {
   visibility: hidden;
   transition: opacity 0.1s ease;
 }
-.effect-tooltip.visible {
+.hover-tooltip.visible {
   opacity: 1;
   visibility: visible;
 }
 
-.effect-tooltip-title {
+.hover-tooltip-title {
   font-weight: 700;
   font-size: 13px;
   margin-bottom: 4px;
 }
 
-.effect-tooltip-meta {
+.hover-tooltip-meta {
   color: #94a3b8;
   margin-top: 4px;
+}
+
+.hover-tooltip-reason {
+  color: #fbbf24;
 }
 
 /* ---- combat log ---- */
@@ -481,20 +486,44 @@ input {
   border-color: #60a5fa;
 }
 
+.unit-card .unit-portrait {
+  display: block;
+  margin: 0 auto 10px;
+}
+
 .unit-card h5 {
   margin: 0 0 4px;
   font-size: 14px;
+  text-align: center;
+}
+
+.unit-card .hint {
+  text-align: center;
 }
 
 .unit-card .stats {
   font-size: 11px;
   color: #94a3b8;
   margin: 6px 0;
+  text-align: center;
 }
 
 .unit-card .abilities {
-  font-size: 11px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.ability-chip {
+  display: inline-block;
+  background: #1e293b;
   color: #cbd5e1;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  cursor: help;
 }
 
 .attribute-modal-panel {

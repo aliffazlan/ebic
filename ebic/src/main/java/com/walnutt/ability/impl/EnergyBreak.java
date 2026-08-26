@@ -1,6 +1,8 @@
 package com.walnutt.ability.impl;
 
 import com.walnutt.ability.Ability;
+import com.walnutt.ability.Attack;
+import com.walnutt.ability.Move;
 import com.walnutt.ability.PassiveAbility;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.event.PostAttackEvent;
@@ -13,7 +15,7 @@ public class EnergyBreak extends PassiveAbility {
     private final int bonusIncrease;
 
     public EnergyBreak(AbilityDefinition definition) {
-        super(definition.name(), definition.description());
+        super(definition.name(), definition.formattedDescription());
         this.cooldownIncrease = definition.getInt("cooldown_increase", 1);
         this.bonusIncrease = definition.getInt("bonus_increase", 3);
     }
@@ -30,7 +32,7 @@ public class EnergyBreak extends PassiveAbility {
 
     private void increaseCooldowns(Unit unit, int amount) {
         for (Ability ability : unit.getAbilities()) {
-            if (!ability.isPassive()) {
+            if (!ability.isPassive() && !(ability instanceof Move) && !(ability instanceof Attack)) {
                 ability.increaseCooldown(amount);
             }
         }
