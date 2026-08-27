@@ -155,9 +155,15 @@ public final class BotHandler implements InputHandler, ConcurrentSetupHandler {
             Comparator.<Tile>comparingInt(tile -> -state.getMap().getDistance(tile.getPosition(), enemyAnchor))
                 .thenComparingInt(tile -> state.getMap().getDistance(tile.getPosition(), ownAnchor));
 
+        if (candidates.isEmpty()) {
+            // PlacementFlow should never ask for a tile with nowhere to put one, but
+            // orElse(candidates.get(0)) would evaluate its argument eagerly and throw
+            // IndexOutOfBounds rather than report what actually went wrong.
+            throw new IllegalArgumentException("No legal placement tiles offered for " + unitToPlace.getName());
+        }
         Comparator<Tile> preference =
             unitToPlace.getUnitType() == UnitType.CHAMPION ? towardHome : towardEnemy;
-        return candidates.stream().min(preference).orElse(candidates.get(0));
+        return candidates.stream().min(preference).orElseThrow();
     }
 
     // ---- ConcurrentSetupHandler: the web setup path ----

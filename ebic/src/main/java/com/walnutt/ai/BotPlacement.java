@@ -50,7 +50,7 @@ public final class BotPlacement {
 
         // The champion keeps the anchor - the tile furthest from the enemy.
         if (champion != null && base.containsKey(champion)) {
-            Position championSpot = openPositions.contains(ownAnchor) ? ownAnchor : safest(openPositions, enemyAnchor, state);
+            Position championSpot = openPositions.contains(ownAnchor) ? ownAnchor : safest(openPositions, enemyAnchor, ownAnchor, state);
             arrangement.put(champion, championSpot);
             openPositions.remove(championSpot);
             unitsToPlace.remove(champion);
@@ -83,9 +83,12 @@ public final class BotPlacement {
         return -range + durability + elitePull;
     }
 
-    private static Position safest(List<Position> positions, Position enemyAnchor, GameState state) {
+    /** Furthest from the enemy, ties broken toward home - the same rule the main sort uses, and for the same reason. */
+    private static Position safest(List<Position> positions, Position enemyAnchor, Position ownAnchor, GameState state) {
         return positions.stream()
-            .max(Comparator.comparingInt(p -> state.getMap().getDistance(p, enemyAnchor)))
+            .min(Comparator
+                .<Position>comparingInt(p -> -state.getMap().getDistance(p, enemyAnchor))
+                .thenComparingInt(p -> state.getMap().getDistance(p, ownAnchor)))
             .orElseThrow(() -> new IllegalStateException("No positions to place the champion on"));
     }
 

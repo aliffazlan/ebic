@@ -67,8 +67,9 @@ public final class AbilityHints {
             if (!context.isEnemy(target)) {
                 return Double.NEGATIVE_INFINITY;
             }
-            double damage = context.ability().getMaxCooldown() > 0 ? 50 : 25; // two ticks of 25
-            return damage * context.targetPriority(target);
+            // Roots for two turns and ticks for 25 each; the root is worth roughly a
+            // third tick's worth of tempo on top.
+            return 75.0 * context.targetPriority(target);
         });
 
         // Damages an enemy, heals an ally - scaled by the caster's strength advantage,

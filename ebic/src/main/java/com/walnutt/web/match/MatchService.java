@@ -61,16 +61,9 @@ public final class MatchService {
     }
 
     private long ensureBotUser() {
-        try (PreparedStatement ps = db.connection().prepareStatement(
-                "SELECT id FROM users WHERE username = ? COLLATE NOCASE")) {
-            ps.setString(1, BOT_USERNAME);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong("id");
-                }
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Failed to look up the bot account", e);
+        Long existing = findBotUser();
+        if (existing != null) {
+            return existing;
         }
 
         // Hashed like any other password so login()'s verify path behaves normally; the
@@ -93,7 +86,25 @@ public final class MatchService {
                 return keys.getLong(1);
             }
         } catch (SQLException e) {
+            // username is UNIQUE, so losing a race with another MatchService constructed
+            // at the same time surfaces here; the row it created is the one we wanted.
+            Long raced = findBotUser();
+            if (raced != null) {
+                return raced;
+            }
             throw new IllegalStateException("Failed to create the bot account", e);
+        }
+    }
+
+    private Long findBotUser() {
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "SELECT id FROM users WHERE username = ? COLLATE NOCASE")) {
+            ps.setString(1, BOT_USERNAME);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong("id") : null;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to look up the bot account", e);
         }
     }
 

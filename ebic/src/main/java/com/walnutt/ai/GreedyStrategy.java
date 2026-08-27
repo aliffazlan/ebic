@@ -72,10 +72,17 @@ public final class GreedyStrategy implements BotStrategy {
             if (!candidate.ability().canUse(state, candidate.target())) {
                 continue;
             }
+            double score = scorer.score(state, candidate);
+            // A hint returns -infinity to mean "never, under any circumstances" - friendly
+            // fire, mainly, since several abilities (Blizzard, Soul Rip) will happily
+            // target your own units. That veto has to hold even when blundering, so these
+            // are excluded from the random pool too, not merely from the best-scoring one.
+            if (score == Double.NEGATIVE_INFINITY || Double.isNaN(score)) {
+                continue;
+            }
             affordable.add(candidate);
 
-            double score = scorer.score(state, candidate);
-            if (score <= threshold || Double.isInfinite(score)) {
+            if (score <= threshold) {
                 continue;
             }
             if (score > bestScore) {
@@ -84,9 +91,9 @@ public final class GreedyStrategy implements BotStrategy {
             }
         }
 
-        // Deliberately drawn from everything legal rather than from what scored well, so
-        // that blunderRate 1.0 is genuinely random play - the baseline the scoring has to
-        // beat for any of it to be worth keeping. Sampling only good moves would have the
+        // Drawn from everything legal rather than from what scored well, so that
+        // blunderRate 1.0 is genuinely random play - the baseline the scoring has to beat
+        // for any of it to be worth keeping. Sampling only good moves would have the
         // "random" opponent quietly using the very scoring under test.
         if (!affordable.isEmpty() && config.blunderRate() > 0
             && state.getRandom().nextDouble() < config.blunderRate()) {

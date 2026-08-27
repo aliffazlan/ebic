@@ -32,10 +32,11 @@ public final class GameSessionManager {
             BotLevel level = null;
             if (matchService.isBot(participants.playerTwoId())) {
                 botTeam = Team.PLAYER_TWO;
-                level = BotLevel.parse(matchService.getBotLevel(id));
             } else if (matchService.isBot(participants.playerOneId())) {
                 botTeam = Team.PLAYER_ONE;
-                level = BotLevel.parse(matchService.getBotLevel(id));
+            }
+            if (botTeam != null) {
+                level = storedLevel(id);
             }
 
             GameSession session = new GameSession(id, participants.playerOneId(), participants.playerTwoId(),
@@ -43,6 +44,21 @@ public final class GameSessionManager {
             session.start();
             return session;
         });
+    }
+
+    /**
+     * The level recorded on the match, defaulting rather than throwing if it no longer
+     * parses. The value passed API validation when the match was created, so an
+     * unrecognised one here means a hand-edited row or a level that has since been
+     * removed - neither is worth making a match permanently unplayable over, and the
+     * exception would escape the WS connect handler, which only catches ApiException.
+     */
+    private BotLevel storedLevel(String matchId) {
+        try {
+            return BotLevel.parse(matchService.getBotLevel(matchId));
+        } catch (IllegalArgumentException e) {
+            return BotLevel.STANDARD;
+        }
     }
 
     public Optional<GameSession> get(String matchId) {

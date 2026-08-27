@@ -13,11 +13,6 @@ public record Candidate(Unit unit, Ability ability, Target target) {
         return ability.getMoveCost(state);
     }
 
-    /** True for the cost-free actions (BASIC attacks) that never compete for the turn's move points. */
-    public boolean isFree(GameState state) {
-        return moveCost(state) == 0;
-    }
-
     public ActionChoice toActionChoice() {
         return new ActionChoice(unit, ability, target);
     }
