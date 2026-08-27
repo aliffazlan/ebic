@@ -44,9 +44,9 @@ five existing units get reworked or retuned.
 - *Overgrowth* — rings a targeted tile with Branchlings, which block movement, damage
   adjacent enemies and heal adjacent allies every turn. Occupied tiles are skipped, and
   overlapping Branchlings stack — a fully surrounded ally is healed six times over.
-- *Sprout* — plants a single Branchling anywhere on the map and teleports to it a turn
-  later, shielding itself and nearby allies on arrival. Killing the Branchling first
-  cancels the teleport, though the cooldown is already spent.
+- *Sprout* — plants a single Branchling anywhere on the map and teleports to it at the
+  start of Branch's next turn, shielding itself and nearby allies on arrival. Killing the
+  Branchling first cancels the teleport, though the cooldown is already spent.
 - Branchlings cannot move, attack or act at all.
 
 ### Unit reworks
@@ -85,6 +85,20 @@ five existing units get reworked or retuned.
 - *Objurgation* nerfed: consumes only **50%** of intelligence instead of all of it,
   converted at a 1:1 ratio into health. Cooldown 3 → **4** turns.
 
+### Interface
+
+- **Selecting a spell now outlines its cast range** on the board, so you can see how far
+  something reaches even when nothing is currently standing in that area. Legal targets
+  are still highlighted on top. Basic attacks show their range too, which matters now
+  that it varies by unit. Abilities that reach the whole map draw no band.
+- **Clicks now resolve to what you meant.** Casting a tile-targeted spell like Eruption
+  on an occupied tile used to require clicking a stray pixel of hex not covered by the
+  unit standing there; clicking the unit cancelled the cast. A tile spell clicked on a
+  unit now targets that unit's tile, and a unit spell clicked on the ground targets
+  whoever is standing there.
+- **Self-cast abilities fire immediately** when selected, instead of asking you to
+  confirm with a separate "no target" button.
+
 ### Fixed
 
 - **Timeless Strike's stun stacked wrong.** Two procs created two separate one-turn
@@ -97,6 +111,10 @@ five existing units get reworked or retuned.
   Decay each referenced a tunable that didn't exist under that name.
 - **Percentages displayed as fractions.** Counterstrike advertised "0.5 % less damage"
   instead of "50%". All percentage values now render correctly.
+- **Sprout resolved instantly.** The teleport fired as soon as Branch ended the turn it
+  was cast on, giving the opponent no window to destroy the Branchling and interrupt it.
+- **Branchling auras** now tick at the end of their controller's turn rather than the
+  start, so they resolve after that side has finished moving around them.
 
 ### Changed
 

@@ -2,7 +2,7 @@
 // overlay), driven by GameStateSnapshot pushed through GameStateStore.
 
 import { Application, Container, Graphics, Sprite, Ticker } from "pixi.js";
-import { type AxialCoord, axialToPixel, hexPolygonPoints } from "../hex/HexMath";
+import { type AxialCoord, axialToPixel, hexDistance, hexPolygonPoints } from "../hex/HexMath";
 import { UnitIconFactory } from "../units/UnitIconFactory";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
@@ -22,6 +22,9 @@ const SELECTED_RING_COLOR = 0xfacc15;
 const LEGAL_TILE_COLOR = 0x4ade80;
 const LEGAL_UNIT_RING_COLOR = 0x4ade80;
 const STROBE_RING_COLOR = 0xf97316;
+// The castable band for the selected ability. Deliberately cooler and fainter than
+// LEGAL_TILE_COLOR so "where this reaches" never competes with "what you can click".
+const CAST_RANGE_COLOR = 0x38bdf8;
 // Frame counts assume Ticker.shared's default ~60fps - matches the
 // frame-counting style already used in ParticleBurst.ts rather than
 // deltaMS-based timing, for consistency with that existing pattern.
@@ -458,6 +461,7 @@ export class Board {
     }
 
     if (state.prompt?.kind === "action" && state.selectedUnitId && state.selectedAbilityId) {
+      this.drawCastRange(state);
       const legal = state.prompt.legalTargets?.[state.selectedUnitId]?.[state.selectedAbilityId];
       if (!legal) return;
       for (const tile of legal.tiles) {
@@ -469,6 +473,43 @@ export class Board {
         const ring = new Graphics().circle(0, 0, HEX_SIZE * 0.75).stroke({ width: 3, color: LEGAL_UNIT_RING_COLOR });
         ring.position.copyFrom(sprite.position);
         this.uiLayer.addChild(ring);
+      }
+    }
+  }
+
+  /**
+   * Outlines how far the selected ability reaches, independent of what happens to be a
+   * legal target right now - a player needs to see "this spell covers three tiles" even
+   * when nothing is standing in that area. Abilities with an effective range of 0 (pure
+   * self-casts) draw nothing.
+   */
+  private drawCastRange(state: MatchUiState): void {
+    const caster = this.currentUnits.find((u) => u.id === state.selectedUnitId);
+    if (!caster) return;
+    const ability = caster.abilities.find((a) => a.id === state.selectedAbilityId);
+    // range < 0 means the ability reaches the whole map (Pylon, Manifestation,
+    // Sprout) - a band would just be a blue wash over everything, so skip it and
+    // let the legal-target highlights speak for themselves.
+    if (!ability || ability.range <= 0) return;
+
+    const origin = { q: caster.q, r: caster.r };
+    const minRange = ability.minRange ?? 0;
+    for (let q = -this.mapRadius; q <= this.mapRadius; q++) {
+      const rMin = Math.max(-this.mapRadius, -q - this.mapRadius);
+      const rMax = Math.min(this.mapRadius, -q + this.mapRadius);
+      for (let r = rMin; r <= rMax; r++) {
+        const distance = hexDistance(origin, { q, r });
+        if (distance > ability.range || distance < minRange) continue;
+        // The caster's own tile is only worth shading when the ability can actually
+        // be aimed there (minRange 0), and even then it already has a selection ring.
+        if (distance === 0) continue;
+        const center = axialToPixel({ q, r }, HEX_SIZE);
+        const band = new Graphics()
+          .poly(hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - 2))
+          .fill({ color: CAST_RANGE_COLOR, alpha: 0.08 })
+          .stroke({ width: 1, color: CAST_RANGE_COLOR, alpha: 0.45 });
+        band.position.set(center.x, center.y);
+        this.uiLayer.addChild(band);
       }
     }
   }

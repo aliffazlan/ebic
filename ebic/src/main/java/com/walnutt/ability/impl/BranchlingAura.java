@@ -5,7 +5,7 @@ import java.util.List;
 import com.walnutt.ability.PassiveAbility;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.event.DamageEvent;
-import com.walnutt.event.TurnStartEvent;
+import com.walnutt.event.TurnEndEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.unit.Unit;
 
@@ -13,10 +13,10 @@ import com.walnutt.unit.Unit;
  * The aura carried by each of Branch's Branchlings - damages adjacent enemies, heals
  * adjacent allies, once per round.
  *
- * Driven off TurnStartEvent rather than an effect duration on purpose: registered
- * summons never get startTurn/endTurn from the turn loop, so their effects never tick,
- * but the event bus still reaches them. Stacking is free - six Branchlings around one
- * ally each run their own copy of this.
+ * Driven off a turn event rather than an effect duration on purpose: registered summons
+ * never get startTurn/endTurn from the turn loop, so their effects never tick, but the
+ * event bus still reaches them. Stacking is free - six Branchlings around one ally each
+ * run their own copy of this.
  */
 public class BranchlingAura extends PassiveAbility {
     private final int radius;
@@ -31,12 +31,13 @@ public class BranchlingAura extends PassiveAbility {
     }
 
     @Override
-    public void onTurnStart(GameState state, TurnStartEvent event) {
+    public void onTurnEnd(GameState state, TurnEndEvent event) {
         Unit self = getOwner();
         if (self == null || self.isDead() || self.getPosition() == null) {
             return;
         }
-        // Fire on its own controller's turn only, so it lands exactly once per round.
+        // Fire at the end of its own controller's turn only, so it lands exactly once
+        // per round and after that side has finished moving around it.
         if (event.team() != self.getTeam()) {
             return;
         }

@@ -16,6 +16,13 @@ import com.walnutt.unit.Unit;
 
 public abstract class Ability extends TriggerHandler {
 
+    /**
+     * Range for abilities that can be aimed anywhere on the map (Pylon, Manifestation,
+     * Sprout). Distinct from a large number so the client can tell "reaches everywhere"
+     * apart from "reaches 8 tiles" and skip drawing a misleading range band.
+     */
+    public static final int UNLIMITED_RANGE = -1;
+
     private final String name;
     private final String description;
     private final boolean isPassive;
@@ -96,6 +103,15 @@ public abstract class Ability extends TriggerHandler {
         this.range = range;
     }
 
+    /**
+     * Closest distance this ability can be aimed at; 0 for everything except a basic
+     * Attack under a minimum-range effect. Exposed so the client can draw the castable
+     * band without re-deriving the rule.
+     */
+    public int getMinRange() {
+        return 0;
+    }
+
     public int getMoveCost(GameState state) {
         return isPassive ? 0 : 1;
     }
@@ -114,7 +130,8 @@ public abstract class Ability extends TriggerHandler {
 
     /** True if {@code position} is within this ability's range of its owner - the range check every targeted ability needs. */
     protected final boolean isInRange(GameState state, Position position) {
-        return state.getMap().getDistance(owner.getPosition(), position) <= range;
+        return range == UNLIMITED_RANGE
+            || state.getMap().getDistance(owner.getPosition(), position) <= range;
     }
 
     /**

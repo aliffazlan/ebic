@@ -7,6 +7,8 @@ public record AbilitySnapshot(
     boolean passive,
     boolean ready,
     int currentCooldown,
-    int maxCooldown
+    int maxCooldown,
+    int range,
+    int minRange
 ) {
 }

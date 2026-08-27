@@ -17,6 +17,7 @@ public class Manifestation extends Ability {
     public Manifestation(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 5));
+        setRange(UNLIMITED_RANGE); // castable anywhere on the map - no distance check in canUse
         this.damageReduction = definition.getDouble("dmg_reduction", 0.5);
         this.duration = definition.getInt("duration", 2);
     }

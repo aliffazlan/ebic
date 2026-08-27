@@ -137,7 +137,9 @@ public final class GameStateSnapshotMapper {
             ability.isPassive(),
             ability.isReady(),
             ability.getCurrentCooldown(),
-            ability.getMaxCooldown()
+            ability.getMaxCooldown(),
+            ability.getRange(),
+            ability.getMinRange()
         );
     }
 

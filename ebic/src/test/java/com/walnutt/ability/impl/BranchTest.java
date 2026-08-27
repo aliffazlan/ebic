@@ -16,8 +16,8 @@ import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.JsonDataLoader;
 import com.walnutt.effect.impl.BarrierEffect;
 import com.walnutt.effect.impl.OvergrowthEffect;
-import com.walnutt.effect.impl.SproutEffect;
 import com.walnutt.event.DamageEvent;
+import com.walnutt.event.TurnEndEvent;
 import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
@@ -139,7 +139,7 @@ class BranchTest {
         overgrowth.onUse(state, new TileTarget(map.getTile(new Position(0, 2))));
         assertEquals(6, branchlingCount());
 
-        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
+        state.getEventBus().publish(state, new TurnEndEvent(Team.PLAYER_ONE));
 
         // 6 Branchlings x 8 healing each, all landing on the one ally in the middle.
         assertEquals(100 + (6 * 8), ally.getHealth(), "overlapping auras stack");
@@ -157,9 +157,10 @@ class BranchTest {
         sprout.onUse(state, new TileTarget(map.getTile(new Position(3, 0))));
         assertEquals(1, branchlingCount());
 
-        SproutEffect effect = branch.getActiveEffect(SproutEffect.class).orElseThrow();
-        effect.setRemainingTurns(0);
-        branch.removeExpiredEffects(state);
+        // Resolves at the start of Branch's NEXT turn, not when this one ends.
+        branch.endTurn(state);
+        assertEquals(1, branchlingCount(), "still pending after the casting turn ends");
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
 
         assertEquals(new Position(3, 0), branch.getPosition(), "Branch teleports to the Branchling");
         assertEquals(0, branchlingCount(), "the Branchling is consumed");
@@ -182,9 +183,7 @@ class BranchTest {
         branchling.takeDamage(state, new DamageEvent(killer, branchling, 9999));
         assertTrue(branchling.isDead());
 
-        SproutEffect effect = branch.getActiveEffect(SproutEffect.class).orElseThrow();
-        effect.setRemainingTurns(0);
-        branch.removeExpiredEffects(state);
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
 
         assertNotEquals(new Position(3, 0), branch.getPosition(), "no teleport");
         assertTrue(branch.getActiveEffect(BarrierEffect.class).isEmpty(), "and no barrier");
@@ -227,10 +226,39 @@ class BranchTest {
         branch.takeDamage(state, new DamageEvent(killer, branch, 99999));
         assertTrue(branch.isDead());
 
-        SproutEffect effect = branch.getActiveEffect(SproutEffect.class).orElseThrow();
-        effect.setRemainingTurns(0);
-        branch.removeExpiredEffects(state);
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
 
         assertEquals(0, branchlingCount(), "the Branchling must not be orphaned on the board");
+    }
+
+    /**
+     * The reported bug: with the delay counted down in Unit.endTurn, casting Sprout and
+     * ending your turn resolved the teleport immediately, so the opponent never got a
+     * window to hunt the Branchling down. It must survive a full opposing turn.
+     */
+    @Test
+    void sproutDoesNotResolveUntilBranchsNextTurnStarts() {
+        setUpBoard();
+        Sprout sprout = newSprout();
+        branch.addAbility(sprout);
+        sprout.onUse(state, new TileTarget(map.getTile(new Position(3, 0))));
+        Position castPosition = branch.getPosition();
+
+        // Branch ends the turn they cast on - nothing should happen yet.
+        branch.endTurn(state);
+        state.getEventBus().publish(state, new TurnEndEvent(Team.PLAYER_ONE));
+        assertEquals(castPosition, branch.getPosition(), "no teleport when the casting turn ends");
+        assertEquals(1, branchlingCount());
+
+        // A whole opposing turn passes - still pending, so it can be interrupted.
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_TWO));
+        state.getEventBus().publish(state, new TurnEndEvent(Team.PLAYER_TWO));
+        assertEquals(castPosition, branch.getPosition(), "still pending through the opponent's turn");
+        assertEquals(1, branchlingCount());
+
+        // Branch's next turn begins - now it lands.
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
+        assertEquals(new Position(3, 0), branch.getPosition(), "resolves at the start of Branch's next turn");
+        assertEquals(0, branchlingCount());
     }
 }

@@ -210,7 +210,7 @@ export class MatchScreen implements Screen, MatchActions {
     }
 
     if (state.selectedAbilityId && state.selectedUnitId) {
-      this.castAbility("tile", { q: coord.q, r: coord.r });
+      this.castAtCoord(coord);
       return;
     }
 
@@ -237,7 +237,7 @@ export class MatchScreen implements Screen, MatchActions {
     }
 
     if (state.selectedAbilityId && state.selectedUnitId) {
-      this.castAbility("unit", { unitId: unit.id });
+      this.castAtCoord({ q: unit.q, r: unit.r }, unit.id);
       return;
     }
 
@@ -252,6 +252,73 @@ export class MatchScreen implements Screen, MatchActions {
 
   selectAbility(abilityId: string | null): void {
     this.store.setState({ selectedAbilityId: abilityId });
+    if (abilityId) this.castImmediatelyIfSelfTargeted(abilityId);
+  }
+
+  /**
+   * A self-cast has exactly one possible outcome, so making the player select it and
+   * then confirm with a "no target" button is pure ceremony - fire it straight away.
+   *
+   * Gated on the ability accepting a no-target cast and offering no unit or tile
+   * choices at all; anything that could also be aimed somewhere still waits for a click.
+   */
+  private castImmediatelyIfSelfTargeted(abilityId: string): void {
+    const state = this.store.getState();
+    const prompt = state.prompt;
+    if (!prompt || prompt.kind !== "action" || !state.selectedUnitId) return;
+    const legal = prompt.legalTargets?.[state.selectedUnitId]?.[abilityId];
+    if (!legal || !legal.noTarget) return;
+    if (legal.unitIds.length > 0 || legal.tiles.length > 0) return;
+    this.castAbility("none");
+  }
+
+  /**
+   * Resolves what the player *meant* by a click, rather than making them hit the exact
+   * shape the ability wants.
+   *
+   * The problem this solves: Eruption targets a tile, but a tile with a unit standing on
+   * it swallows the click as a unit click, so casting on an occupied tile used to mean
+   * hunting for a stray pixel of hex not covered by the sprite. The reverse is just as
+   * annoying for unit-targeted spells.
+   *
+   * The ability's own legalTargets tells us which shape it accepts, so this stays
+   * data-driven - there's no per-ability knowledge here, and an ability accepting both
+   * shapes still gets whatever the player literally clicked.
+   */
+  private castAtCoord(coord: AxialCoord, clickedUnitId?: string): void {
+    const state = this.store.getState();
+    if (!state.selectedUnitId || !state.selectedAbilityId) return;
+    const prompt = state.prompt;
+    const legal =
+      prompt && prompt.kind === "action"
+        ? prompt.legalTargets?.[state.selectedUnitId]?.[state.selectedAbilityId]
+        : undefined;
+
+    const takesUnits = !legal || legal.unitIds.length > 0;
+    const takesTiles = !legal || legal.tiles.length > 0;
+
+    if (clickedUnitId) {
+      // Clicked a unit. If this spell only lands on tiles, aim at the tile it occupies.
+      if (!takesUnits && takesTiles) {
+        this.castAbility("tile", { q: coord.q, r: coord.r });
+      } else {
+        this.castAbility("unit", { unitId: clickedUnitId });
+      }
+      return;
+    }
+
+    // Clicked bare ground. If this spell only lands on units, redirect to whoever is
+    // standing there - but only if someone actually is.
+    if (!takesTiles && takesUnits) {
+      const occupant = this.store
+        .getState()
+        .snapshot?.units.find((u) => u.q === coord.q && u.r === coord.r && !u.dead);
+      if (occupant) {
+        this.castAbility("unit", { unitId: occupant.id });
+        return;
+      }
+    }
+    this.castAbility("tile", { q: coord.q, r: coord.r });
   }
 
   castAbility(targetKind: "unit" | "tile" | "none", target?: { unitId?: string; q?: number; r?: number }): void {

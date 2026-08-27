@@ -11,6 +11,11 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 import com.walnutt.ability.target.UnitTarget;
+import com.walnutt.ability.impl.Fireblast;
+import com.walnutt.ability.impl.Manifestation;
+import com.walnutt.ability.impl.PylonAbility;
+import com.walnutt.ability.impl.Sprout;
+import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.JsonDataLoader;
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.game.GameState;
@@ -18,6 +23,7 @@ import com.walnutt.game.Player;
 import com.walnutt.game.Team;
 import com.walnutt.map.GameMap;
 import com.walnutt.map.Position;
+import com.walnutt.effect.impl.SteadyFocusEffect;
 import com.walnutt.status.Stat;
 import com.walnutt.unit.BasicUnit;
 import com.walnutt.unit.Unit;
@@ -134,5 +140,42 @@ class AttackRangeTest {
             new UnitDefinition("Nameless", "elite", 100, 10, 10, 10, 0, List.of());
 
         assertEquals(1, noRange.effectiveAttackRange());
+    }
+
+    /** Attack reports the owner's stat, not the unused base `range` field, so the client can draw it. */
+    @Test
+    void attackReportsTheOwnersEffectiveRangeToTheClient() {
+        Unit archer = rangedAttacker(4);
+        Attack attack = new Attack();
+        archer.addAbility(attack);
+
+        assertEquals(4, attack.getRange());
+        assertEquals(1, attack.getMinRange(), "floored at 1 - you can never hit your own tile");
+
+        archer.addEffect(new SteadyFocusEffect(2, 3, 3));
+        assertEquals(7, attack.getRange(), "a range buff shows through");
+        assertEquals(3, attack.getMinRange());
+    }
+
+    /**
+     * Abilities castable anywhere on the map must report UNLIMITED_RANGE rather than the
+     * default of 1 - otherwise the client would draw a one-tile band around a spell that
+     * actually reaches the whole board, which is worse than drawing nothing.
+     */
+    @Test
+    void mapWideAbilitiesReportUnlimitedRange() {
+        Map<String, Double> stats = Map.of("cooldown", 5.0, "delay", 1.0, "barrier", 20.0,
+            "dmg_reduction", 0.5, "duration", 2.0, "death_damage", 50.0, "death_duration", 1.0);
+
+        assertEquals(Ability.UNLIMITED_RANGE,
+            new Manifestation(new AbilityDefinition("Manifestation", "active", "d", stats)).getRange());
+        assertEquals(Ability.UNLIMITED_RANGE,
+            new PylonAbility(new AbilityDefinition("Pylon", "active", "d", stats)).getRange());
+        assertEquals(Ability.UNLIMITED_RANGE,
+            new Sprout(new AbilityDefinition("Sprout", "active", "d", stats)).getRange());
+
+        // Contrast: a normal targeted ability reports its real cast_range.
+        assertEquals(3, new Fireblast(new AbilityDefinition("Fireblast", "active", "d",
+            Map.of("cooldown", 2.0, "cast_range", 3.0, "damage", 24.0, "burn_stacks", 3.0))).getRange());
     }
 }

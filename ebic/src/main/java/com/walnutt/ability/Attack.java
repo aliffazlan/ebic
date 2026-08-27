@@ -39,6 +39,17 @@ public class Attack extends Ability {
         return owner != null && owner.getUnitType() == UnitType.BASIC ? 0 : 1;
     }
 
+    /** Attack ignores the base `range` field entirely - its reach is the owner's stat. */
+    @Override
+    public int getRange() {
+        return owner == null ? 1 : (int) owner.getEffective(Stat.ATTACK_RANGE);
+    }
+
+    @Override
+    public int getMinRange() {
+        return owner == null ? 0 : Math.max(1, owner.getMinAttackRange());
+    }
+
     @Override
     public boolean canUse(GameState state, Target target) {
         if (owner == null || owner.hasAttackedThisTurn() || owner.isBlockedFrom(ActionKind.ATTACK)) {

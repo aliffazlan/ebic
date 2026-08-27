@@ -26,6 +26,7 @@ public class PylonAbility extends Ability {
     public PylonAbility(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 4));
+        setRange(UNLIMITED_RANGE); // castable anywhere on the map - no distance check in canUse
         this.deathDamage = definition.getInt("death_damage", 50);
         this.deathDuration = definition.getInt("death_duration", 1);
     }

@@ -51,6 +51,13 @@ export interface AbilitySnapshot {
   ready: boolean;
   currentCooldown: number;
   maxCooldown: number;
+  // How far this ability reaches, so the client can outline the castable band rather
+  // than only marking currently-legal targets. For a basic Attack this is the owner's
+  // effective attack range. `minRange` is 0 for everything except an Attack under a
+  // minimum-range effect (Artemis's Steady Focus).
+  // -1 means the ability can be aimed anywhere on the map.
+  range: number;
+  minRange: number;
 }
 
 // Static ability info for a not-yet-drafted unit (draft/opponent-options cards) -

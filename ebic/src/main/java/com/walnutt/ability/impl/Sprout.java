@@ -23,6 +23,7 @@ public class Sprout extends Ability {
     public Sprout(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
         setMaxCooldown(definition.getInt("cooldown", 6));
+        setRange(UNLIMITED_RANGE); // castable anywhere on the map - no distance check in canUse
         this.delay = definition.getInt("delay", 1);
         this.barrierHp = definition.getInt("barrier", 20);
         this.barrierDuration = definition.getInt("barrier_duration", 2);

@@ -236,6 +236,9 @@ export class Hud {
       targetHint.className = "hint";
       targetHint.style.marginTop = "8px";
       targetHint.textContent = "Click a unit or tile on the board to target this ability.";
+      // Self-casts fire the moment they are selected (see MatchScreen's
+      // castImmediatelyIfSelfTargeted), so anything still showing this panel is
+      // genuinely waiting on a target.
       section.appendChild(targetHint);
 
       const row = document.createElement("div");
