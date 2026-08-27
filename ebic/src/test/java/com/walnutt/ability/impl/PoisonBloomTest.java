@@ -16,6 +16,7 @@ import com.walnutt.effect.Effect;
 import com.walnutt.effect.impl.BloomingPoisonEffect;
 import com.walnutt.effect.impl.PoisonEffect;
 import com.walnutt.event.DamageEvent;
+import com.walnutt.event.PostAttackEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
@@ -180,5 +181,50 @@ class PoisonBloomTest {
 
         assertEquals(afterDeath, bystander.getActiveEffect(PoisonEffect.class).orElseThrow().getRemainingTurns(),
             "the death burst and the expiry burst must not both land");
+    }
+
+    /**
+     * The bloom used to inherit PoisonEffect's name verbatim, so a 6-cooldown signature
+     * cast produced a sidebar chip identical to the passive's ordinary poison - it looked
+     * like nothing had happened.
+     */
+    @Test
+    void presentsItselfUnderItsOwnNameRatherThanPlainPoison() {
+        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
+        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
+        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
+        GameState state = scenario(spitter, host, bystander);
+
+        host.addEffect(new BloomingPoisonEffect(spitter, 4, 3, 5, 1, 1));
+        PoisonEffect.applyOrExtend(bystander, spitter, 2, 5);
+
+        assertEquals("Poison Bloom", host.getEffects().get(0).getName());
+        assertEquals("Poison", bystander.getEffects().get(0).getName());
+        assertNotNull(host.getEffects().get(0).getExtraInfo());
+    }
+
+    /**
+     * A Spitter attack on a blooming target should add exactly the bloom's own
+     * duration_increase. It used to add that PLUS Poison Sting's duration, because
+     * applyOrExtend matched the bloom as a PoisonEffect subclass and extended it too.
+     */
+    @Test
+    void aCasterHitExtendsTheBloomOnlyOnce() {
+        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
+        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
+        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
+        GameState state = scenario(spitter, host, bystander);
+
+        host.addEffect(new BloomingPoisonEffect(spitter, 4, 3, 5, 1, 1));
+        int before = bloomOn(host).getRemainingTurns();
+
+        // Both paths a real Spitter attack triggers: Poison Sting's applyOrExtend and the
+        // bloom's own onPostAttack.
+        PoisonEffect.applyOrExtend(host, spitter, 2, 5);
+        bloomOn(host).onPostAttack(state, new PostAttackEvent(spitter, host, new DamageEvent(spitter, host, 10)));
+
+        assertEquals(before + 1, bloomOn(host).getRemainingTurns(),
+            "only the bloom's own duration_increase should apply");
+        assertEquals(1, host.getEffects().size(), "and no second poison instance is stacked alongside it");
     }
 }

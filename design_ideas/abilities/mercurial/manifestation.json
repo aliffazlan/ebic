@@ -1,7 +1,7 @@
 {
     "name": "Manifestation",
     "type": "active",
-    "description": "Rematerialises on any free tile on the map, leaving adjacent enemies silenced and dealing %dmg_reduction:pct%% less damage for %duration% turns.",
+    "description": "Rematerialises on any free tile on the map that borders an enemy, leaving adjacent enemies silenced and dealing %dmg_reduction:pct%% less damage for %duration% turns.",
     "stats": {
         "cooldown": 5,
         "dmg_reduction": 0.5,

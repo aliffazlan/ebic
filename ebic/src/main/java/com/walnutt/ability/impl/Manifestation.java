@@ -9,7 +9,14 @@ import com.walnutt.game.GameState;
 import com.walnutt.map.Tile;
 import com.walnutt.unit.Unit;
 
-/** Mercurial - teleports to any free tile on the map, debuffing whoever's now adjacent. */
+/**
+ * Mercurial - teleports to a free tile anywhere on the map, debuffing whoever's now
+ * adjacent.
+ *
+ * The destination must border an enemy: the range is still global, but it's a strike
+ * rather than a general-purpose escape, so it can only land where it actually does
+ * something.
+ */
 public class Manifestation extends Ability {
     private final double damageReduction;
     private final int duration;
@@ -30,7 +37,14 @@ public class Manifestation extends Ability {
         if (!(target instanceof TileTarget tileTarget)) {
             return false;
         }
-        return tileTarget.getTile().isWalkable();
+        Tile destination = tileTarget.getTile();
+        return destination.isWalkable() && hasAdjacentEnemy(state, destination);
+    }
+
+    /** Checks the DESTINATION's neighbours, not the caster's - this runs before the teleport. */
+    private boolean hasAdjacentEnemy(GameState state, Tile destination) {
+        return !state.getMap().getAdjacentUnits(destination.getPosition(),
+            u -> u.getTeam() != owner.getTeam() && !u.isDead()).isEmpty();
     }
 
     @Override

@@ -65,8 +65,16 @@ five existing units get reworked or retuned.
 **Spitter**
 
 - *Poison Bloom* now bursts when the bloom **ends**, not only when its host dies —
-  but cleansing it early denies the spread entirely.
+  but cleansing it early denies the spread entirely. It also shows up under its own name
+  in the effects list instead of looking identical to ordinary poison, and is nerfed:
+  initial stacks 10 → **4**, which also means the bloom actually runs its course during a
+  match rather than outlasting it.
 - *Poison Sting* nerfed: duration 3 → **2** turns, damage 4 → **5** per remaining turn.
+
+**Mercurial**
+
+- *Manifestation* can now only land on a tile **bordering an enemy**. The range is still
+  the whole map, but it's a strike rather than a free escape.
 
 **Valor** — buffed across the kit.
 
@@ -125,6 +133,11 @@ five existing units get reworked or retuned.
 - **Eruption can no longer be cast on ground that is already burning.** It gave no
   benefit — a second patch on one tile just burns whoever stands there twice a round —
   so it only ever wasted the cooldown.
+- **Poison Bloom was indistinguishable from ordinary poison.** It applied an effect named
+  plain "Poison", so casting it looked like nothing had happened.
+- **Poison Bloom grew far faster than intended.** A single Spitter attack on a blooming
+  target extended it three times over instead of once, which is why blooms rarely lived
+  long enough to burst.
 
 ### Changed
 

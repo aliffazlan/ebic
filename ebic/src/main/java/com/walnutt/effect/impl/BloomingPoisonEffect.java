@@ -26,7 +26,12 @@ public class BloomingPoisonEffect extends PoisonEffect {
 
     public BloomingPoisonEffect(Unit caster, int initialStacks, int growthTurns, int damagePerTurnRemaining,
                                  int durationIncreaseOnCasterHit, int infectRadius) {
-        super(caster, initialStacks, damagePerTurnRemaining);
+        super("Poison Bloom",
+            "A virulent bloom. It grows for " + growthTurns + " more turn(s) instead of fading, and "
+                + "each of the caster's attacks feeds it another " + durationIncreaseOnCasterHit
+                + ". When it finally ends - by running its course or by killing its host - it bursts, "
+                + "poisoning nearby enemies. Cleansing it first prevents the burst.",
+            caster, initialStacks, damagePerTurnRemaining);
         this.growthTurnsRemaining = growthTurns;
         this.caster = caster;
         this.durationIncreaseOnCasterHit = durationIncreaseOnCasterHit;
@@ -43,6 +48,15 @@ public class BloomingPoisonEffect extends PoisonEffect {
             super.tick();
         }
         peakStacks = Math.max(peakStacks, getRemainingTurns());
+    }
+
+    /** Distinct from plain Poison's readout so the two are tellable apart at a glance. */
+    @Override
+    public String getExtraInfo() {
+        String tick = "Next tick: " + (getDamagePerTurn() * getRemainingTurns()) + " damage";
+        return growthTurnsRemaining > 0
+            ? tick + " - still growing (" + growthTurnsRemaining + " turn(s))"
+            : tick + " - fading, bursts at 0";
     }
 
     @Override
