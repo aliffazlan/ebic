@@ -84,11 +84,14 @@ retuned.
 
 **Spitter**
 
-- *Poison Bloom* now bursts when the bloom **ends**, not only when its host dies —
-  but cleansing it early denies the spread entirely. It also shows up under its own name
-  in the effects list instead of looking identical to ordinary poison, and is nerfed:
-  initial stacks 10 → **4**, which also means the bloom actually runs its course during a
-  match rather than outlasting it.
+- *Poison Bloom* is now a **separate effect from Poison**. Casting it applies both: the
+  poison that does the damage, and a bloom that feeds it. While the bloom lasts the poison
+  grows instead of fading; when the bloom ends — or the host dies — it bursts and spreads
+  that poison to nearby enemies. Cleansing the bloom denies the burst. The bloom lasts
+  **3 turns**, so the burst is now something you actually see in a match, and initial
+  stacks are nerfed 10 → **4**.
+- *Poison Sting* works on a bloomed target again, and stacks with the bloom: attacking one
+  is worth 3 stacks (2 from the sting, 1 from the bloom).
 - *Poison Sting* nerfed: duration 3 → **2** turns, damage 4 → **5** per remaining turn.
 
 **Mercurial**
@@ -112,6 +115,12 @@ retuned.
 
 - *Objurgation* nerfed: consumes only **50%** of intelligence instead of all of it,
   converted at a 1:1 ratio into health. Cooldown 3 → **4** turns.
+
+### Rules
+
+- **Basic units now act entirely for free.** Their moves cost no action points, just like
+  their attacks already did, so a swarm of basics no longer competes with your champion and
+  elites for the three points a turn. They can still each move once and attack once.
 
 ### Map
 
@@ -158,6 +167,10 @@ retuned.
 - **Poison Bloom grew far faster than intended.** A single Spitter attack on a blooming
   target extended it three times over instead of once, which is why blooms rarely lived
   long enough to burst.
+- **Static Link outlived Discharge.** Killing him didn't cancel the link — it kept draining
+  the target and triggering Eye of the Storm for as long as the target stood beside his
+  corpse. The same bug applied to Dirge: a dead Dirge's Decay went on permanently stealing
+  max health and strength from everything next to his body.
 
 ### Changed
 

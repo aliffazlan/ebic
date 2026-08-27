@@ -14,6 +14,9 @@ import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.combat.Attribute;
 import com.walnutt.combat.CombatEngine;
 import com.walnutt.data.AbilityDefinition;
+import com.walnutt.effect.impl.DamageDealtModifierEffect;
+import com.walnutt.effect.impl.StaticLinkEffect;
+import com.walnutt.event.DamageEvent;
 import com.walnutt.event.TurnEndEvent;
 import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
@@ -100,5 +103,80 @@ class StaticLinkTest {
 
         assertFalse(link.canUse(state, new UnitTarget(farEnemy)), "out of range");
         assertFalse(link.canUse(state, new UnitTarget(ally)), "must target an enemy");
+    }
+
+    /**
+     * Killing Discharge must cancel the link. A dead unit keeps its position, stays in
+     * Player.getUnits() and keeps receiving turn hooks, so his corpse used to go on
+     * draining the target and firing free attacks for as long as it stood beside him.
+     */
+    @Test
+    void theLinkIsCancelledWhenDischargeDies() {
+        Unit discharge = new BasicUnit("Discharge", Team.PLAYER_ONE, new UnitStats(50, 0, 0, 200));
+        StaticLink link = new StaticLink(new AbilityDefinition("Static Link", "active", "desc",
+            Map.of("cooldown", 7.0, "cast_range", 1.0, "dmg_steal", 5.0, "buff_linger_duration", 2.0)));
+        discharge.addAbility(link);
+        Unit target = new BasicUnit("Target", Team.PLAYER_TWO, new UnitStats(0, 0, 50, 1000));
+
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        p1.addUnit(discharge);
+        p2.addUnit(target);
+        GameMap map = new GameMap(5);
+        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+        state.setRemainingMoves(3);
+        map.moveUnit(discharge, map.getTile(new Position(0, 0)));
+        map.moveUnit(target, map.getTile(new Position(1, 0)));
+
+        link.onUse(state, new UnitTarget(target));
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
+        state.getEventBus().publish(state, new TurnEndEvent(Team.PLAYER_ONE));
+        assertTrue(target.getHealth() < 1000, "the link should have been working while he was alive");
+
+        discharge.takeDamage(state, new DamageEvent(target, discharge, 9999));
+        assertTrue(discharge.isDead());
+        assertTrue(discharge.getActiveEffect(StaticLinkEffect.class).isEmpty(), "the link is gone");
+
+        // The target never moves off the corpse - which is exactly the case that used to leak.
+        int healthAtDeath = target.getHealth();
+        for (int turn = 0; turn < 3; turn++) {
+            state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
+            state.getEventBus().publish(state, new TurnEndEvent(Team.PLAYER_ONE));
+        }
+
+        assertEquals(healthAtDeath, target.getHealth(), "a dead Discharge must not keep attacking");
+    }
+
+    /** The drain/buff pair are created PERMANENT, so the break has to hand them a real duration. */
+    @Test
+    void theLingeringDrainStopsGrowingAndExpiresAfterDischargeDies() {
+        Unit discharge = new BasicUnit("Discharge", Team.PLAYER_ONE, new UnitStats(50, 0, 0, 200));
+        StaticLink link = new StaticLink(new AbilityDefinition("Static Link", "active", "desc",
+            Map.of("cooldown", 7.0, "cast_range", 1.0, "dmg_steal", 5.0, "buff_linger_duration", 2.0)));
+        discharge.addAbility(link);
+        Unit target = new BasicUnit("Target", Team.PLAYER_TWO, new UnitStats(0, 0, 50, 1000));
+
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        p1.addUnit(discharge);
+        p2.addUnit(target);
+        GameMap map = new GameMap(5);
+        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+        state.setRemainingMoves(3);
+        map.moveUnit(discharge, map.getTile(new Position(0, 0)));
+        map.moveUnit(target, map.getTile(new Position(1, 0)));
+
+        link.onUse(state, new UnitTarget(target));
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
+
+        DamageDealtModifierEffect drain = target.getActiveEffect(DamageDealtModifierEffect.class).orElseThrow();
+        assertTrue(drain.getRemainingTurns() > 1000, "created PERMANENT while the link holds");
+
+        discharge.takeDamage(state, new DamageEvent(target, discharge, 9999));
+
+        assertEquals(2, drain.getRemainingTurns(), "death hands it the finite linger duration");
+        int bonusAtDeath = drain.getTotalBonus();
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
+        assertEquals(bonusAtDeath, drain.getTotalBonus(), "and it stops growing");
     }
 }

@@ -27,7 +27,9 @@ public class Decay extends PassiveAbility {
 
     @Override
     public void onTurnStart(GameState state, TurnStartEvent event) {
-        if (getOwner() == null || event.team() != getOwner().getTeam()) {
+        // Same trap as Eye of the Storm: a dead Dirge still has a position and still gets
+        // turn hooks, so without isDead his corpse kept draining everything beside it.
+        if (getOwner() == null || getOwner().isDead() || event.team() != getOwner().getTeam()) {
             return;
         }
         for (Unit victim : state.getMap().getUnitsInRadius(getOwner().getPosition(), radius)) {

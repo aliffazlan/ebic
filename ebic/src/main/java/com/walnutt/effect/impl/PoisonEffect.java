@@ -7,23 +7,25 @@ import com.walnutt.game.GameState;
 import com.walnutt.status.EffectCategory;
 import com.walnutt.unit.Unit;
 
-/** Deals damage_per_turn_remaining * turns-left at the start of the poisoned unit's controller's turn. */
+/**
+ * The damage-dealing half of Spitter's kit: deals damage_per_turn_remaining * turns-left
+ * at the start of the poisoned unit's controller's turn.
+ *
+ * Poison Bloom is a separate effect that feeds this one (see PoisonBloomEffect) rather
+ * than a kind of poison in its own right - this class is the only thing that ever deals
+ * poison damage.
+ */
 public class PoisonEffect extends Effect {
     private final Unit source;
     private final int damagePerTurnRemaining;
 
     public PoisonEffect(Unit source, int duration, int damagePerTurnRemaining) {
-        this("Poison",
+        super("Poison",
             "Deals poison damage at the start of each of the target's turns, scaling with the turns "
                 + "still remaining on the debuff (" + damagePerTurnRemaining + " damage x turns left). "
                 + "Reapplying while already poisoned extends the duration instead of stacking a new "
                 + "instance.",
-            source, duration, damagePerTurnRemaining);
-    }
-
-    /** Lets a subclass (Poison Bloom) present itself under its own name in the effects sidebar. */
-    protected PoisonEffect(String name, String description, Unit source, int duration, int damagePerTurnRemaining) {
-        super(name, description, duration);
+            duration);
         this.source = source;
         this.damagePerTurnRemaining = damagePerTurnRemaining;
         this.category = EffectCategory.DEBUFF;
@@ -35,6 +37,20 @@ public class PoisonEffect extends Effect {
 
     public int getDamagePerTurn() {
         return damagePerTurnRemaining;
+    }
+
+    /**
+     * Adds `stacks` of net growth, for something that is actively feeding this poison
+     * (Poison Bloom).
+     *
+     * It adds one more than asked because the poison also takes its own decay tick during
+     * the same Unit.endTurn pass. The order of the two within that pass isn't guaranteed,
+     * but both always run, so the net gain is exactly `stacks`.
+     */
+    public void feed(int stacks) {
+        if (stacks > 0) {
+            extendDuration(stacks + 1);
+        }
     }
 
     @Override
@@ -57,28 +73,14 @@ public class PoisonEffect extends Effect {
         getOwner().takeDamage(state, damageEvent);
     }
 
-    /**
-     * If the target is already poisoned, stack duration onto the existing instance instead
-     * of refreshing it.
-     *
-     * A target already carrying a Poison Bloom is left completely alone: the bloom runs
-     * its own caster-hit rule (duration_increase) from its onPostAttack hook, so extending
-     * it here as well made one Spitter attack add both amounts, and adding a separate
-     * poison beside it would put two near-identical chips on the same unit.
-     */
+    /** First active poison on this unit, if any. */
+    public static PoisonEffect on(Unit unit) {
+        return unit.getActiveEffect(PoisonEffect.class).orElse(null);
+    }
+
+    /** If the target is already poisoned, stack duration onto the existing instance instead of refreshing it. */
     public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn) {
-        PoisonEffect existing = null;
-        for (Effect effect : target.getEffects()) {
-            if (effect.isExpired() || !(effect instanceof PoisonEffect poison)) {
-                continue;
-            }
-            if (poison instanceof BloomingPoisonEffect) {
-                return;
-            }
-            if (existing == null) {
-                existing = poison;
-            }
-        }
+        PoisonEffect existing = on(target);
         if (existing != null) {
             existing.extendDuration(duration);
         } else {

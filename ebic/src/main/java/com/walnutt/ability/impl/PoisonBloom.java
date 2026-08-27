@@ -4,12 +4,23 @@ import com.walnutt.ability.Ability;
 import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.data.AbilityDefinition;
-import com.walnutt.effect.impl.BloomingPoisonEffect;
+import com.walnutt.effect.impl.PoisonBloomEffect;
+import com.walnutt.effect.impl.PoisonEffect;
 import com.walnutt.game.GameState;
 import com.walnutt.unit.Unit;
 
-/** Spitter - immediately applies a large poison stack that counts up before it counts down. */
+/**
+ * Spitter - poisons the target and plants a bloom in it.
+ *
+ * Applies two distinct effects: a normal PoisonEffect carrying the initial stacks (the
+ * only thing that deals damage) and a PoisonBloomEffect that feeds it while the bloom
+ * lasts and bursts when the bloom ends. The damage rate comes from Spitter's own Poison
+ * Sting, since it is the same venom and poison_bloom.json carries no damage stat.
+ */
 public class PoisonBloom extends Ability {
+    /** Net stacks the bloom adds to the poison each turn it is active. */
+    private static final int GROWTH_PER_TURN = 1;
+
     private final int initialPoison;
     private final int growthDuration;
     private final int durationIncrease;
@@ -47,8 +58,10 @@ public class PoisonBloom extends Ability {
             .findFirst()
             .orElse(4);
 
-        other.addEffect(new BloomingPoisonEffect(owner, initialPoison, growthDuration, damagePerTurn,
-            durationIncrease, infectRadius));
+        // Two separate effects: the Poison does the damage, the Bloom feeds it and bursts.
+        PoisonEffect.applyOrExtend(other, owner, initialPoison, damagePerTurn);
+        other.addEffect(new PoisonBloomEffect(owner, growthDuration, GROWTH_PER_TURN, durationIncrease,
+            infectRadius));
 
         state.spendMoves(getMoveCost(state));
         resetToMax();

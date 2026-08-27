@@ -8,10 +8,21 @@ import com.walnutt.game.GameState;
 import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.unit.ActionKind;
+import com.walnutt.unit.UnitType;
 
 public class Move extends Ability {
     public Move() {
         super("Move", "Moves to an adjacent tile", false);
+    }
+
+    /**
+     * Basics move for free, exactly as they attack for free - they are meant to swarm
+     * without eating into the champion/elite action budget. They can still only move once
+     * per turn (hasMovedThisTurn), so "free" means "costs no move point", not "unlimited".
+     */
+    @Override
+    public int getMoveCost(GameState state) {
+        return owner != null && owner.getUnitType() == UnitType.BASIC ? 0 : 1;
     }
 
     @Override

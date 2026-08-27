@@ -3,6 +3,7 @@ package com.walnutt.effect.impl;
 import com.walnutt.combat.CombatEngine;
 import com.walnutt.combat.WeightedEncounter;
 import com.walnutt.effect.Effect;
+import com.walnutt.event.DeathEvent;
 import com.walnutt.event.TurnEndEvent;
 import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
@@ -12,8 +13,14 @@ import com.walnutt.unit.Unit;
  * Discharge's Static Link: lives until broken (not on a fixed duration - see
  * PERMANENT), stealing more damage each of Discharge's own turns via a pair of
  * linked DamageDealtModifierEffects (one buffing him, one debuffing the target),
- * and granting a free attack at turn end. Breaks if not adjacent at turn end,
- * at which point the buff/debuff pair lingers on its own for a while longer.
+ * and granting a free attack at turn end. Breaks if not adjacent at turn end, or if
+ * either party dies, at which point the buff/debuff pair lingers on its own for a while
+ * longer.
+ *
+ * The death case needs its own hook rather than falling out of the tick loop: a dead unit
+ * keeps its position, stays in Player.getUnits() and keeps receiving turn hooks, so a dead
+ * Discharge still read as adjacent to his target and went on draining it and firing free
+ * attacks from beyond the grave.
  */
 public class StaticLinkEffect extends Effect {
     private final Unit caster;
@@ -42,7 +49,20 @@ public class StaticLinkEffect extends Effect {
 
     @Override
     public boolean isExpired() {
-        return super.isExpired() || target.isDead();
+        return super.isExpired() || target.isDead() || (getOwner() != null && getOwner().isDead());
+    }
+
+    /**
+     * Either party dying ends the link. Routing this through breakLink (rather than just
+     * letting isExpired go true) is what gives the buff/debuff pair their finite linger
+     * duration - they are created PERMANENT, so without it they would sit on both units
+     * for the rest of the match.
+     */
+    @Override
+    public void onDeath(GameState state, DeathEvent event) {
+        if (event.unit() == getOwner() || event.unit() == target) {
+            breakLink();
+        }
     }
 
     @Override

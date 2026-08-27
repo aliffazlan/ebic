@@ -90,4 +90,48 @@ class MoveAndAttackTest {
         assertFalse(attack.canUse(state, new UnitTarget(ally)));
         assertFalse(attack.canUse(state, new UnitTarget(farEnemy)));
     }
+
+    /** Basics no longer eat into the turn budget at all - moves are free like their attacks. */
+    @Test
+    void basicMoveCostsZeroMoves_championMoveCostsOne() {
+        Unit basic = new BasicUnit("Basic", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100));
+        Unit champion = new ChampionUnit("Champ", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100));
+        Move basicMove = new Move();
+        Move championMove = new Move();
+        basic.addAbility(basicMove);
+        champion.addAbility(championMove);
+
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        p1.addUnit(basic);
+        p1.addUnit(champion);
+        GameMap map = new GameMap(3);
+        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+
+        assertEquals(0, basicMove.getMoveCost(state));
+        assertEquals(1, championMove.getMoveCost(state));
+    }
+
+    @Test
+    void aBasicCanStillMoveWithAnEmptyBudget_butOnlyOncePerTurn() {
+        Unit basic = new BasicUnit("Basic", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100));
+        Move move = new Move();
+        basic.addAbility(move);
+
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        p1.addUnit(basic);
+        GameMap map = new GameMap(3);
+        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+        map.moveUnit(basic, map.getTile(new Position(0, 0)));
+        state.setRemainingMoves(0);
+
+        TileTarget target = new TileTarget(map.getTile(new Position(1, 0)));
+        assertTrue(move.canUse(state, target), "no move points left, but a basic move is free");
+        move.onUse(state, target);
+
+        assertEquals(0, state.getRemainingMoves(), "and it spent nothing");
+        assertFalse(move.canUse(state, new TileTarget(map.getTile(new Position(0, 1)))),
+            "still capped at one move per turn");
+    }
 }

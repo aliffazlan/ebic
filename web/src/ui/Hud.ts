@@ -282,11 +282,12 @@ export class Hud {
   /**
    * Move/Attack/ability cost and blocked-by-status-flag rules mirror the
    * engine exactly (see CLAUDE.md's Core game rules + Status flags sections):
-   * Move always costs 1, Attack costs 0 for a BASIC unit and 1 otherwise, any
-   * other active ability costs 1 - no ability in the engine overrides that
-   * default. A unit can also only move/attack once per turn regardless of
-   * move points remaining (hasMovedThisTurn/hasAttackedThisTurn), independent
-   * of cooldown-based `ready`.
+   * BASIC units move AND attack for free, everything else pays 1 per move or
+   * attack, and any other active ability costs 1 - no ability in the engine
+   * overrides that default. A unit can also only move/attack once per turn
+   * regardless of move points remaining (hasMovedThisTurn/hasAttackedThisTurn),
+   * independent of cooldown-based `ready`, so "free" means "costs no move
+   * point", not "unlimited".
    */
   private renderAbilityButton(
     unit: UnitSnapshot,
@@ -325,7 +326,9 @@ export class Hud {
         disabled = true;
         reason = "Already attacked this turn";
       } else {
-        const cost = kind === "attack" && unit.unitType === "BASIC" ? 0 : 1;
+        const isFreeBasicAction =
+          unit.unitType === "BASIC" && (kind === "attack" || kind === "move");
+        const cost = isFreeBasicAction ? 0 : 1;
         const remainingMoves = state.snapshot?.remainingMoves ?? 0;
         if (remainingMoves < cost) {
           disabled = true;

@@ -2,6 +2,7 @@ package com.walnutt.ability.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -12,11 +13,11 @@ import org.junit.jupiter.api.Test;
 
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.data.AbilityDefinition;
-import com.walnutt.effect.Effect;
-import com.walnutt.effect.impl.BloomingPoisonEffect;
+import com.walnutt.effect.impl.PoisonBloomEffect;
 import com.walnutt.effect.impl.PoisonEffect;
 import com.walnutt.event.DamageEvent;
 import com.walnutt.event.PostAttackEvent;
+import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
@@ -26,205 +27,219 @@ import com.walnutt.unit.BasicUnit;
 import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitStats;
 
+/**
+ * Poison and Poison Bloom are two independent effects: Poison is the status that deals
+ * damage, the Bloom is a separate thing that feeds it and bursts. These tests are written
+ * against that separation - the Bloom used to BE a poison (it subclassed PoisonEffect),
+ * which is why casting it produced a single chip and Poison Sting could not stack onto a
+ * bloomed target at all.
+ */
 class PoisonBloomTest {
 
-    @Test
-    void durationTicksUpDuringGrowthWindowThenDown() {
-        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
-        PoisonBloom bloom = new PoisonBloom(new AbilityDefinition("Poison Bloom", "active", "desc", Map.of(
-            "cooldown", 6.0, "cast_range", 3.0, "duration", 2.0, "initial_poison", 10.0,
-            "duration_increase", 1.0, "infect_radius", 1.0)));
-        spitter.addAbility(bloom);
-        Unit target = new BasicUnit("Target", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 500));
+    private Unit spitter;
+    private Unit host;
+    private Unit bystander;
+    private GameState state;
+    private GameMap map;
 
-        Player p1 = new Player("P1", Team.PLAYER_ONE);
-        Player p2 = new Player("P2", Team.PLAYER_TWO);
-        p1.addUnit(spitter);
-        p2.addUnit(target);
-        GameMap map = new GameMap(3);
-        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
-        state.setRemainingMoves(3);
-        map.moveUnit(spitter, map.getTile(new Position(0, 0)));
-        map.moveUnit(target, map.getTile(new Position(0, 2)));
-
-        bloom.onUse(state, new UnitTarget(target));
-
-        PoisonEffect poison = findPoison(target);
-        assertNotNull(poison);
-        assertEquals(10, poison.getRemainingTurns());
-
-        target.endTurn(state); // growthTurnsRemaining=2 -> ticks UP
-        assertEquals(11, findPoison(target).getRemainingTurns());
-
-        target.endTurn(state); // growthTurnsRemaining=1 -> ticks UP again
-        assertEquals(12, findPoison(target).getRemainingTurns());
-
-        target.endTurn(state); // growth window used up -> ticks DOWN normally now
-        assertEquals(11, findPoison(target).getRemainingTurns());
-    }
-
-    @Test
-    void burstsIntoNearbyEnemiesOnDeathBasedOnStacksAtDeath() {
-        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
-        PoisonBloom bloom = new PoisonBloom(new AbilityDefinition("Poison Bloom", "active", "desc", Map.of(
-            "cooldown", 6.0, "cast_range", 3.0, "duration", 0.0, "initial_poison", 6.0,
-            "duration_increase", 1.0, "infect_radius", 1.0)));
-        spitter.addAbility(bloom);
-        Unit victim = new BasicUnit("Victim", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 5));
-        Unit nearbyEnemy = new BasicUnit("Nearby", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 500));
-
-        Player p1 = new Player("P1", Team.PLAYER_ONE);
-        Player p2 = new Player("P2", Team.PLAYER_TWO);
-        p1.addUnit(spitter);
-        p2.addUnit(victim);
-        p2.addUnit(nearbyEnemy);
-        GameMap map = new GameMap(3);
-        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
-        state.setRemainingMoves(3);
-        map.moveUnit(spitter, map.getTile(new Position(0, 0)));
-        map.moveUnit(victim, map.getTile(new Position(0, 2)));
-        map.moveUnit(nearbyEnemy, map.getTile(new Position(0, 1)));
-
-        bloom.onUse(state, new UnitTarget(victim)); // no growth window (duration=0) -> stacks stay at 6
-
-        victim.takeDamage(state, new DamageEvent(spitter, victim, 5)); // kills victim (hp 5)
-
-        assertNotNull(findPoison(nearbyEnemy), "death burst should apply poison to the nearby enemy");
-        assertEquals(6, findPoison(nearbyEnemy).getRemainingTurns());
-    }
-
-    private PoisonEffect findPoison(Unit unit) {
-        for (Effect effect : unit.getEffects()) {
-            if (effect instanceof PoisonEffect poisonEffect) {
-                return poisonEffect;
-            }
-        }
-        return null;
-    }
-
-    /** Helper: Spitter at (0,0), victim adjacent to the bloom host so it can catch the spread. */
-    private static GameState scenario(Unit spitter, Unit host, Unit bystander) {
+    private void setUpBoard() {
+        spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
+        host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 1_000_000));
+        bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 1_000_000));
         Player p1 = new Player("P1", Team.PLAYER_ONE);
         Player p2 = new Player("P2", Team.PLAYER_TWO);
         p1.addUnit(spitter);
         p2.addUnit(host);
         p2.addUnit(bystander);
-        GameMap map = new GameMap(4);
-        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+        map = new GameMap(4);
+        state = new GameState(map, List.of(p1, p2), new Random(1));
         state.setRemainingMoves(3);
         map.moveUnit(spitter, map.getTile(new Position(0, 0)));
         map.moveUnit(host, map.getTile(new Position(0, 2)));
         map.moveUnit(bystander, map.getTile(new Position(0, 3)));
-        return state;
     }
 
-    private static BloomingPoisonEffect bloomOn(Unit host) {
-        return host.getActiveEffect(BloomingPoisonEffect.class).orElseThrow();
+    private PoisonBloom newBloom() {
+        return new PoisonBloom(new AbilityDefinition("Poison Bloom", "active", "desc", Map.of(
+            "cooldown", 6.0, "cast_range", 3.0, "duration", 3.0, "initial_poison", 4.0,
+            "duration_increase", 1.0, "infect_radius", 1.0)));
+    }
+
+    private static PoisonEffect poisonOn(Unit unit) {
+        return PoisonEffect.on(unit);
+    }
+
+    private static PoisonBloomEffect bloomOn(Unit unit) {
+        return unit.getActiveEffect(PoisonBloomEffect.class).orElse(null);
     }
 
     @Test
-    void spreadsToNearbyEnemiesWhenTheBloomRunsItsFullCourse() {
-        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
-        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
-        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
-        GameState state = scenario(spitter, host, bystander);
+    void castingItAppliesBothAPoisonAndASeparateBloom() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
 
-        host.addEffect(new BloomingPoisonEffect(spitter, 3, 0, 4, 1, 1));
+        bloom.onUse(state, new UnitTarget(host));
 
-        // Run it down to nothing the way the engine would, then let expiry fire.
-        BloomingPoisonEffect bloom = bloomOn(host);
-        while (!bloom.isExpired()) {
-            bloom.tick();
+        assertEquals(2, host.getEffects().size(), "poison and bloom are two distinct effects");
+        assertNotNull(poisonOn(host), "the damage-dealing poison");
+        assertNotNull(bloomOn(host), "and the bloom feeding it");
+        assertEquals(4, poisonOn(host).getRemainingTurns(), "initial_poison stacks land on the poison");
+        assertEquals(3, bloomOn(host).getRemainingTurns(), "the bloom lasts its own duration");
+    }
+
+    /** All poison damage comes from the Poison effect; the Bloom deals none of its own. */
+    @Test
+    void onlyThePoisonDealsDamage() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
+        bloom.onUse(state, new UnitTarget(host));
+
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_TWO));
+
+        // 4 stacks x the default 4 damage-per-remaining-turn = 16, counted once, not twice.
+        assertEquals(4 * 4, 1_000_000 - host.getHealth(), "exactly one source of poison damage");
+    }
+
+    @Test
+    void theBloomGrowsThePoisonInsteadOfLettingItFade() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
+        bloom.onUse(state, new UnitTarget(host));
+        assertEquals(4, poisonOn(host).getRemainingTurns());
+
+        host.endTurn(state);
+        assertEquals(5, poisonOn(host).getRemainingTurns(), "net +1 a turn while the bloom holds");
+        host.endTurn(state);
+        assertEquals(6, poisonOn(host).getRemainingTurns());
+
+        // Third tick expires the bloom; from then on the poison decays normally.
+        host.endTurn(state);
+        assertNull(bloomOn(host), "the bloom has run its 3 turns");
+        int afterBurst = poisonOn(host).getRemainingTurns();
+        host.endTurn(state);
+        assertEquals(afterBurst - 1, poisonOn(host).getRemainingTurns(), "and now it fades");
+    }
+
+    /**
+     * With the effects independent, a Spitter attack extends the poison through Poison
+     * Sting AND feeds the bloom's own bonus - that stacking is the point of pairing them.
+     */
+    @Test
+    void aCasterHitStacksBothThePassiveAndTheBloomBonus() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
+        PoisonSting sting = new PoisonSting(new AbilityDefinition("Poison Sting", "passive", "desc",
+            Map.of("duration", 2.0, "dmg_per_duration", 5.0)));
+        spitter.addAbility(sting);
+        bloom.onUse(state, new UnitTarget(host));
+        int before = poisonOn(host).getRemainingTurns();
+
+        PostAttackEvent hit = new PostAttackEvent(spitter, host, new DamageEvent(spitter, host, 10));
+        sting.onPostAttack(state, hit);
+        bloomOn(host).onPostAttack(state, hit);
+
+        assertEquals(before + 3, poisonOn(host).getRemainingTurns(), "+2 from the sting, +1 from the bloom");
+        assertEquals(2, host.getEffects().size(), "and still just the two effects");
+    }
+
+    /** Poison Sting used to be a no-op against a bloomed target. */
+    @Test
+    void poisonStingWorksNormallyOnABloomedTarget() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
+        PoisonSting sting = new PoisonSting(new AbilityDefinition("Poison Sting", "passive", "desc",
+            Map.of("duration", 2.0, "dmg_per_duration", 5.0)));
+        spitter.addAbility(sting);
+        bloom.onUse(state, new UnitTarget(host));
+        int before = poisonOn(host).getRemainingTurns();
+
+        sting.onPostAttack(state, new PostAttackEvent(spitter, host, new DamageEvent(spitter, host, 10)));
+
+        assertEquals(before + 2, poisonOn(host).getRemainingTurns());
+    }
+
+    @Test
+    void burstsIntoNearbyEnemiesWhenTheBloomEnds() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
+        bloom.onUse(state, new UnitTarget(host));
+        assertNull(poisonOn(bystander), "not yet");
+
+        for (int turn = 0; turn < 3; turn++) {
+            host.endTurn(state);
         }
-        host.removeExpiredEffects(state);
 
-        assertNotNull(bystander.getActiveEffect(PoisonEffect.class).orElse(null),
-            "a bloom that finished naturally should have spread to the adjacent enemy");
+        assertNull(bloomOn(host), "the bloom has ended");
+        assertNotNull(poisonOn(bystander), "and spread its poison to the adjacent enemy");
     }
 
     @Test
-    void doesNotSpreadWhenCleansedOffEarly() {
-        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
-        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
-        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
-        GameState state = scenario(spitter, host, bystander);
+    void burstsWhenTheHostDiesUnderIt() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
+        bloom.onUse(state, new UnitTarget(host));
 
-        host.addEffect(new BloomingPoisonEffect(spitter, 5, 0, 4, 1, 1));
+        host.takeDamage(state, new DamageEvent(spitter, host, 9_999_999));
+        assertTrue(host.isDead());
 
-        // dispelDebuffs is the cleanse path (Holy Shield); it force-expires through the
-        // same onExpire hook a natural finish uses, so the two must stay distinguishable.
+        assertNotNull(poisonOn(bystander), "the death burst still spreads");
+    }
+
+    @Test
+    void doesNotBurstWhenCleansedOffEarly() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
+        bloom.onUse(state, new UnitTarget(host));
+
+        // dispelDebuffs is the cleanse path; it force-expires through the same onExpire
+        // hook a natural finish uses, so the two must stay distinguishable.
         host.dispelDebuffs(state);
 
-        assertTrue(bystander.getActiveEffect(PoisonEffect.class).isEmpty(),
-            "cleansing the bloom off must deny the spread entirely");
-        assertTrue(host.getActiveEffect(BloomingPoisonEffect.class).isEmpty(), "the bloom itself is gone");
+        assertNull(bloomOn(host), "the bloom is gone");
+        assertNull(poisonOn(bystander), "cleansing must deny the burst entirely");
     }
 
     @Test
-    void spreadsOnlyOnceEvenIfTheHostDiesAndTheEffectLaterExpires() {
-        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
-        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 10));
-        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
-        GameState state = scenario(spitter, host, bystander);
+    void burstsOnlyOnceEvenIfTheHostDiesAndTheBloomLaterExpires() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
+        bloom.onUse(state, new UnitTarget(host));
 
-        host.addEffect(new BloomingPoisonEffect(spitter, 4, 0, 4, 1, 1));
-        host.takeDamage(state, new DamageEvent(spitter, host, 999)); // dies under the bloom
-
-        int afterDeath = bystander.getActiveEffect(PoisonEffect.class).orElseThrow().getRemainingTurns();
+        host.takeDamage(state, new DamageEvent(spitter, host, 9_999_999));
+        int afterDeath = poisonOn(bystander).getRemainingTurns();
 
         // A dead unit stays in Player.getUnits() and keeps ticking, so expiry still comes.
-        BloomingPoisonEffect bloom = bloomOn(host);
-        while (!bloom.isExpired()) {
-            bloom.tick();
+        for (int turn = 0; turn < 4; turn++) {
+            host.endTurn(state);
         }
-        host.removeExpiredEffects(state);
 
-        assertEquals(afterDeath, bystander.getActiveEffect(PoisonEffect.class).orElseThrow().getRemainingTurns(),
+        assertEquals(afterDeath, poisonOn(bystander).getRemainingTurns(),
             "the death burst and the expiry burst must not both land");
     }
 
-    /**
-     * The bloom used to inherit PoisonEffect's name verbatim, so a 6-cooldown signature
-     * cast produced a sidebar chip identical to the passive's ordinary poison - it looked
-     * like nothing had happened.
-     */
     @Test
-    void presentsItselfUnderItsOwnNameRatherThanPlainPoison() {
-        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
-        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
-        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
-        GameState state = scenario(spitter, host, bystander);
+    void theTwoEffectsReadAsSeparateThingsInTheSidebar() {
+        setUpBoard();
+        PoisonBloom bloom = newBloom();
+        spitter.addAbility(bloom);
+        bloom.onUse(state, new UnitTarget(host));
 
-        host.addEffect(new BloomingPoisonEffect(spitter, 4, 3, 5, 1, 1));
-        PoisonEffect.applyOrExtend(bystander, spitter, 2, 5);
-
-        assertEquals("Poison Bloom", host.getEffects().get(0).getName());
-        assertEquals("Poison", bystander.getEffects().get(0).getName());
-        assertNotNull(host.getEffects().get(0).getExtraInfo());
-    }
-
-    /**
-     * A Spitter attack on a blooming target should add exactly the bloom's own
-     * duration_increase. It used to add that PLUS Poison Sting's duration, because
-     * applyOrExtend matched the bloom as a PoisonEffect subclass and extended it too.
-     */
-    @Test
-    void aCasterHitExtendsTheBloomOnlyOnce() {
-        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
-        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
-        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
-        GameState state = scenario(spitter, host, bystander);
-
-        host.addEffect(new BloomingPoisonEffect(spitter, 4, 3, 5, 1, 1));
-        int before = bloomOn(host).getRemainingTurns();
-
-        // Both paths a real Spitter attack triggers: Poison Sting's applyOrExtend and the
-        // bloom's own onPostAttack.
-        PoisonEffect.applyOrExtend(host, spitter, 2, 5);
-        bloomOn(host).onPostAttack(state, new PostAttackEvent(spitter, host, new DamageEvent(spitter, host, 10)));
-
-        assertEquals(before + 1, bloomOn(host).getRemainingTurns(),
-            "only the bloom's own duration_increase should apply");
-        assertEquals(1, host.getEffects().size(), "and no second poison instance is stacked alongside it");
+        assertEquals("Poison", poisonOn(host).getName());
+        assertEquals("Poison Bloom", bloomOn(host).getName());
+        assertNotNull(poisonOn(host).getExtraInfo());
+        assertNotNull(bloomOn(host).getExtraInfo());
+        // The bloom is no longer a PoisonEffect subclass, so a poison lookup finds only the
+        // real poison - which is what makes them two independent chips rather than one.
+        assertEquals(1, host.getEffects().stream().filter(e -> e instanceof PoisonEffect).count(),
+            "exactly one poison on the unit, and the bloom is not it");
     }
 }

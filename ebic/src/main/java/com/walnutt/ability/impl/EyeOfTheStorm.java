@@ -24,7 +24,9 @@ public class EyeOfTheStorm extends PassiveAbility {
     @Override
     public void onTurnStart(GameState state, TurnStartEvent event) {
         Unit owner = getOwner();
-        if (owner == null || event.team() != owner.getTeam()) {
+        // A dead unit keeps its position and keeps receiving turn hooks, so without the
+        // isDead check Discharge went on striking from beyond the grave.
+        if (owner == null || owner.isDead() || event.team() != owner.getTeam()) {
             return;
         }
 

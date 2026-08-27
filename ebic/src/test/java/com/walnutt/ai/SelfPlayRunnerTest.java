@@ -75,7 +75,12 @@ class SelfPlayRunnerTest {
      */
     @Test
     void takingFreeAttacksBeatsIgnoringThem() {
-        SelfPlayRunner runner = new SelfPlayRunner(60);
+        // The cap has to be high enough for matches to actually resolve. Basics move for
+        // free now as well as attacking, so games run longer; at the old 60-turn cap most
+        // of them hit the ceiling and got scored on surviving army strength instead, where
+        // simply never advancing your basics looks just as good and the series went 50/50.
+        // Measured across three seeds and two sample sizes, 120 is decisive and 60 is not.
+        SelfPlayRunner runner = new SelfPlayRunner(120);
         BotConfig standard = BotConfig.standard();
 
         SelfPlayRunner.SeriesResult series =
