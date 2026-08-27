@@ -1,8 +1,13 @@
 import { api, ApiError } from "../net/api";
-import type { AuthUser, Team } from "../types/contract";
+import type { AuthUser, BotLevel, Team } from "../types/contract";
 import type { Screen } from "./Screen";
 
 const POLL_INTERVAL_MS = 2000;
+
+/** Difficulties offered in the lobby. Adding one here and server-side is the whole change. */
+const BOT_LEVELS: ReadonlyArray<{ value: BotLevel; label: string }> = [
+  { value: "STANDARD", label: "Standard" },
+];
 
 export interface LobbyCallbacks {
   onMatchReady(matchId: string, yourTeam: Team): void;
@@ -76,6 +81,47 @@ export class LobbyScreen implements Screen {
     const setError = (err: unknown) => {
       errorText.textContent = err instanceof ApiError ? err.message : "Something went wrong.";
     };
+
+    // Play vs the computer - listed first because it is the only option that needs
+    // nobody else: no join code to share, no waiting for an opponent to connect.
+    const botHeading = document.createElement("h2");
+    botHeading.textContent = "Play vs the computer";
+    card.appendChild(botHeading);
+
+    const botRow = document.createElement("div");
+    botRow.className = "row";
+
+    const botLevelSelect = document.createElement("select");
+    botLevelSelect.style.flex = "1";
+    // One level today. The control is rendered anyway so that adding a second is a new
+    // option element here and a new BotConfig server-side, with no layout to rethink.
+    for (const level of BOT_LEVELS) {
+      const option = document.createElement("option");
+      option.value = level.value;
+      option.textContent = level.label;
+      botLevelSelect.appendChild(option);
+    }
+
+    const botBtn = document.createElement("button");
+    botBtn.className = "primary";
+    botBtn.textContent = "Play vs Bot";
+    botBtn.addEventListener("click", async () => {
+      errorText.textContent = "";
+      botBtn.disabled = true;
+      try {
+        const res = await api.createBotMatch(botLevelSelect.value as BotLevel);
+        // The opponent is already seated, so this goes straight into the match rather
+        // than through the waiting-for-opponent screen the join-code flow needs.
+        const info = await api.getMatch(res.matchId);
+        this.callbacks.onMatchReady(res.matchId, info.yourTeam);
+      } catch (err) {
+        setError(err);
+        botBtn.disabled = false;
+      }
+    });
+
+    botRow.append(botLevelSelect, botBtn);
+    card.appendChild(botRow);
 
     // Create match
     const createHeading = document.createElement("h2");

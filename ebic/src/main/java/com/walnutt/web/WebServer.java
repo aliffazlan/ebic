@@ -17,6 +17,7 @@ import io.javalin.websocket.WsCloseContext;
 import io.javalin.websocket.WsConnectContext;
 import io.javalin.websocket.WsMessageContext;
 
+import com.walnutt.ai.BotLevel;
 import com.walnutt.game.Team;
 import com.walnutt.web.auth.AuthService;
 import com.walnutt.web.db.Database;
@@ -83,6 +84,7 @@ public final class WebServer {
         app.post("/api/logout", this::handleLogout);
         app.get("/api/me", this::handleMe);
         app.post("/api/matches", this::handleCreateMatch);
+        app.post("/api/matches/bot", this::handleCreateBotMatch);
         app.post("/api/matches/join", this::handleJoinMatch);
         app.get("/api/matches/{matchId}", this::handleMatchStatus);
 
@@ -142,6 +144,29 @@ public final class WebServer {
         payload.addProperty("matchId", summary.matchId());
         payload.addProperty("joinCode", summary.joinCode());
         payload.addProperty("status", summary.status());
+        sendJson(ctx, 201, payload);
+    }
+
+    /**
+     * Starts a match against the computer. The level is accepted and validated even though
+     * STANDARD is currently the only value, so introducing another difficulty later is a
+     * new enum constant rather than a change to this contract or to the client.
+     */
+    private void handleCreateBotMatch(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        JsonObject body = readJsonBody(ctx);
+        String requested = JsonSupport.optString(body, "level");
+        BotLevel level;
+        try {
+            level = BotLevel.parse(requested);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(400, e.getMessage());
+        }
+        MatchService.MatchSummary summary = matches.createBotMatch(user.userId(), level.name());
+        JsonObject payload = new JsonObject();
+        payload.addProperty("matchId", summary.matchId());
+        payload.addProperty("status", summary.status());
+        payload.addProperty("level", level.name());
         sendJson(ctx, 201, payload);
     }
 

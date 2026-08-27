@@ -5,8 +5,28 @@ All notable changes to EBIC are documented here. This project follows the spirit
 
 ## [Unreleased]
 
-The roster grows to **5 champions and 14 elites**, basic attacks gain real range, and
-five existing units get reworked or retuned.
+You can now play on your own against the computer. The roster grows to **5 champions and
+14 elites**, basic attacks gain real range, and five existing units get reworked or
+retuned.
+
+### Play against the computer
+
+- **New "Play vs the computer" option in the lobby.** No join code, nobody to wait for —
+  pick a difficulty and you are straight into the draft.
+- The bot drafts, lays out its army, and plays full turns: it advances, focuses wounded
+  and high-value targets, uses its abilities, and goes for your champion.
+- It never wastes its **free basic attacks**. Attacks by basic units cost no move points,
+  and the bot always takes every one worth taking before spending a point on anything
+  else — the single most common thing human players leave on the table.
+- **It plays the attribute stand-off properly.** Rather than always leading with its
+  biggest stat, it plays the mathematically unexploitable mix for each encounter, as
+  attacker and as defender. You cannot find a pattern to read, because there isn't one —
+  and a bot with huge Strength will happily attack with Intelligence if that is the right
+  answer to how you are likely to defend.
+- Its army starts sensibly arranged: champion at the back, durable units at the front,
+  long-range units behind the line.
+- One difficulty (**Standard**) for now. The lobby has a difficulty selector ready for
+  more.
 
 ### New mechanic — attack range
 

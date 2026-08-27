@@ -2,6 +2,7 @@ package com.walnutt.web.db;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -65,6 +66,28 @@ public final class Database {
             st.execute("CREATE INDEX IF NOT EXISTS idx_matches_join_code ON matches(join_code)");
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to run schema migration", e);
+        }
+        // CREATE TABLE IF NOT EXISTS silently leaves an existing table alone, so columns
+        // added after a database already exists need their own guarded ALTER.
+        addColumnIfMissing("matches", "bot_level", "TEXT");
+    }
+
+    /** Idempotent ALTER for a column added to a table that may already exist in a dev database. */
+    private void addColumnIfMissing(String table, String column, String type) {
+        try (Statement st = connection.createStatement();
+             ResultSet rs = st.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) {
+                    return;
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to inspect " + table, e);
+        }
+        try (Statement st = connection.createStatement()) {
+            st.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + type);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to add column " + column + " to " + table, e);
         }
     }
 

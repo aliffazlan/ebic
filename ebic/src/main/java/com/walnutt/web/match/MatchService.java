@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.walnutt.web.ApiException;
+import com.walnutt.web.auth.PasswordHasher;
 import com.walnutt.web.db.Database;
 
 /**
@@ -33,10 +34,106 @@ public final class MatchService {
     public record MatchParticipants(String matchId, long playerOneId, long playerTwoId) {
     }
 
+    /**
+     * The account a bot match's second seat belongs to. A real users row, rather than a
+     * nullable player_two_id, so that every existing read path - getParticipants,
+     * GameSession.teamFor, finishMatch's winner, the WS upgrade's participant check -
+     * keeps working untouched. It is never logged into: its password is a throwaway
+     * random string that is hashed and immediately discarded.
+     */
+    public static final String BOT_USERNAME = "EBIC_Bot";
+
     private final Database db;
+    private final long botUserId;
 
     public MatchService(Database db) {
         this.db = db;
+        this.botUserId = ensureBotUser();
+    }
+
+    /** The reserved bot account's id, creating the account on first use. */
+    public long botUserId() {
+        return botUserId;
+    }
+
+    public boolean isBot(long userId) {
+        return userId == botUserId;
+    }
+
+    private long ensureBotUser() {
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "SELECT id FROM users WHERE username = ? COLLATE NOCASE")) {
+            ps.setString(1, BOT_USERNAME);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong("id");
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to look up the bot account", e);
+        }
+
+        // Hashed like any other password so login()'s verify path behaves normally; the
+        // plaintext is never kept, so there is nothing to log in with.
+        byte[] secret = new byte[32];
+        RANDOM.nextBytes(secret);
+        PasswordHasher.HashResult hashed = PasswordHasher.hash(
+            java.util.Base64.getEncoder().encodeToString(secret).toCharArray());
+
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "INSERT INTO users (username, password_hash, password_salt, created_at) VALUES (?, ?, ?, ?)",
+                java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, BOT_USERNAME);
+            ps.setString(2, hashed.hashBase64());
+            ps.setString(3, hashed.saltBase64());
+            ps.setLong(4, System.currentTimeMillis());
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                keys.next();
+                return keys.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to create the bot account", e);
+        }
+    }
+
+    /**
+     * A match against the bot: opponent already seated, so it starts at DRAFTING with no
+     * join code. A null join_code is deliberate - the column is UNIQUE but nullable, and
+     * SQLite treats NULLs as distinct, so any number of bot matches can coexist. It also
+     * means a bot match can never be joined by a person typing a code.
+     */
+    public MatchSummary createBotMatch(long callerUserId, String botLevel) {
+        String matchId = UUID.randomUUID().toString();
+        String sql = """
+            INSERT INTO matches (id, join_code, status, player_one_id, player_two_id, bot_level, created_at)
+            VALUES (?, NULL, ?, ?, ?, ?, ?)
+            """;
+        try (PreparedStatement ps = db.connection().prepareStatement(sql)) {
+            ps.setString(1, matchId);
+            ps.setString(2, Status.DRAFTING.name());
+            ps.setLong(3, callerUserId);
+            ps.setLong(4, botUserId);
+            ps.setString(5, botLevel);
+            ps.setLong(6, System.currentTimeMillis());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to create bot match", e);
+        }
+        return new MatchSummary(matchId, null, Status.DRAFTING.name());
+    }
+
+    /** The difficulty this match was created with, or null for a human-versus-human match. */
+    public String getBotLevel(String matchId) {
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "SELECT bot_level FROM matches WHERE id = ?")) {
+            ps.setString(1, matchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString("bot_level") : null;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load the match's bot level", e);
+        }
     }
 
     public MatchSummary createMatch(long callerUserId) {

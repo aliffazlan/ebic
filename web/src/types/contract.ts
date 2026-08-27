@@ -25,6 +25,19 @@ export interface JoinMatchResponse {
   status: "DRAFTING";
 }
 
+/**
+ * Bot difficulty. Only one level exists today, but it travels through the API and is
+ * stored on the match, so adding another is a server-side BotConfig entry rather than a
+ * contract change.
+ */
+export type BotLevel = "STANDARD";
+
+export interface CreateBotMatchResponse {
+  matchId: string;
+  status: "DRAFTING";
+  level: BotLevel;
+}
+
 export interface MatchInfo {
   matchId: string;
   status: MatchStatus;

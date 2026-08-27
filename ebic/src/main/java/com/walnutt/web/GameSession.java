@@ -5,6 +5,9 @@ import java.lang.System.Logger.Level;
 
 import com.google.gson.JsonObject;
 
+import com.walnutt.ai.BotConfig;
+import com.walnutt.ai.BotHandler;
+import com.walnutt.ai.TeamRoutingHandler;
 import com.walnutt.game.Game;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
@@ -32,15 +35,38 @@ public final class GameSession {
     private final WebInputHandler input = new WebInputHandler(hub, ids);
     private final WebRenderer renderer;
 
+    /** Null for an ordinary two-human match; otherwise the seat the computer plays. */
+    private final Team botTeam;
+    private final BotHandler bot;
+
     private volatile GameState state;
     private Thread thread;
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService) {
+        this(matchId, playerOneUserId, playerTwoUserId, matchService, null, null);
+    }
+
+    public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService,
+                        Team botTeam, BotConfig botConfig) {
         this.matchId = matchId;
         this.playerOneUserId = playerOneUserId;
         this.playerTwoUserId = playerTwoUserId;
         this.matchService = matchService;
+        this.botTeam = botTeam;
+        this.bot = botTeam == null ? null : new BotHandler(botConfig);
         this.renderer = new WebRenderer(hub, new GameStateSnapshotMapper(ids), vfx, this::onGameOver);
+    }
+
+    /**
+     * Both setup and turn input for this match. For a bot match the two seats are split
+     * by team, so the human's prompts still go over the socket while the bot's are
+     * answered in-process - see TeamRoutingHandler, which also explains why the
+     * attribute-pair path must not be left to WebInputHandler's own override.
+     */
+    private TeamRoutingHandler routedHandler() {
+        return botTeam == Team.PLAYER_ONE
+            ? TeamRoutingHandler.of(bot, input)
+            : TeamRoutingHandler.of(input, bot);
     }
 
     public synchronized void start() {
@@ -54,7 +80,7 @@ public final class GameSession {
 
     private void runMatch() {
         try {
-            Game game = Game.newConcurrentFullDraftMatch(input, input, renderer);
+            Game game = newMatch();
             this.state = game.getState();
             renderer.setAbilityDefinitions(state.getAbilityDefinitions());
             state.getEventBus().addGlobalListener(vfx);
@@ -69,6 +95,14 @@ public final class GameSession {
                 // best-effort - the match is already broken, don't compound it with a second failure
             }
         }
+    }
+
+    private Game newMatch() {
+        if (botTeam == null) {
+            return Game.newConcurrentFullDraftMatch(input, input, renderer);
+        }
+        TeamRoutingHandler router = routedHandler();
+        return Game.newConcurrentFullDraftMatch(router, router, renderer);
     }
 
     private void onGameOver(GameState finalState) {

@@ -5,6 +5,7 @@ import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.combat.Attribute;
 import com.walnutt.combat.CombatEngine;
 import com.walnutt.game.GameState;
+import com.walnutt.map.Position;
 import com.walnutt.status.Stat;
 import com.walnutt.unit.ActionKind;
 import com.walnutt.unit.Unit;
@@ -25,10 +26,20 @@ public class Attack extends Ability {
      * targeting never permitted.
      */
     public static boolean canReach(GameState state, Unit attacker, Unit defender) {
-        if (attacker.getPosition() == null || defender.getPosition() == null) {
+        return canReachFrom(state, attacker, attacker.getPosition(), defender);
+    }
+
+    /**
+     * The same rule evaluated from a hypothetical position, so a caller can ask "could
+     * this unit attack that one if it stood there?" without actually moving it - what
+     * the bot needs to tell an advancing step apart from a pointless one. Kept as an
+     * overload rather than re-derived by the caller so the reach rule stays in one place.
+     */
+    public static boolean canReachFrom(GameState state, Unit attacker, Position from, Unit defender) {
+        if (from == null || defender.getPosition() == null) {
             return false;
         }
-        int distance = state.getMap().getDistance(attacker.getPosition(), defender.getPosition());
+        int distance = state.getMap().getDistance(from, defender.getPosition());
         int max = (int) attacker.getEffective(Stat.ATTACK_RANGE);
         int min = Math.max(1, attacker.getMinAttackRange());
         return distance >= min && distance <= max;

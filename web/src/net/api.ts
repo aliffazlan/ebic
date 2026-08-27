@@ -6,6 +6,8 @@
 import type {
   ApiErrorBody,
   AuthUser,
+  BotLevel,
+  CreateBotMatchResponse,
   CreateMatchResponse,
   JoinMatchResponse,
   MatchInfo,
@@ -75,6 +77,14 @@ export const api = {
 
   createMatch(): Promise<CreateMatchResponse> {
     return request<CreateMatchResponse>("/matches", { method: "POST" });
+  },
+
+  /** Starts a match against the computer. No join code and nobody to wait for - it is playable immediately. */
+  createBotMatch(level: BotLevel): Promise<CreateBotMatchResponse> {
+    return request<CreateBotMatchResponse>("/matches/bot", {
+      method: "POST",
+      body: JSON.stringify({ level }),
+    });
   },
 
   joinMatch(joinCode: string): Promise<JoinMatchResponse> {
