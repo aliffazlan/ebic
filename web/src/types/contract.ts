@@ -120,6 +120,10 @@ export interface GameStateSnapshot {
   remainingMoves: number;
   gameOver: boolean;
   mapRadius: number;
+  // Largest |r| that exists on the board. Equal to mapRadius for a regular hexagon;
+  // lower when the top and bottom rows are trimmed off into an elongated one, in which
+  // case being inside the radius no longer means a tile exists.
+  mapRowLimit: number;
   units: UnitSnapshot[];
   // Persistent effects painted on the board itself rather than on a unit -
   // currently just Ember's Eruption leaving burning ground behind.

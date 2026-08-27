@@ -3,6 +3,7 @@
   "remainingMoves": 2,
   "gameOver": false,
   "mapRadius": 5,
+  "mapRowLimit": 5,
   "units": [
     {
       "id": "u-valor",
@@ -22,9 +23,30 @@
       "hasAttackedThisTurn": false,
       "statusFlags": [],
       "abilities": [
-        { "id": "counterstrike", "name": "Counterstrike", "passive": true, "ready": true, "currentCooldown": 0, "maxCooldown": 0 },
-        { "id": "duel", "name": "Duel", "passive": false, "ready": true, "currentCooldown": 0, "maxCooldown": 3 },
-        { "id": "overwhelming_odds", "name": "Overwhelming Odds", "passive": false, "ready": false, "currentCooldown": 2, "maxCooldown": 4 }
+        {
+          "id": "counterstrike",
+          "name": "Counterstrike",
+          "passive": true,
+          "ready": true,
+          "currentCooldown": 0,
+          "maxCooldown": 0
+        },
+        {
+          "id": "duel",
+          "name": "Duel",
+          "passive": false,
+          "ready": true,
+          "currentCooldown": 0,
+          "maxCooldown": 3
+        },
+        {
+          "id": "overwhelming_odds",
+          "name": "Overwhelming Odds",
+          "passive": false,
+          "ready": false,
+          "currentCooldown": 2,
+          "maxCooldown": 4
+        }
       ]
     },
     {
@@ -43,10 +65,26 @@
       "dead": false,
       "hasMovedThisTurn": true,
       "hasAttackedThisTurn": false,
-      "statusFlags": ["HIDDEN"],
+      "statusFlags": [
+        "HIDDEN"
+      ],
       "abilities": [
-        { "id": "soul_rip", "name": "Soul Rip", "passive": false, "ready": true, "currentCooldown": 0, "maxCooldown": 3 },
-        { "id": "decay", "name": "Decay", "passive": true, "ready": true, "currentCooldown": 0, "maxCooldown": 0 }
+        {
+          "id": "soul_rip",
+          "name": "Soul Rip",
+          "passive": false,
+          "ready": true,
+          "currentCooldown": 0,
+          "maxCooldown": 3
+        },
+        {
+          "id": "decay",
+          "name": "Decay",
+          "passive": true,
+          "ready": true,
+          "currentCooldown": 0,
+          "maxCooldown": 0
+        }
       ]
     },
     {
@@ -103,11 +141,34 @@
       "dead": false,
       "hasMovedThisTurn": false,
       "hasAttackedThisTurn": false,
-      "statusFlags": ["STUNNED"],
+      "statusFlags": [
+        "STUNNED"
+      ],
       "abilities": [
-        { "id": "objurgation", "name": "Objurgation", "passive": true, "ready": true, "currentCooldown": 0, "maxCooldown": 0 },
-        { "id": "oblivion_confinement", "name": "Oblivion Confinement", "passive": false, "ready": true, "currentCooldown": 0, "maxCooldown": 4 },
-        { "id": "sanitys_eclipse", "name": "Sanity's Eclipse", "passive": false, "ready": false, "currentCooldown": 3, "maxCooldown": 5 }
+        {
+          "id": "objurgation",
+          "name": "Objurgation",
+          "passive": true,
+          "ready": true,
+          "currentCooldown": 0,
+          "maxCooldown": 0
+        },
+        {
+          "id": "oblivion_confinement",
+          "name": "Oblivion Confinement",
+          "passive": false,
+          "ready": true,
+          "currentCooldown": 0,
+          "maxCooldown": 4
+        },
+        {
+          "id": "sanitys_eclipse",
+          "name": "Sanity's Eclipse",
+          "passive": false,
+          "ready": false,
+          "currentCooldown": 3,
+          "maxCooldown": 5
+        }
       ]
     },
     {
@@ -126,10 +187,27 @@
       "dead": false,
       "hasMovedThisTurn": false,
       "hasAttackedThisTurn": false,
-      "statusFlags": ["INVULNERABLE", "HIDDEN"],
+      "statusFlags": [
+        "INVULNERABLE",
+        "HIDDEN"
+      ],
       "abilities": [
-        { "id": "backstab", "name": "Backstab", "passive": true, "ready": true, "currentCooldown": 0, "maxCooldown": 0 },
-        { "id": "cloak_and_dagger", "name": "Cloak and Dagger", "passive": false, "ready": true, "currentCooldown": 0, "maxCooldown": 5 }
+        {
+          "id": "backstab",
+          "name": "Backstab",
+          "passive": true,
+          "ready": true,
+          "currentCooldown": 0,
+          "maxCooldown": 0
+        },
+        {
+          "id": "cloak_and_dagger",
+          "name": "Cloak and Dagger",
+          "passive": false,
+          "ready": true,
+          "currentCooldown": 0,
+          "maxCooldown": 5
+        }
       ]
     },
     {

@@ -12,22 +12,40 @@ import java.util.function.Predicate;
 import com.walnutt.unit.Unit;
 
 /**
- * Hexagonal map using axial coordinates (Position), shaped as a regular hexagon
- * of the given radius centered on (0,0): every Position with hexDistance <= radius
- * from the origin is a valid tile. Adjacency is the six directions in
- * Position.DIRECTIONS, so "distance"/"radius"/"adjacent" are all geometrically
- * consistent with each other.
+ * Hexagonal map using axial coordinates (Position), centered on (0,0): every Position
+ * with hexDistance &lt;= radius from the origin is a valid tile. Adjacency is the six
+ * directions in Position.DIRECTIONS, so "distance"/"radius"/"adjacent" are all
+ * geometrically consistent with each other.
+ *
+ * A `rowLimit` below the radius trims whole rows off the top and bottom, turning the
+ * regular hexagon into an elongated one - r is the vertical axis in both the terminal
+ * renderer and the browser client, so "row" means "constant r". The full match uses this
+ * to get a wide, shallow battlefield; every other caller gets an untrimmed hexagon.
+ *
+ * IMPORTANT: with a trim in play, `hexDistance &lt;= radius` no longer implies a tile
+ * exists. Ask the map (getTile / isWithinBounds / getTilesInRadius) rather than deriving
+ * membership from a coordinate formula.
  */
 public class GameMap {
     private final int radius;
+    private final int rowLimit;
     private final Map<Position, Tile> tiles = new LinkedHashMap<>();
 
+    /** A regular hexagon - no rows trimmed. */
     public GameMap(int radius) {
+        this(radius, radius);
+    }
+
+    public GameMap(int radius, int rowLimit) {
         this.radius = radius;
+        this.rowLimit = Math.min(rowLimit, radius);
         for (int q = -radius; q <= radius; q++) {
             int rMin = Math.max(-radius, -q - radius);
             int rMax = Math.min(radius, -q + radius);
             for (int r = rMin; r <= rMax; r++) {
+                if (Math.abs(r) > this.rowLimit) {
+                    continue;
+                }
                 Position position = new Position(q, r);
                 tiles.put(position, new Tile(position, TileType.PLAIN));
             }
@@ -36,6 +54,11 @@ public class GameMap {
 
     public int getRadius() {
         return radius;
+    }
+
+    /** Largest |r| that exists on this map; equal to the radius when nothing is trimmed. */
+    public int getRowLimit() {
+        return rowLimit;
     }
 
     public boolean isWithinBounds(Position position) {

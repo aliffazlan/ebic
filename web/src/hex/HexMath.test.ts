@@ -3,6 +3,7 @@ import {
   AXIAL_DIRECTIONS,
   axialToPixel,
   hexDistance,
+  mapTiles,
   pixelToAxial,
   roundAxial,
 } from "./HexMath";
@@ -40,5 +41,37 @@ describe("HexMath", () => {
     for (const dir of AXIAL_DIRECTIONS) {
       expect(hexDistance({ q: 0, r: 0 }, dir)).toBe(1);
     }
+  });
+
+  // mapTiles is the client's only definition of which tiles exist, and it has to agree
+  // with the server's GameMap constructor - these numbers come from the Java side.
+  describe("mapTiles", () => {
+    it("builds a regular hexagon when nothing is trimmed", () => {
+      for (let radius = 0; radius <= 6; radius++) {
+        expect(mapTiles(radius, radius)).toHaveLength(3 * radius * radius + 3 * radius + 1);
+      }
+    });
+
+    it("matches the server's elongated full-match board", () => {
+      const tiles = mapTiles(7, 5);
+
+      expect(tiles).toHaveLength(135);
+      expect(new Set(tiles.map((t) => t.r)).size).toBe(11);
+      expect(tiles.every((t) => Math.abs(t.r) <= 5)).toBe(true);
+    });
+
+    it("drops rows past the limit but keeps the full width", () => {
+      const tiles = mapTiles(7, 5);
+      const has = (q: number, r: number) => tiles.some((t) => t.q === q && t.r === r);
+
+      expect(has(0, 5)).toBe(true);
+      expect(has(0, 6)).toBe(false); // inside the radius, but a trimmed row
+      expect(has(7, 0)).toBe(true); // the wide axis is untouched
+      expect(has(-7, 0)).toBe(true);
+    });
+
+    it("clamps a row limit larger than the radius", () => {
+      expect(mapTiles(3, 99)).toHaveLength(3 * 9 + 3 * 3 + 1);
+    });
   });
 });

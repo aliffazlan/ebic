@@ -7,6 +7,7 @@ public record GameStateSnapshot(
     int remainingMoves,
     boolean gameOver,
     int mapRadius,
+    int mapRowLimit,
     List<UnitSnapshot> units,
     List<TileEffectSnapshot> tileEffects
 ) {

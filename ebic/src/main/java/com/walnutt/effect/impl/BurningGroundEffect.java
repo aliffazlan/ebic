@@ -1,5 +1,6 @@
 package com.walnutt.effect.impl;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.walnutt.effect.Effect;
@@ -39,6 +40,40 @@ public class BurningGroundEffect extends Effect {
 
     public Position getTile() {
         return tile;
+    }
+
+    /**
+     * Every patch of ground currently alight. These live on their casters rather than on
+     * the tiles, so finding them means sweeping active units - one definition shared by
+     * Eruption's re-cast guard and the snapshot mapper's overlay, so what the rules
+     * consider burning and what the board draws as burning can never drift apart.
+     *
+     * A dead caster's fire goes out (see onTurnEnd), and a dead unit keeps its effects,
+     * so owners that are dead are skipped.
+     */
+    public static List<BurningGroundEffect> activeGrounds(GameState state) {
+        List<BurningGroundEffect> grounds = new ArrayList<>();
+        for (Unit unit : state.getAllActiveUnits()) {
+            if (unit.isDead()) {
+                continue;
+            }
+            for (Effect effect : unit.getEffects()) {
+                if (!effect.isExpired() && effect instanceof BurningGroundEffect ground) {
+                    grounds.add(ground);
+                }
+            }
+        }
+        return grounds;
+    }
+
+    /** True if `position` is already alight - Eruption refuses to re-ignite it. */
+    public static boolean isBurning(GameState state, Position position) {
+        for (BurningGroundEffect ground : activeGrounds(state)) {
+            if (ground.getTile().equals(position)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

@@ -46,6 +46,7 @@ public final class GameStateSnapshotMapper {
             state.getRemainingMoves(),
             state.isGameOver(),
             state.getMap().getRadius(),
+            state.getMap().getRowLimit(),
             units,
             collectTileEffects(state)
         );
@@ -57,24 +58,13 @@ public final class GameStateSnapshotMapper {
      */
     private static List<TileEffectSnapshot> collectTileEffects(GameState state) {
         List<TileEffectSnapshot> tileEffects = new ArrayList<>();
-        for (Unit unit : state.getAllActiveUnits()) {
-            // A dead caster's ground fire stops burning (BurningGroundEffect bails on
-            // isDead), and a dead unit keeps its effects, so skip it here too rather
-            // than painting a hazard tile that no longer does anything.
-            if (unit.isDead()) {
-                continue;
-            }
-            for (Effect effect : unit.getEffects()) {
-                if (effect.isExpired() || !(effect instanceof BurningGroundEffect ground)) {
-                    continue;
-                }
-                tileEffects.add(new TileEffectSnapshot(
-                    ground.getTile().getQ(),
-                    ground.getTile().getR(),
-                    "burning",
-                    effect.getName(),
-                    effect.getRemainingTurns()));
-            }
+        for (BurningGroundEffect ground : BurningGroundEffect.activeGrounds(state)) {
+            tileEffects.add(new TileEffectSnapshot(
+                ground.getTile().getQ(),
+                ground.getTile().getR(),
+                "burning",
+                ground.getName(),
+                ground.getRemainingTurns()));
         }
         return tileEffects;
     }

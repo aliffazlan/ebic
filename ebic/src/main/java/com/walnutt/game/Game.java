@@ -24,8 +24,13 @@ import com.walnutt.unit.UnitFactory;
  * alternate TurnManager.takeTurn calls until a Champion dies.
  */
 public class Game {
-    /** Hexagon of radius 8 has 217 tiles - plenty of room for ~28 units (14/side) plus maneuvering space. */
-    private static final int FULL_MATCH_MAP_RADIUS = 8;
+    /**
+     * Radius 7 trimmed to rows |r| <= 5: an elongated hexagon of 135 tiles (a regular
+     * radius-7 hex would be 169, the old radius-8 one 217). Wide enough to flank in,
+     * shallow enough that ~28 units meet in a couple of turns instead of marching.
+     */
+    private static final int FULL_MATCH_MAP_RADIUS = 7;
+    private static final int FULL_MATCH_MAP_ROW_LIMIT = 5;
     private static final int MINIMAL_MATCH_MAP_RADIUS = 3;
 
     private final GameState state;
@@ -70,7 +75,7 @@ public class Game {
         Map<String, UnitDefinition> unitDefs = loader.loadAllUnits();
         Map<String, AbilityDefinition> abilityDefs = loader.loadAllAbilities();
 
-        GameMap map = new GameMap(FULL_MATCH_MAP_RADIUS);
+        GameMap map = new GameMap(FULL_MATCH_MAP_RADIUS, FULL_MATCH_MAP_ROW_LIMIT);
         Player playerOne = new Player("Player One", Team.PLAYER_ONE);
         Player playerTwo = new Player("Player Two", Team.PLAYER_TWO);
 
@@ -105,7 +110,7 @@ public class Game {
         Map<String, UnitDefinition> unitDefs = loader.loadAllUnits();
         Map<String, AbilityDefinition> abilityDefs = loader.loadAllAbilities();
 
-        GameMap map = new GameMap(FULL_MATCH_MAP_RADIUS);
+        GameMap map = new GameMap(FULL_MATCH_MAP_RADIUS, FULL_MATCH_MAP_ROW_LIMIT);
         Player playerOne = new Player("Player One", Team.PLAYER_ONE);
         Player playerTwo = new Player("Player Two", Team.PLAYER_TWO);
 

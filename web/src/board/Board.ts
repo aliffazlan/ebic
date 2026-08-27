@@ -2,7 +2,7 @@
 // overlay), driven by GameStateSnapshot pushed through GameStateStore.
 
 import { Application, Container, Graphics, Sprite, Ticker } from "pixi.js";
-import { type AxialCoord, axialToPixel, hexDistance, hexPolygonPoints } from "../hex/HexMath";
+import { type AxialCoord, axialToPixel, hexDistance, hexPolygonPoints, mapTiles } from "../hex/HexMath";
 import { UnitIconFactory } from "../units/UnitIconFactory";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
@@ -38,7 +38,8 @@ const MOVE_TWEEN_FRAMES = 20; // ~330ms at 60fps - short slide, not a full anima
 // (matches Game.newFullDraftMatch()'s radius 8, per CLAUDE.md) until then;
 // ensureMap() will correct it automatically the moment a real snapshot
 // arrives with a different value.
-const PLACEMENT_MAP_RADIUS = 8;
+const PLACEMENT_MAP_RADIUS = 7;
+const PLACEMENT_MAP_ROW_LIMIT = 5;
 
 export interface BoardCallbacks {
   onTileClick(coord: AxialCoord): void;
@@ -72,6 +73,7 @@ export class Board {
   private tileGraphics = new Map<string, Graphics>();
   private unitSprites = new Map<string, Container>();
   private mapRadius = -1;
+  private mapRowLimit = -1;
   private unsubscribe: () => void;
   private app: Application;
   private store: GameStateStore;
@@ -189,20 +191,19 @@ export class Board {
     Ticker.shared.add(tick);
   }
 
-  private ensureMap(radius: number): void {
-    if (radius === this.mapRadius) return;
+  private ensureMap(radius: number, rowLimit: number): void {
+    // Both halves of the shape are in the cache key - a board that changed only its row
+    // trim would otherwise keep the stale tiles.
+    if (radius === this.mapRadius && rowLimit === this.mapRowLimit) return;
     this.mapRadius = radius;
+    this.mapRowLimit = rowLimit;
     this.boardLayer.removeChildren();
     this.tileGraphics.clear();
 
-    for (let q = -radius; q <= radius; q++) {
-      const rMin = Math.max(-radius, -q - radius);
-      const rMax = Math.min(radius, -q + radius);
-      for (let r = rMin; r <= rMax; r++) {
-        const tile = this.drawTile({ q, r });
-        this.tileGraphics.set(`${q},${r}`, tile);
-        this.boardLayer.addChild(tile);
-      }
+    for (const coord of mapTiles(radius, rowLimit)) {
+      const tile = this.drawTile(coord);
+      this.tileGraphics.set(`${coord.q},${coord.r}`, tile);
+      this.boardLayer.addChild(tile);
     }
   }
 
@@ -227,9 +228,14 @@ export class Board {
   }
 
   private async applySnapshot(
-    snapshot: { mapRadius: number; units: UnitSnapshot[]; tileEffects?: TileEffectSnapshot[] },
+    snapshot: {
+      mapRadius: number;
+      mapRowLimit?: number;
+      units: UnitSnapshot[];
+      tileEffects?: TileEffectSnapshot[];
+    },
   ): Promise<void> {
-    this.ensureMap(snapshot.mapRadius);
+    this.ensureMap(snapshot.mapRadius, snapshot.mapRowLimit ?? snapshot.mapRadius);
     this.currentUnits = snapshot.units;
     this.renderTileEffects(snapshot.tileEffects ?? []);
 
@@ -308,7 +314,11 @@ export class Board {
       abilities: [],
       effects: [],
     }));
-    void this.applySnapshot({ mapRadius: PLACEMENT_MAP_RADIUS, units: synthetic });
+    void this.applySnapshot({
+      mapRadius: PLACEMENT_MAP_RADIUS,
+      mapRowLimit: PLACEMENT_MAP_ROW_LIMIT,
+      units: synthetic,
+    });
   }
 
   private async upsertUnit(unit: UnitSnapshot): Promise<void> {
@@ -494,23 +504,19 @@ export class Board {
 
     const origin = { q: caster.q, r: caster.r };
     const minRange = ability.minRange ?? 0;
-    for (let q = -this.mapRadius; q <= this.mapRadius; q++) {
-      const rMin = Math.max(-this.mapRadius, -q - this.mapRadius);
-      const rMax = Math.min(this.mapRadius, -q + this.mapRadius);
-      for (let r = rMin; r <= rMax; r++) {
-        const distance = hexDistance(origin, { q, r });
-        if (distance > ability.range || distance < minRange) continue;
-        // The caster's own tile is only worth shading when the ability can actually
-        // be aimed there (minRange 0), and even then it already has a selection ring.
-        if (distance === 0) continue;
-        const center = axialToPixel({ q, r }, HEX_SIZE);
-        const band = new Graphics()
-          .poly(hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - 2))
-          .fill({ color: CAST_RANGE_COLOR, alpha: 0.08 })
-          .stroke({ width: 1, color: CAST_RANGE_COLOR, alpha: 0.45 });
-        band.position.set(center.x, center.y);
-        this.uiLayer.addChild(band);
-      }
+    for (const coord of mapTiles(this.mapRadius, this.mapRowLimit)) {
+      const distance = hexDistance(origin, coord);
+      if (distance > ability.range || distance < minRange) continue;
+      // The caster's own tile is only worth shading when the ability can actually
+      // be aimed there (minRange 0), and even then it already has a selection ring.
+      if (distance === 0) continue;
+      const center = axialToPixel(coord, HEX_SIZE);
+      const band = new Graphics()
+        .poly(hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - 2))
+        .fill({ color: CAST_RANGE_COLOR, alpha: 0.08 })
+        .stroke({ width: 1, color: CAST_RANGE_COLOR, alpha: 0.45 });
+      band.position.set(center.x, center.y);
+      this.uiLayer.addChild(band);
     }
   }
 

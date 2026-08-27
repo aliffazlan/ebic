@@ -44,6 +44,12 @@ public class TerminalRenderer implements Renderer {
     }
 
     private String symbolFor(Tile tile) {
+        // The loop above walks a q/r bounding box, and a trimmed map (see GameMap's
+        // rowLimit) has coordinates inside that box with no tile behind them - render
+        // those as blank rather than dereferencing null.
+        if (tile == null) {
+            return " ";
+        }
         if (tile.getType() == TileType.BLOCKED) {
             return "#";
         }

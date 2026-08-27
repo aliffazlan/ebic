@@ -25,6 +25,29 @@ export const AXIAL_DIRECTIONS: readonly AxialCoord[] = [
   { q: 0, r: 1 },
 ];
 
+/**
+ * Every tile on the board, mirroring the server's GameMap constructor.
+ *
+ * `rowLimit` is the largest |r| that exists: equal to `radius` for a regular hexagon, and
+ * lower when the top and bottom rows have been trimmed off to make an elongated one (r is
+ * the vertical axis, so a "row" is a constant r). With a trim in play, being inside the
+ * radius no longer means a tile exists - anything drawing the board must go through this
+ * rather than re-deriving the bounds from `radius` alone.
+ */
+export function mapTiles(radius: number, rowLimit: number): AxialCoord[] {
+  const limit = Math.min(rowLimit, radius);
+  const tiles: AxialCoord[] = [];
+  for (let q = -radius; q <= radius; q++) {
+    const rMin = Math.max(-radius, -q - radius);
+    const rMax = Math.min(radius, -q + radius);
+    for (let r = rMin; r <= rMax; r++) {
+      if (Math.abs(r) > limit) continue;
+      tiles.push({ q, r });
+    }
+  }
+  return tiles;
+}
+
 const SQRT3 = Math.sqrt(3);
 
 /** Axial hex coordinate -> pixel center, pointed-top orientation. */

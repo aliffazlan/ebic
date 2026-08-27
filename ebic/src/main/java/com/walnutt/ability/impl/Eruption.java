@@ -9,6 +9,7 @@ import com.walnutt.data.AbilityDefinition;
 import com.walnutt.effect.impl.BurnEffect;
 import com.walnutt.effect.impl.BurningGroundEffect;
 import com.walnutt.game.GameState;
+import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.unit.Unit;
 
@@ -35,10 +36,14 @@ public class Eruption extends Ability {
         if (!(target instanceof TileTarget tileTarget)) {
             return false;
         }
+        Position position = tileTarget.getTile().getPosition();
         // Deliberately not requiring a walkable/empty tile - igniting the ground an enemy
-        // is standing on is the point of the ability.
-        return state.getMap().getTile(tileTarget.getTile().getPosition()) != null
-            && isInRange(state, tileTarget.getTile().getPosition());
+        // is standing on is the point of the ability. Ground that is already alight is
+        // refused though: a second patch on one tile just burns whoever stands there
+        // twice per round, so re-casting there is a wasted cooldown.
+        return state.getMap().getTile(position) != null
+            && isInRange(state, position)
+            && !BurningGroundEffect.isBurning(state, position);
     }
 
     @Override

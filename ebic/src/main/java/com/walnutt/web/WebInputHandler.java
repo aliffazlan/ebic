@@ -317,8 +317,8 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
      * itself actually uses (empirically its 14-unit layout never exceeds
      * radius 3 from the anchor on a radius-8 map) so there's real room to
      * rearrange, while still being unambiguously "this player's own corner" -
-     * opposite-corner anchors are 2x map radius apart, so even a radius-6 zone
-     * for both players can never overlap.
+     * opposite-corner anchors are 2x map radius apart - 14 on the current board - so
+     * two radius-6 zones (12 combined) still cannot overlap, with 2 tiles to spare.
      */
     private List<TilePosition> computeLegalPlacementTiles(GameState state, Player player) {
         Position anchor = DefaultArrangement.anchorFor(state, player);

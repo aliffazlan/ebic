@@ -81,4 +81,57 @@ class GameMapTest {
         assertEquals(expectedFree.getPosition(), found.getPosition());
         assertEquals(1, map.getDistance(origin, found.getPosition()));
     }
+
+    @Test
+    void trimmingRowsRemovesTheTopAndBottomOfTheHexagon() {
+        // The shape the full match uses: radius 7 with rows cut to |r| <= 5.
+        GameMap map = new GameMap(7, 5);
+
+        assertEquals(5, map.getRowLimit());
+        assertEquals(7, map.getRadius(), "the horizontal half-extent is unchanged by a row trim");
+        assertEquals(135, map.getTilesInRadius(new Position(0, 0), 7).size());
+
+        // Rows beyond the limit are gone even though they're inside the radius.
+        assertFalse(map.isWithinBounds(new Position(0, 6)));
+        assertFalse(map.isWithinBounds(new Position(0, -6)));
+        assertEquals(null, map.getTile(new Position(0, 7)));
+        assertTrue(map.isWithinBounds(new Position(0, 5)));
+        assertTrue(map.isWithinBounds(new Position(0, -5)));
+
+        // The wide axis is untouched, so it's elongated rather than uniformly smaller.
+        assertTrue(map.isWithinBounds(new Position(7, 0)));
+        assertTrue(map.isWithinBounds(new Position(-7, 0)));
+    }
+
+    @Test
+    void theDefaultConstructorStillBuildsARegularHexagon() {
+        GameMap map = new GameMap(4);
+
+        assertEquals(4, map.getRowLimit(), "no trim means the row limit equals the radius");
+        assertTrue(map.isWithinBounds(new Position(0, 4)));
+        assertEquals(3 * 16 + 3 * 4 + 1, map.getTilesInRadius(new Position(0, 0), 4).size());
+    }
+
+    /**
+     * DefaultArrangement throws unless a player's corner anchor has at least 3 in-bounds
+     * neighbours (one per elite), so the trimmed shape has to preserve that.
+     */
+    @Test
+    void cornerAnchorsKeepThreeNeighboursOnATrimmedMap() {
+        GameMap map = new GameMap(7, 5);
+
+        for (Position anchor : List.of(new Position(-7, 0), new Position(7, 0))) {
+            assertTrue(map.isWithinBounds(anchor), "anchor " + anchor + " must exist");
+            assertEquals(3, map.getAdjacentTiles(anchor).size(), "anchor " + anchor);
+        }
+    }
+
+    /** A row trim larger than the radius would leave nothing sensible; it clamps instead. */
+    @Test
+    void rowLimitIsClampedToTheRadius() {
+        GameMap map = new GameMap(3, 99);
+
+        assertEquals(3, map.getRowLimit());
+        assertEquals(3 * 9 + 3 * 3 + 1, map.getTilesInRadius(new Position(0, 0), 3).size());
+    }
 }

@@ -122,7 +122,10 @@ class FullDraftWebIntegrationTest {
         GameStateSnapshot snapshot = JsonSupport.GSON.fromJson(parsed, GameStateSnapshot.class);
 
         assertEquals(28, snapshot.units().size(), "1 champion + 3 elites + 10 basics per side = 28 units total");
-        assertEquals(8, snapshot.mapRadius());
+        assertEquals(7, snapshot.mapRadius());
+        assertEquals(5, snapshot.mapRowLimit(), "the full match is an elongated hexagon, not a regular one");
+        assertTrue(snapshot.units().stream().allMatch(u -> Math.abs(u.r()) <= 5),
+            "no unit may be placed on a trimmed row");
         assertFalse(snapshot.gameOver());
         assertEquals("PLAYER_ONE", snapshot.currentTeam());
         assertEquals(14, snapshot.units().stream().filter(u -> u.team().equals("PLAYER_ONE")).count());

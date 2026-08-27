@@ -156,4 +156,46 @@ class EmberTest {
 
         assertEquals(0, stacksOn(ally), "burning ground never harms Ember's own team");
     }
+
+    /**
+     * Re-igniting ground that is already alight just burns whoever stands there twice a
+     * round for the price of a second cooldown, so it's refused outright.
+     */
+    @Test
+    void eruptionRefusesATileThatIsAlreadyBurning() {
+        setUpBoard();
+        Eruption eruption = newEruption();
+        ember.addAbility(eruption);
+        TileTarget burning = new TileTarget(map.getTile(new Position(0, 2)));
+        TileTarget neighbour = new TileTarget(map.getTile(new Position(0, 3)));
+
+        assertTrue(eruption.canUse(state, burning));
+        eruption.onUse(state, burning);
+
+        // Cooldown would block it anyway, so clear that to isolate the new rule.
+        eruption.decreaseCooldown(99);
+        state.setRemainingMoves(3);
+
+        assertFalse(eruption.canUse(state, burning), "that ground is already on fire");
+        assertTrue(eruption.canUse(state, neighbour), "an adjacent tile is still fair game");
+    }
+
+    @Test
+    void aTileBecomesCastableAgainOnceItsFireBurnsOut() {
+        setUpBoard();
+        Eruption eruption = newEruption();
+        ember.addAbility(eruption);
+        TileTarget tile = new TileTarget(map.getTile(new Position(0, 2)));
+
+        eruption.onUse(state, tile);
+        eruption.decreaseCooldown(99);
+        state.setRemainingMoves(3);
+        assertFalse(eruption.canUse(state, tile));
+
+        BurningGroundEffect ground = ember.getActiveEffect(BurningGroundEffect.class).orElseThrow();
+        ground.setRemainingTurns(0);
+        ember.removeExpiredEffects(state);
+
+        assertTrue(eruption.canUse(state, tile), "the fire is out, so it can be lit again");
+    }
 }

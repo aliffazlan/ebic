@@ -85,6 +85,13 @@ five existing units get reworked or retuned.
 - *Objurgation* nerfed: consumes only **50%** of intelligence instead of all of it,
   converted at a 1:1 ratio into health. Cooldown 3 → **4** turns.
 
+### Map
+
+- **The battlefield is smaller and wider.** It was a regular 217-tile hexagon, so armies
+  spent the opening turns walking. It is now an elongated hexagon — one radius step
+  smaller with two rows trimmed off the top and bottom — for **135 tiles**: still wide
+  enough to flank in, shallow enough that the two sides meet quickly.
+
 ### Interface
 
 - **Selecting a spell now outlines its cast range** on the board, so you can see how far
@@ -115,6 +122,9 @@ five existing units get reworked or retuned.
   was cast on, giving the opponent no window to destroy the Branchling and interrupt it.
 - **Branchling auras** now tick at the end of their controller's turn rather than the
   start, so they resolve after that side has finished moving around them.
+- **Eruption can no longer be cast on ground that is already burning.** It gave no
+  benefit — a second patch on one tile just burns whoever stands there twice a round —
+  so it only ever wasted the cooldown.
 
 ### Changed
 
