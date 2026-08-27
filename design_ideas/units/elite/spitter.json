@@ -5,6 +5,7 @@
     "strength": 30,
     "agility": 35,
     "intelligence" : 60,
+    "attack_range": 2,
     "abilities": [
         "poison_sting", "poison_bloom"
     ]

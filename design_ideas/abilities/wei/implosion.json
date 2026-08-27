@@ -1,7 +1,7 @@
 {
     "name": "Implosion",
     "type": "active",
-    "description": "Finds a weakness in the target's energy, and deals damage in an area of effect. Deals %dmg_per_cooldown% damage per cooldown the target unit has, and damages all adjacent enemy units.",
+    "description": "Strikes at the exhausted energy of a target within %cast_range% tiles, dealing %dmg_per_cooldown% damage for every turn of cooldown it is carrying, and splashing the same onto enemies within %radius% tile.",
     "stats": {
         "cooldown": 5,
         "cast_range": 2,

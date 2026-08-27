@@ -1,5 +1,6 @@
 package com.walnutt.web;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -7,6 +8,7 @@ import com.walnutt.ability.Ability;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.effect.Effect;
+import com.walnutt.effect.impl.BurningGroundEffect;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Position;
 import com.walnutt.status.Stat;
@@ -17,6 +19,7 @@ import com.walnutt.web.dto.AbilityPreviewSnapshot;
 import com.walnutt.web.dto.AbilitySnapshot;
 import com.walnutt.web.dto.EffectSnapshot;
 import com.walnutt.web.dto.GameStateSnapshot;
+import com.walnutt.web.dto.TileEffectSnapshot;
 import com.walnutt.web.dto.UnitDefinitionSnapshot;
 import com.walnutt.web.dto.UnitSnapshot;
 
@@ -43,8 +46,37 @@ public final class GameStateSnapshotMapper {
             state.getRemainingMoves(),
             state.isGameOver(),
             state.getMap().getRadius(),
-            units
+            units,
+            collectTileEffects(state)
         );
+    }
+
+    /**
+     * Tile-bound effects are stored on the unit that created them (see
+     * BurningGroundEffect), so this sweeps every active unit rather than the map.
+     */
+    private static List<TileEffectSnapshot> collectTileEffects(GameState state) {
+        List<TileEffectSnapshot> tileEffects = new ArrayList<>();
+        for (Unit unit : state.getAllActiveUnits()) {
+            // A dead caster's ground fire stops burning (BurningGroundEffect bails on
+            // isDead), and a dead unit keeps its effects, so skip it here too rather
+            // than painting a hazard tile that no longer does anything.
+            if (unit.isDead()) {
+                continue;
+            }
+            for (Effect effect : unit.getEffects()) {
+                if (effect.isExpired() || !(effect instanceof BurningGroundEffect ground)) {
+                    continue;
+                }
+                tileEffects.add(new TileEffectSnapshot(
+                    ground.getTile().getQ(),
+                    ground.getTile().getR(),
+                    "burning",
+                    effect.getName(),
+                    effect.getRemainingTurns()));
+            }
+        }
+        return tileEffects;
     }
 
     public UnitSnapshot toUnitSnapshot(Unit unit) {
@@ -73,6 +105,8 @@ public final class GameStateSnapshotMapper {
             (int) unit.getEffective(Stat.STRENGTH),
             (int) unit.getEffective(Stat.AGILITY),
             (int) unit.getEffective(Stat.INTELLIGENCE),
+            (int) unit.getEffective(Stat.ATTACK_RANGE),
+            unit.getMinAttackRange(),
             unit.isDead(),
             unit.hasMovedThisTurn(),
             unit.hasAttackedThisTurn(),
@@ -132,6 +166,7 @@ public final class GameStateSnapshotMapper {
             def.strength(),
             def.agility(),
             def.intelligence(),
+            def.effectiveAttackRange(),
             abilities
         );
     }

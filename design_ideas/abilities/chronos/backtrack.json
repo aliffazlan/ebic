@@ -1,7 +1,7 @@
 {
     "name": "Backtrack",
     "type": "active",
-    "description": "Dashes to an empty tile, and recovers all damage taken in the previous turn.",
+    "description": "Dashes to an empty tile within %range% tiles and rewinds this unit's wounds, restoring all damage it took over the last %backtrack_period% turn.",
     "stats": {
         "cooldown": 3,
         "range": 3,

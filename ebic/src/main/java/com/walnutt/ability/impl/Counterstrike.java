@@ -1,5 +1,6 @@
 package com.walnutt.ability.impl;
 
+import com.walnutt.ability.Attack;
 import com.walnutt.ability.PassiveAbility;
 import com.walnutt.combat.Attribute;
 import com.walnutt.combat.Encounter;
@@ -41,7 +42,9 @@ public class Counterstrike extends PassiveAbility {
         if (attacker == null || attacker.isDead() || attacker == getOwner()) {
             return;
         }
-        if (!state.getMap().areAdjacent(getOwner().getPosition(), attacker.getPosition())) {
+        // "You counter if you could have attacked them" - follows this unit's own attack
+        // range rather than assuming melee, so a ranged counter-attacker works correctly.
+        if (!Attack.canReach(state, getOwner(), attacker)) {
             return;
         }
 

@@ -1,13 +1,13 @@
 {
     "name": "Duel",
     "type": "active",
-    "description": "Taunts the target enemy into a duel. For %duration% turns, neither unit will be able to act. At the end of their turns, each unit is forced to attack their opponent. When a unit dies in a duel, the winner will recieve %duel_bonus% bonus to all stats, and heal for %duel_heal% % of their max health. Defeating a non-basic unit will recieve %win_multiplier% times the stat bonuses. If dueled units are seperated through external means, the duel will end early.",
+    "description": "Locks an adjacent enemy into single combat for %duration% turns. Neither unit may act, and each is forced to attack the other at the end of its turn. The survivor permanently gains %duel_bonus% to every attribute and heals %duel_heal:pct%% of its maximum health, multiplied by %win_multiplier% if the loser was more than a basic unit. Separating the duellists ends it early with no reward.",
     "stats": {
-        "cooldown": 10,
+        "cooldown": 6,
         "cast_range": 1,
-        "duration": 4,
-        "duel_bonus": 10,
+        "duration": 3,
+        "duel_bonus": 20,
         "duel_heal": 0.5,
-        "win_multiplier": 3
+        "win_multiplier": 2.5
     }
 }

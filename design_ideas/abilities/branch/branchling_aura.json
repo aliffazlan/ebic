@@ -1,0 +1,10 @@
+{
+    "name": "Branchling Aura",
+    "type": "passive",
+    "description": "Every turn, this Branchling deals %branch_dmg% damage to enemies within %radius% tile and heals allies within %radius% tile for %branch_heal% health.",
+    "stats": {
+        "radius": 1,
+        "branch_dmg": 10,
+        "branch_heal": 8
+    }
+}

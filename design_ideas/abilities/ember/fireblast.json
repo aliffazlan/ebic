@@ -1,0 +1,11 @@
+{
+    "name": "Fireblast",
+    "type": "active",
+    "description": "Hurls a fireball at a target within %cast_range% tiles, dealing %damage% damage and applying %burn_stacks% stacks of Burn.",
+    "stats": {
+        "cooldown": 2,
+        "cast_range": 3,
+        "damage": 24,
+        "burn_stacks": 3
+    }
+}

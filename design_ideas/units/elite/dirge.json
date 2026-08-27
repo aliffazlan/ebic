@@ -5,6 +5,7 @@
     "strength": 60,
     "agility": 20,
     "intelligence" : 45,
+    "attack_range": 1,
     "abilities": [
         "decay", "soul_rip"
     ]

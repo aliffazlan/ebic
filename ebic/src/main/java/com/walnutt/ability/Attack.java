@@ -5,13 +5,33 @@ import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.combat.Attribute;
 import com.walnutt.combat.CombatEngine;
 import com.walnutt.game.GameState;
+import com.walnutt.status.Stat;
 import com.walnutt.unit.ActionKind;
 import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitType;
 
 public class Attack extends Ability {
     public Attack() {
-        super("Attack", "Basic attack against an adjacent enemy", false);
+        super("Attack", "Basic attack against an enemy within this unit's attack range", false);
+    }
+
+    /**
+     * Single source of truth for "could this unit basic-attack that one from where it
+     * stands right now". Shared so nothing re-derives the rule and drifts.
+     *
+     * The lower bound is at least 1: tiles can legally hold more than one unit (Cloak
+     * and Dagger stacks Evayne onto an occupied tile), so without a floor a ranged
+     * unit could attack something standing on its own tile, which adjacency-based
+     * targeting never permitted.
+     */
+    public static boolean canReach(GameState state, Unit attacker, Unit defender) {
+        if (attacker.getPosition() == null || defender.getPosition() == null) {
+            return false;
+        }
+        int distance = state.getMap().getDistance(attacker.getPosition(), defender.getPosition());
+        int max = (int) attacker.getEffective(Stat.ATTACK_RANGE);
+        int min = Math.max(1, attacker.getMinAttackRange());
+        return distance >= min && distance <= max;
     }
 
     @Override
@@ -34,7 +54,7 @@ public class Attack extends Ability {
         if (defender.isDead() || defender.getTeam() == owner.getTeam()) {
             return false;
         }
-        return state.getMap().areAdjacent(owner.getPosition(), defender.getPosition());
+        return canReach(state, owner, defender);
     }
 
     @Override

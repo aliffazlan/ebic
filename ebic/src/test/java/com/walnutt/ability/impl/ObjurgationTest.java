@@ -26,8 +26,8 @@ class ObjurgationTest {
     @Test
     void preventsDeathOnce_thenAllowsDeathWhileOnCooldown() {
         Unit unit = new BasicUnit("Harbinger", Team.PLAYER_ONE, new UnitStats(10, 10, 50, 100));
-        Objurgation objurgation = new Objurgation(new AbilityDefinition(
-            "Objurgation", "passive", "desc", Map.of("cooldown", 3.0, "int_to_hp", 0.8)));
+        Objurgation objurgation = new Objurgation(new AbilityDefinition("Objurgation", "passive", "desc",
+            Map.of("cooldown", 4.0, "int_to_hp", 1.0, "int_consumed", 0.5)));
         unit.addAbility(objurgation);
         Unit enemy = new BasicUnit("Enemy", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100));
 
@@ -41,12 +41,35 @@ class ObjurgationTest {
         unit.takeDamage(state, new DamageEvent(enemy, unit, 50)); // would be fatal
 
         assertFalse(unit.isDead());
-        assertEquals(40, unit.getHealth()); // round(0.8 * 50 intelligence) = 40
-        assertEquals(0, unit.getAttributeValue(Attribute.INTELLIGENCE)); // consumed
+        // Only half the intelligence is consumed now (50 -> 25), converted 1:1 into HP.
+        assertEquals(25, unit.getHealth());
+        assertEquals(25, unit.getAttributeValue(Attribute.INTELLIGENCE));
         assertFalse(objurgation.isReady());
 
         // Still on cooldown - a second fatal hit is not prevented.
         unit.takeDamage(state, new DamageEvent(enemy, unit, 100));
         assertTrue(unit.isDead());
+    }
+
+    /** The nerf: Objurgation no longer zeroes intelligence outright. */
+    @Test
+    void consumesOnlyTheConfiguredFractionOfIntelligence() {
+        Unit unit = new BasicUnit("Harbinger", Team.PLAYER_ONE, new UnitStats(10, 10, 80, 100));
+        unit.addAbility(new Objurgation(new AbilityDefinition("Objurgation", "passive", "desc",
+            Map.of("cooldown", 4.0, "int_to_hp", 1.0, "int_consumed", 0.5))));
+        Unit enemy = new BasicUnit("Enemy", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100));
+
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        p1.addUnit(unit);
+        p2.addUnit(enemy);
+        GameState state = new GameState(new GameMap(3), List.of(p1, p2), new Random(1));
+
+        unit.getHealthPool().setCurrent(5);
+        unit.takeDamage(state, new DamageEvent(enemy, unit, 500));
+
+        assertFalse(unit.isDead());
+        assertEquals(40, unit.getHealth(), "half of 80 intelligence, converted 1:1");
+        assertEquals(40, unit.getAttributeValue(Attribute.INTELLIGENCE), "the other half survives");
     }
 }

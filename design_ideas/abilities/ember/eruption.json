@@ -1,0 +1,12 @@
+{
+    "name": "Eruption",
+    "type": "active",
+    "description": "Sets the targeted tile ablaze for %duration% turns, up to %cast_range% tiles away, immediately applying %burn_stacks_init% stacks of Burn to whoever is standing on it. Any enemy that ends its turn in the flames gains another %burn_stacks% stack.",
+    "stats": {
+        "cooldown": 3,
+        "duration": 7,
+        "cast_range": 3,
+        "burn_stacks_init": 2,
+        "burn_stacks": 1
+    }
+}

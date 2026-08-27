@@ -2,7 +2,6 @@ package com.walnutt.unit;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
@@ -141,15 +140,42 @@ public abstract class Unit {
         return Collections.unmodifiableList(effects);
     }
 
+    /**
+     * Collect-then-expire-then-remove, deliberately in three passes: an onExpire hook
+     * is allowed to add or remove effects on any unit including this one (Sprout's
+     * delayed teleport grants itself a barrier), which would invalidate a live
+     * iterator. Structural removal is deferred until every hook has run, so the
+     * expiring effect's own flags/modifiers are still readable from inside its own
+     * onExpire - ImprisonmentEffect relies on that.
+     */
     public void removeExpiredEffects(GameState state) {
-        Iterator<Effect> it = effects.iterator();
-        while (it.hasNext()) {
-            Effect effect = it.next();
+        List<Effect> expired = new ArrayList<>();
+        for (Effect effect : effects) {
             if (effect.isExpired()) {
-                effect.onExpire(state);
-                it.remove();
+                expired.add(effect);
             }
         }
+        if (expired.isEmpty()) {
+            return;
+        }
+        for (Effect effect : expired) {
+            effect.onExpire(state);
+        }
+        effects.removeAll(expired);
+    }
+
+    /**
+     * Strictest minimum attack range imposed by any active effect, or 0 if none.
+     * Aggregated by max (not sum) so two overlapping minimums of 3 and 2 yield 3.
+     */
+    public int getMinAttackRange() {
+        int min = 0;
+        for (Effect effect : effects) {
+            if (!effect.isExpired()) {
+                min = Math.max(min, effect.getMinAttackRange());
+            }
+        }
+        return min;
     }
 
     /** First active effect of the given type, if any - a typed alternative to scanning getEffects() by hand. */
@@ -171,6 +197,7 @@ public abstract class Unit {
         int count = 0;
         for (Effect effect : effects) {
             if (!effect.isExpired() && effect.isDispellable() && effect.getCategory() == EffectCategory.DEBUFF) {
+                effect.markDispelled();
                 effect.setRemainingTurns(0);
                 count++;
             }
@@ -198,6 +225,7 @@ public abstract class Unit {
             case AGILITY -> baseStats.agility();
             case INTELLIGENCE -> baseStats.intelligence();
             case MAX_HEALTH -> baseStats.maxHealth();
+            case ATTACK_RANGE -> baseStats.attackRange();
         };
 
         double flatTotal = 0;

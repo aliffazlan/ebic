@@ -93,6 +93,11 @@ export interface UnitSnapshot {
   strength: number;
   agility: number;
   intelligence: number;
+  // How far this unit's basic attack reaches, in tiles (default 1). `minAttackRange`
+  // is 0 for almost everything - Artemis's Steady Focus is the one thing that sets it,
+  // forbidding attacks on targets closer than that.
+  attackRange: number;
+  minAttackRange: number;
   dead: boolean;
   hasMovedThisTurn: boolean;
   hasAttackedThisTurn: boolean;
@@ -109,6 +114,17 @@ export interface GameStateSnapshot {
   gameOver: boolean;
   mapRadius: number;
   units: UnitSnapshot[];
+  // Persistent effects painted on the board itself rather than on a unit -
+  // currently just Ember's Eruption leaving burning ground behind.
+  tileEffects: TileEffectSnapshot[];
+}
+
+export interface TileEffectSnapshot {
+  q: number;
+  r: number;
+  kind: "burning" | string;
+  name: string;
+  remainingTurns: number;
 }
 
 export type VfxType = "ability_used" | "damage" | "death" | "status_applied" | "heal";
@@ -132,6 +148,7 @@ export interface UnitDefinitionSnapshot {
   strength: number;
   agility: number;
   intelligence: number;
+  attackRange: number;
   abilities: AbilityPreviewSnapshot[];
 }
 

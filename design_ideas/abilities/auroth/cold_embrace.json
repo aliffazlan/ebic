@@ -1,7 +1,7 @@
 {
     "name": "Cold Embrace",
     "type": "active",
-    "description": "Freezes the targetted unit for %duration% turns, and making them immune to attacks. Deals %dmg_heal% damage per turn if the target is an enemy, or heals if the target is an ally.",
+    "description": "Seals a unit within %cast_range% tiles in ice for %duration% turns, making it immune to attacks. Each turn the ice deals %dmg_heal% damage to an enemy, or heals an ally for the same amount.",
     "stats": {
         "cooldown": 6,
         "cast_range": 4,

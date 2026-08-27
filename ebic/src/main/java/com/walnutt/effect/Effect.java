@@ -29,6 +29,7 @@ public abstract class Effect extends TriggerHandler {
     protected final List<StatModifier> modifiers = new ArrayList<>();
     protected EffectCategory category = EffectCategory.NEUTRAL;
     protected boolean dispellable = true;
+    private boolean dispelled;
     private boolean slowTickPending;
 
     public Effect(String name, int remainingTurns) {
@@ -113,6 +114,21 @@ public abstract class Effect extends TriggerHandler {
     }
 
     /**
+     * True if this effect was cleared early by a dispel rather than running out of
+     * duration. Both paths funnel through the same onExpire hook (dispelDebuffs just
+     * force-expires), so an effect whose payload should only fire on a natural finish -
+     * Poison Bloom's spread - needs this to tell them apart.
+     */
+    public boolean wasDispelled() {
+        return dispelled;
+    }
+
+    /** Called by Unit.dispelDebuffs immediately before force-expiring this effect. */
+    public void markDispelled() {
+        this.dispelled = true;
+    }
+
+    /**
      * Called once, right before this effect is removed for actually running out of
      * duration (Unit.removeExpiredEffects). Default no-op; a handful of effects
      * (Oblivion Confinement's "escape" steal, Sanity's Eclipse's delayed orb) do
@@ -123,6 +139,18 @@ public abstract class Effect extends TriggerHandler {
 
     public Set<StatusFlag> getStatusFlags() {
         return flags;
+    }
+
+    /**
+     * Minimum distance this effect forces its owner's basic attacks to keep (Artemis's
+     * Steady Focus can't shoot anything closer than 3 tiles). 0 means no constraint.
+     *
+     * Deliberately not a {@link com.walnutt.status.Stat}: Unit.getEffective SUMS flat
+     * modifiers, but overlapping minimums must resolve to the STRICTEST one, so
+     * Unit.getMinAttackRange aggregates these by max instead.
+     */
+    public int getMinAttackRange() {
+        return 0;
     }
 
     /**

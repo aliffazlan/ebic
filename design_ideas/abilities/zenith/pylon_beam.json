@@ -1,7 +1,7 @@
 {
     "name": "Pylon Orbital Beam",
     "type": "passive",
-    "description": "Whenever the summoning unit casts Orbital Beam, this unit will also cast Orbital Beam on a random adjcaent enemy unit.",
+    "description": "Whenever this pylon's summoner casts Orbital Beam, this pylon fires one too, at a random enemy within %radius% tile.",
     "stats": {
         "radius": 1
     }

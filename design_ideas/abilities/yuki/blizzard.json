@@ -1,7 +1,7 @@
 {
     "name": "Blizzard",
     "type": "active",
-    "description": "Covers the targetted unit in snow, rooting them in place and dealing %damage% damage per turn for %duration% turns. If the target is already affected by blizzard, the duration is increased.",
+    "description": "Buries a target within %cast_range% tiles in snow, rooting it and dealing %damage% damage per turn for %duration% turns. Re-casting it on an already-buried target extends the duration.",
     "stats": {
         "cooldown": 4,
         "cast_range": 3,

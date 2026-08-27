@@ -5,6 +5,7 @@
     "strength": 80,
     "agility": 30,
     "intelligence" : 20,
+    "attack_range": 1,
     "abilities": [
         "doom", "infernal_blade"
     ]

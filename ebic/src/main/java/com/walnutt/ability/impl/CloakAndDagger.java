@@ -24,7 +24,7 @@ public class CloakAndDagger extends Ability {
         setMaxCooldown(definition.getInt("cooldown", 5));
         setRange(definition.getInt("cast_range", 2));
         this.duration = definition.getInt("duration", 2);
-        this.damagePenalty = definition.getDouble("dmg_penalty", definition.getDouble("dmg_penality", 0.4));
+        this.damagePenalty = definition.getDouble("dmg_penalty", 0.4);
     }
 
     @Override

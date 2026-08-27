@@ -1,7 +1,7 @@
 {
     "name": "Manifestation",
     "type": "active",
-    "description": "Moves to any free tile on the map, and applies a debuff to adjacent enemy units that reduces damage output by %dmg_reduction%, and silences for %duration% turns.",
+    "description": "Rematerialises on any free tile on the map, leaving adjacent enemies silenced and dealing %dmg_reduction:pct%% less damage for %duration% turns.",
     "stats": {
         "cooldown": 5,
         "dmg_reduction": 0.5,

@@ -8,6 +8,7 @@ import com.walnutt.ability.impl.Backstab;
 import com.walnutt.ability.impl.Backtrack;
 import com.walnutt.ability.impl.Blizzard;
 import com.walnutt.ability.impl.BlizzardFist;
+import com.walnutt.ability.impl.BranchlingAura;
 import com.walnutt.ability.impl.CloakAndDagger;
 import com.walnutt.ability.impl.ColdEmbrace;
 import com.walnutt.ability.impl.Counterstrike;
@@ -19,16 +20,21 @@ import com.walnutt.ability.impl.Dispersion;
 import com.walnutt.ability.impl.Doom;
 import com.walnutt.ability.impl.Duel;
 import com.walnutt.ability.impl.EnergyBreak;
+import com.walnutt.ability.impl.Eruption;
 import com.walnutt.ability.impl.EyeOfTheStorm;
 import com.walnutt.ability.impl.Feast;
+import com.walnutt.ability.impl.Fireblast;
 import com.walnutt.ability.impl.Frostbite;
 import com.walnutt.ability.impl.HolyShield;
 import com.walnutt.ability.impl.Implosion;
 import com.walnutt.ability.impl.InfernalBlade;
+import com.walnutt.ability.impl.Longshot;
 import com.walnutt.ability.impl.Manifestation;
-import com.walnutt.ability.impl.OblivionConfinement;
 import com.walnutt.ability.impl.Objurgation;
+import com.walnutt.ability.impl.OblivionConfinement;
 import com.walnutt.ability.impl.OrbitalBeam;
+import com.walnutt.ability.impl.Overgrowth;
+import com.walnutt.ability.impl.Overheat;
 import com.walnutt.ability.impl.OverwhelmingOdds;
 import com.walnutt.ability.impl.PoisonBloom;
 import com.walnutt.ability.impl.PoisonSting;
@@ -41,7 +47,9 @@ import com.walnutt.ability.impl.Selfless;
 import com.walnutt.ability.impl.SnowBlast;
 import com.walnutt.ability.impl.SnowGolem;
 import com.walnutt.ability.impl.SoulRip;
+import com.walnutt.ability.impl.Sprout;
 import com.walnutt.ability.impl.StaticLink;
+import com.walnutt.ability.impl.SteadyFocus;
 import com.walnutt.ability.impl.TimelessStrike;
 
 /**
@@ -92,7 +100,15 @@ public final class AbilityFactory {
         Map.entry("feast", Feast::new),
         Map.entry("cripple", Cripple::new),
         Map.entry("static_link", StaticLink::new),
-        Map.entry("eye_of_the_storm", EyeOfTheStorm::new)
+        Map.entry("eye_of_the_storm", EyeOfTheStorm::new),
+        Map.entry("overheat", Overheat::new),
+        Map.entry("fireblast", Fireblast::new),
+        Map.entry("eruption", Eruption::new),
+        Map.entry("longshot", Longshot::new),
+        Map.entry("steady_focus", SteadyFocus::new),
+        Map.entry("overgrowth", Overgrowth::new),
+        Map.entry("sprout", Sprout::new),
+        Map.entry("branchling_aura", BranchlingAura::new)
     );
 
     private AbilityFactory() {

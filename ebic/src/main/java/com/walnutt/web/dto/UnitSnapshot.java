@@ -15,6 +15,8 @@ public record UnitSnapshot(
     int strength,
     int agility,
     int intelligence,
+    int attackRange,
+    int minAttackRange,
     boolean dead,
     boolean hasMovedThisTurn,
     boolean hasAttackedThisTurn,

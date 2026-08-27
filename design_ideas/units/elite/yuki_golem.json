@@ -5,6 +5,7 @@
     "strength": 60,
     "agility": 40,
     "intelligence" : 15,
+    "attack_range": 1,
     "abilities": [
         "blizzard_fist", "snow_blast"
     ]

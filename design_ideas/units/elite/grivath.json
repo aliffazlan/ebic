@@ -5,6 +5,7 @@
     "strength": 60,
     "agility": 54,
     "intelligence" : 48,
+    "attack_range": 1,
     "abilities": [
         "feast", "cripple"
     ]

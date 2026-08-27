@@ -2,6 +2,7 @@ package com.walnutt.ability.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.effect.Effect;
+import com.walnutt.effect.impl.BloomingPoisonEffect;
 import com.walnutt.effect.impl.PoisonEffect;
 import com.walnutt.event.DamageEvent;
 import com.walnutt.game.GameState;
@@ -97,5 +99,86 @@ class PoisonBloomTest {
             }
         }
         return null;
+    }
+
+    /** Helper: Spitter at (0,0), victim adjacent to the bloom host so it can catch the spread. */
+    private static GameState scenario(Unit spitter, Unit host, Unit bystander) {
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        p1.addUnit(spitter);
+        p2.addUnit(host);
+        p2.addUnit(bystander);
+        GameMap map = new GameMap(4);
+        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+        state.setRemainingMoves(3);
+        map.moveUnit(spitter, map.getTile(new Position(0, 0)));
+        map.moveUnit(host, map.getTile(new Position(0, 2)));
+        map.moveUnit(bystander, map.getTile(new Position(0, 3)));
+        return state;
+    }
+
+    private static BloomingPoisonEffect bloomOn(Unit host) {
+        return host.getActiveEffect(BloomingPoisonEffect.class).orElseThrow();
+    }
+
+    @Test
+    void spreadsToNearbyEnemiesWhenTheBloomRunsItsFullCourse() {
+        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
+        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
+        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
+        GameState state = scenario(spitter, host, bystander);
+
+        host.addEffect(new BloomingPoisonEffect(spitter, 3, 0, 4, 1, 1));
+
+        // Run it down to nothing the way the engine would, then let expiry fire.
+        BloomingPoisonEffect bloom = bloomOn(host);
+        while (!bloom.isExpired()) {
+            bloom.tick();
+        }
+        host.removeExpiredEffects(state);
+
+        assertNotNull(bystander.getActiveEffect(PoisonEffect.class).orElse(null),
+            "a bloom that finished naturally should have spread to the adjacent enemy");
+    }
+
+    @Test
+    void doesNotSpreadWhenCleansedOffEarly() {
+        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
+        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
+        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
+        GameState state = scenario(spitter, host, bystander);
+
+        host.addEffect(new BloomingPoisonEffect(spitter, 5, 0, 4, 1, 1));
+
+        // dispelDebuffs is the cleanse path (Holy Shield); it force-expires through the
+        // same onExpire hook a natural finish uses, so the two must stay distinguishable.
+        host.dispelDebuffs(state);
+
+        assertTrue(bystander.getActiveEffect(PoisonEffect.class).isEmpty(),
+            "cleansing the bloom off must deny the spread entirely");
+        assertTrue(host.getActiveEffect(BloomingPoisonEffect.class).isEmpty(), "the bloom itself is gone");
+    }
+
+    @Test
+    void spreadsOnlyOnceEvenIfTheHostDiesAndTheEffectLaterExpires() {
+        Unit spitter = new BasicUnit("Spitter", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
+        Unit host = new BasicUnit("Host", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 10));
+        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100000));
+        GameState state = scenario(spitter, host, bystander);
+
+        host.addEffect(new BloomingPoisonEffect(spitter, 4, 0, 4, 1, 1));
+        host.takeDamage(state, new DamageEvent(spitter, host, 999)); // dies under the bloom
+
+        int afterDeath = bystander.getActiveEffect(PoisonEffect.class).orElseThrow().getRemainingTurns();
+
+        // A dead unit stays in Player.getUnits() and keeps ticking, so expiry still comes.
+        BloomingPoisonEffect bloom = bloomOn(host);
+        while (!bloom.isExpired()) {
+            bloom.tick();
+        }
+        host.removeExpiredEffects(state);
+
+        assertEquals(afterDeath, bystander.getActiveEffect(PoisonEffect.class).orElseThrow().getRemainingTurns(),
+            "the death burst and the expiry burst must not both land");
     }
 }

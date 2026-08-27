@@ -1,0 +1,12 @@
+{
+    "name": "Artemis",
+    "type": "elite",
+    "max_hp": 440,
+    "strength": 28,
+    "agility": 55,
+    "intelligence" : 50,
+    "attack_range": 4,
+    "abilities": [
+        "longshot", "steady_focus"
+    ]
+}

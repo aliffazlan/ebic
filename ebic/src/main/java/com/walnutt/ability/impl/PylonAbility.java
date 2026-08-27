@@ -11,6 +11,7 @@ import com.walnutt.map.Tile;
 import com.walnutt.unit.HealthPool;
 import com.walnutt.unit.SummonedUnit;
 import com.walnutt.unit.Unit;
+import com.walnutt.unit.UnitFactory;
 import com.walnutt.unit.UnitStats;
 
 /**
@@ -41,7 +42,8 @@ public class PylonAbility extends Ability {
         UnitStats stats = new UnitStats(pylonDefinition.strength(), pylonDefinition.agility(),
             pylonDefinition.intelligence(), pylonDefinition.maxHp());
 
-        Unit pylon = new SummonedUnit(pylonDefinition.name(), owner.getTeam(), stats,
+        Unit pylon = new SummonedUnit(pylonDefinition.name(), owner.getTeam(),
+            UnitFactory.parseType(pylonDefinition.type()), stats,
             new HealthPool(pylonDefinition.maxHp()), owner, false, false);
 
         for (String abilityId : pylonDefinition.abilities()) {

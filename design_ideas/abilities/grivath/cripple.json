@@ -1,9 +1,11 @@
 {
     "name": "Cripple",
     "type": "passive",
-    "description": "Passively deals %damage_reduction% % less damage. Instead, when attacking, the converted damage will remove the attacked unit's stats. Every %dmg_to_stat% point of reduced damage will remove 1 attribute. The removed attribute depends on what the enemy used to defend with." ,
+    "description": "A landed attack drains %stat_steal% point of every attribute from the target and transfers it to this unit, plus %defended_bonus% extra points of whichever attribute the target defended with, along with %hp_steal% maximum and current health. Against anything tougher than a basic unit every amount is multiplied by %non_basic_multiplier%. An attack that is successfully defended still shaves %stat_steal% point off the defending attribute, but drains no health.",
     "stats": {
-        "damage_reduction": 0.5,
-        "dmg_to_stat": 3
+        "stat_steal": 1,
+        "defended_bonus": 3,
+        "hp_steal": 5,
+        "non_basic_multiplier": 2
     }
 }

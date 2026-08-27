@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
@@ -56,7 +57,11 @@ class FullDraftMatchTest {
                                                      Player p2, List<UnitDefinition> p2Options) {}
         };
 
-        GameState state = Game.newFullDraftMatch(alwaysFirst, silent).getState();
+        // Fixed seed: the draft pool is now larger than what a single draft consumes
+        // (5 champions for 4 slots, 14 elites for 12), so WHICH heroes get offered
+        // varies run to run. Without a seed this test's roster assertions silently
+        // depend on that draw and only fail some of the time.
+        GameState state = Game.newFullDraftMatch(alwaysFirst, silent, new Random(20260827L)).getState();
 
         assertEquals(2, state.getPlayers().size());
         for (Player player : state.getPlayers()) {
@@ -67,18 +72,9 @@ class FullDraftMatchTest {
             assertEquals(10, units.stream().filter(u -> u.getUnitType() == UnitType.BASIC).count());
             assertTrue(player.getChampion().isPresent());
 
-            // Every drafted champion/elite should have picked up at least one
-            // implemented special ability beyond the universal Move+Attack - true for
-            // every hero currently in the pool, Lucifer included now that Doom/Infernal
-            // Blade are wired up.
-            for (Unit unit : units) {
-                if (unit.getUnitType() == UnitType.BASIC) {
-                    continue;
-                }
-                long specialAbilities = unit.getAbilities().size() - 2; // minus Move, Attack
-                assertTrue(specialAbilities >= 1,
-                    unit.getName() + " (" + unit.getUnitType() + ") has no implemented special ability wired");
-            }
+            // Kit-wiring is NOT asserted here any more - a random draft only ever
+            // reveals a subset of the pool, so doing it here silently tested whichever
+            // heroes happened to be drawn. DraftPoolCoverageTest checks all of them.
         }
     }
 }

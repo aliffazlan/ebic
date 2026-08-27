@@ -1,0 +1,10 @@
+{
+    "name": "Overheat",
+    "type": "passive",
+    "description": "Tracks the damage this unit deals to each enemy. Once one has accumulated %threshold% damage it overheats, applying %burn_stacks% stack of Burn to every other enemy within %radius% tile. Overheat triggers at most once per turn, and any damage past the threshold carries over toward the next one.",
+    "stats": {
+        "threshold": 50,
+        "radius": 1,
+        "burn_stacks": 1
+    }
+}

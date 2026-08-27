@@ -22,7 +22,8 @@ public final class UnitFactory {
      * with its base kit while the rest of the roster catches up.
      */
     public static Unit createFromDefinition(UnitDefinition def, Team team, Map<String, AbilityDefinition> abilityDefs) {
-        UnitStats stats = new UnitStats(def.strength(), def.agility(), def.intelligence(), def.maxHp());
+        UnitStats stats = new UnitStats(def.strength(), def.agility(), def.intelligence(), def.maxHp(),
+            def.effectiveAttackRange());
         UnitType type = parseType(def.type());
         Unit unit = switch (type) {
             case CHAMPION -> new ChampionUnit(def.name(), team, stats);
@@ -54,7 +55,8 @@ public final class UnitFactory {
         return unit;
     }
 
-    private static UnitType parseType(String type) {
+    /** Shared with summon builders (Branchlings, Pylons) that construct a Unit from a prototype definition. */
+    public static UnitType parseType(String type) {
         return switch (type.toLowerCase()) {
             case "champion" -> UnitType.CHAMPION;
             case "elite" -> UnitType.ELITE;

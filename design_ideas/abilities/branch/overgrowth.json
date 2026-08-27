@@ -1,0 +1,12 @@
+{
+    "name": "Overgrowth",
+    "type": "active",
+    "description": "Rings the targeted tile, up to %cast_range% tiles away, with Branchlings that take root for %duration% turns. Tiles that are already occupied are skipped. Each Branchling deals %branch_dmg% damage to adjacent enemies and heals adjacent allies for %branch_heal% every turn, and overlapping Branchlings stack.",
+    "stats": {
+        "cooldown": 4,
+        "duration": 3,
+        "cast_range": 3,
+        "branch_dmg": 10,
+        "branch_heal": 8
+    }
+}

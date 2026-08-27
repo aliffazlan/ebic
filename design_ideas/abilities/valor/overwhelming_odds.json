@@ -1,11 +1,11 @@
 {
     "name": "Overwhelming Odds",
     "type": "active",
-    "description": "In a %radius% tile radius centered around this unit, if there are more allies than enemies, deals %diff_dmg% damage per difference of allies and enemies to all enemies in the area. Otherwise if there are more enemies, heals for %diff_heal% per diffence of allies and enemies to all allies in the area.",
+    "description": "Counts allies against enemies within %radius% tiles. If allies outnumber them, every enemy in the area takes %diff_dmg% damage per unit of that advantage; if this unit is outnumbered instead, every ally in the area is healed %diff_heal% per unit of the deficit.",
     "stats": {
         "cooldown": 5,
-        "radius": 2,
-        "diff_dmg": 20,
-        "diff_heal": 20
+        "radius": 3,
+        "diff_dmg": 16,
+        "diff_heal": 16
     }
 }

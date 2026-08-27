@@ -1,0 +1,8 @@
+{
+    "name": "Longshot",
+    "type": "passive",
+    "description": "Every tile between this unit and its target adds %dmg_increase:pct%% to its attack damage, rewarding shots taken from maximum range.",
+    "stats": {
+        "dmg_increase": 0.2
+    }
+}

@@ -10,6 +10,7 @@ public record UnitDefinitionSnapshot(
     int strength,
     int agility,
     int intelligence,
+    int attackRange,
     List<AbilityPreviewSnapshot> abilities
 ) {
 }

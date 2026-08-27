@@ -1,7 +1,7 @@
 {
     "name": "Refraction",
     "type": "passive",
-    "description": "If this unit is about to take damage, a random adjacent unit will take that instance of damage instead. This can only happen %count% time(s) per turn. If there are no valid adjacent units, then this effect does not occur.",
+    "description": "Refracts incoming damage onto a random adjacent unit instead, up to %count% time per turn. With no adjacent unit to absorb it, the damage lands as normal.",
     "stats": {
         "count": 1
     }

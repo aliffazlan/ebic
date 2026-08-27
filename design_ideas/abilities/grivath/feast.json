@@ -1,13 +1,12 @@
 {
     "name": "Feast",
     "type": "active",
-    "description": "Leaps to a nearby empty tile. For %duration% turns, this unit is unable to make any moves. Instead, every turn, %attacks% free attacks are made towards adjacent enemy units, with %lifesteal% % lifesteal. Enemies attacked while in this state are rooted for %root_duration% turns." ,
+    "description": "Enters a feeding frenzy for %duration% turns. Each turn this unit makes %attacks% free attack against an adjacent enemy, healing for %lifesteal:pct%% of the damage dealt and rooting the victim for %root_duration% turn. This unit is free to move and act as normal throughout.",
     "stats": {
         "cooldown": 7,
-        "cast_range": 3,
         "duration": 3,
-        "attacks": 2,
-        "lifesteal": 0.5,
+        "attacks": 1,
+        "lifesteal": 0.25,
         "root_duration": 1
     }
 }

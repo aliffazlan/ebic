@@ -1,7 +1,7 @@
 {
     "name": "Dispersion",
     "type": "passive",
-    "description": "Absorbs and reflects %dmg_reflect% % of damage taken to surrounding enemy units.",
+    "description": "Disperses %dmg_reflect:pct%% of all damage this unit takes back onto enemies within %radius% tile.",
     "stats": {
         "radius": 1,
         "dmg_reflect": 0.25

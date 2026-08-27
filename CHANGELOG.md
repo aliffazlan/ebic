@@ -1,0 +1,107 @@
+# Changelog
+
+All notable changes to EBIC are documented here. This project follows the spirit of
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+The roster grows to **5 champions and 14 elites**, basic attacks gain real range, and
+five existing units get reworked or retuned.
+
+### New mechanic — attack range
+
+- Basic attacks are no longer locked to adjacent tiles. Every unit now has an **attack
+  range**, shown alongside its attributes on the unit panel and on draft cards.
+- Most units stay at range 1. **Spitter, Zenith, Yuki, Auroth and Harbinger** attack at
+  range 2; **Branch** at 2 and **Artemis** at 4.
+- Attack range is a real stat, so abilities can raise or lower it for a few turns.
+- Legal-target highlighting understands range automatically — a ranged unit lights up
+  everything it can actually reach.
+
+### New units
+
+**Ember** — a spell-focused champion who burns everything around her.
+
+- *Burn* — a stacking damage-over-time. Each stack deals damage at the start of the
+  victim's turn, and new stacks refresh the timer instead of extending it.
+- *Overheat* (passive) — tracks the damage Ember deals to each enemy. Once one has
+  soaked up enough, it overheats and sets **every other adjacent enemy** alight. Fires
+  at most once per turn, and any damage past the threshold carries over toward the next
+  one, so a single huge hit banks fuel rather than cashing in all at once.
+- *Fireblast* — a direct fireball: damage plus three stacks of Burn.
+- *Eruption* — sets a tile alight for several turns. Enemies standing there when it
+  lands catch fire immediately, and any enemy that ends its turn in the flames gains
+  another stack. Ember's own troops walk through it unharmed.
+
+**Artemis** — a long-ranged elite glass cannon.
+
+- *Longshot* (passive) — attacks hit harder the further away the target is.
+- *Steady Focus* — takes aim for two turns: +3 attack range, but rooted in place and
+  unable to shoot anything closer than three tiles.
+
+**Branch** — a utility elite who grows cover and traps.
+
+- *Overgrowth* — rings a targeted tile with Branchlings, which block movement, damage
+  adjacent enemies and heal adjacent allies every turn. Occupied tiles are skipped, and
+  overlapping Branchlings stack — a fully surrounded ally is healed six times over.
+- *Sprout* — plants a single Branchling anywhere on the map and teleports to it a turn
+  later, shielding itself and nearby allies on arrival. Killing the Branchling first
+  cancels the teleport, though the cooldown is already spent.
+- Branchlings cannot move, attack or act at all.
+
+### Unit reworks
+
+**Grivath** — completely reworked from a damage-trading bruiser into a stat thief.
+
+- *Cripple* no longer reduces Grivath's own damage. A landed attack now steals 1 point
+  of every attribute plus 3 extra of whichever attribute the target defended with, along
+  with 5 maximum **and** current health — all doubled against champions and elites. An
+  attack that is successfully defended still shaves a point off the defending attribute
+  but steals no health.
+- *Feast* is no longer a leap and no longer roots Grivath. It is now a self-cast buff
+  granting one free automatic attack per turn against an adjacent enemy. Victims are
+  still rooted; lifesteal reduced 50% → **25%**.
+
+**Spitter**
+
+- *Poison Bloom* now bursts when the bloom **ends**, not only when its host dies —
+  but cleansing it early denies the spread entirely.
+- *Poison Sting* nerfed: duration 3 → **2** turns, damage 4 → **5** per remaining turn.
+
+**Valor** — buffed across the kit.
+
+- *Duel*: cooldown 10 → **6**, duration 4 → **3**, stat bonus 10 → **20**, win
+  multiplier 3 → **2.5**.
+- *Counterstrike*: counters now deal **80%** damage (was 50%), lifesteal 100% → **25%**.
+- *Overwhelming Odds*: radius 2 → **3**, damage and healing 20 → **16**.
+
+**Chronos**
+
+- *Timeless Strike*: chained attacks now deal **50%** damage. A 50-damage opener that
+  chains twice deals 50 + 25 + 25 rather than 50 + 50 + 50.
+
+**Harbinger**
+
+- *Objurgation* nerfed: consumes only **50%** of intelligence instead of all of it,
+  converted at a 1:1 ratio into health. Cooldown 3 → **4** turns.
+
+### Fixed
+
+- **Timeless Strike's stun stacked wrong.** Two procs created two separate one-turn
+  stuns that expired independently instead of one two-turn stun, so targets woke up
+  early. The stun is also now a proper debuff, so it can be cleansed.
+- **Effects that granted an effect to their own owner crashed the game.** Expiry walked
+  a live list while running each effect's finishing hook. Nothing shipped had triggered
+  it, but Branch's Sprout would have crashed on its first cast.
+- **Two ability descriptions showed "0" where a number belonged.** Cloak and Dagger and
+  Decay each referenced a tunable that didn't exist under that name.
+- **Percentages displayed as fractions.** Counterstrike advertised "0.5 % less damage"
+  instead of "50%". All percentage values now render correctly.
+
+### Changed
+
+- **Every ability description rewritten** — all 48 of them — for consistent phrasing,
+  correct spelling, and accurate numbers. Descriptions now surface values that were
+  previously invisible, such as Poison Bloom's infection radius.
+- Draft rounds may now leave a champion and a couple of elites unoffered, since the pool
+  is larger than a single draft consumes.

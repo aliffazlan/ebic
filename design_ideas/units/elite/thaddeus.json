@@ -5,6 +5,7 @@
     "strength": 30,
     "agility": 9,
     "intelligence" : 20,
+    "attack_range": 1,
     "abilities": [
         "holy_shield", "selfless"
     ]

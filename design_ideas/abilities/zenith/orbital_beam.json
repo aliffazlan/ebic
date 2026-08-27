@@ -1,7 +1,7 @@
 {
     "name": "Orbital Beam",
     "type": "active",
-    "description": "Fires a powerful beam from space, dealing %damage% to the targetted unit. Can also be cast on empty tiles.",
+    "description": "Calls down a beam from orbit on a unit or empty tile within %cast_range% tiles, dealing %damage% damage.",
     "stats": {
         "cooldown": 2,
         "damage": 40,

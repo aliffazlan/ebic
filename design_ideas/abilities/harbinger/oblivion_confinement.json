@@ -1,7 +1,7 @@
 {
     "name": "Oblivion Confinement",
     "type": "active",
-    "description": "Imprisons the target unit for %duration% turns, and steals %int_steal% % intelligence. The unit is stunned and invulernable during this effect. If the unit escapes from this effect, an additional %int_steal% % intelligence is stolen.",
+    "description": "Banishes an enemy within %cast_range% tiles for %duration% turns, stunning it but leaving it invulnerable, and stealing %int_steal:pct%% of its intelligence. Another %int_steal:pct%% is torn away when it returns.",
     "stats": {
         "cooldown": 3,
         "cast_range": 2,

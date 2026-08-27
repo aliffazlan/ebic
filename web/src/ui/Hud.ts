@@ -14,6 +14,16 @@ import { renderUnitPortrait } from "../units/UnitPortrait";
 
 const ATTRIBUTES: Attribute[] = ["STRENGTH", "AGILITY", "INTELLIGENCE"];
 
+/**
+ * "Range 4", or "Range 7 (min 3)" while something like Steady Focus forbids close shots.
+ * Range 1 is the default for most units, so it's still worth showing explicitly - it's
+ * the difference between a melee unit and a ranged one at a glance.
+ */
+function formatRange(unit: UnitSnapshot): string {
+  const min = unit.minAttackRange ?? 0;
+  return min > 0 ? `Range ${unit.attackRange} (min ${min})` : `Range ${unit.attackRange}`;
+}
+
 // Large square portrait shown on each draft card (see API_CONTRACT.md /
 // web/public/icons/README.md) - big enough to read clearly in a modal, still
 // comfortably under the recommended 256x256 source art so nothing upscales.
@@ -201,7 +211,7 @@ export class Hud {
     const attrText = document.createElement("div");
     attrText.className = "hint";
     attrText.style.marginBottom = "8px";
-    attrText.textContent = `STR ${unit.strength} · AGI ${unit.agility} · INT ${unit.intelligence}`;
+    attrText.textContent = `STR ${unit.strength} · AGI ${unit.agility} · INT ${unit.intelligence}` + ` · ${formatRange(unit)}`;
     section.appendChild(attrText);
 
     if (unit.effects.length > 0) {
@@ -599,7 +609,7 @@ export class Hud {
 
     const stats = document.createElement("div");
     stats.className = "stats";
-    stats.textContent = `HP ${def.maxHp} · STR ${def.strength} · AGI ${def.agility} · INT ${def.intelligence}`;
+    stats.textContent = `HP ${def.maxHp} · STR ${def.strength} · AGI ${def.agility} · INT ${def.intelligence} · Range ${def.attackRange}`;
     card.appendChild(stats);
 
     const abilities = document.createElement("div");
@@ -798,7 +808,7 @@ export class Hud {
 
     const attrText = document.createElement("div");
     attrText.className = "hint";
-    attrText.textContent = `STR ${unit.strength} · AGI ${unit.agility} · INT ${unit.intelligence}`;
+    attrText.textContent = `STR ${unit.strength} · AGI ${unit.agility} · INT ${unit.intelligence}` + ` · ${formatRange(unit)}`;
     card.appendChild(attrText);
 
     return card;

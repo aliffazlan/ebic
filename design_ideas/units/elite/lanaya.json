@@ -5,6 +5,7 @@
     "strength": 30,
     "agility": 120,
     "intelligence" : 70,
+    "attack_range": 1,
     "abilities": [
         "psychic_projection", "refraction"
     ]

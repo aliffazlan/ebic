@@ -12,10 +12,6 @@ import com.walnutt.unit.Unit;
 /**
  * Dirge - at the start of every one of Dirge's own turns, permanently steals max HP
  * and strength from all units in radius (ally and enemy alike), plus direct damage.
- *
- * Note: the design JSON's description mentions a "str_steal" stat that isn't
- * actually present in stats{} (only health_steal and bonus_increase are) - this
- * reuses bonus_increase as the strength-steal amount, the closest available number.
  */
 public class Decay extends PassiveAbility {
     private final int radius;
@@ -26,7 +22,7 @@ public class Decay extends PassiveAbility {
         super(definition.name(), definition.formattedDescription());
         this.radius = definition.getInt("radius", 1);
         this.healthSteal = definition.getInt("health_steal", 5);
-        this.strengthSteal = definition.getInt("str_steal", definition.getInt("bonus_increase", 2));
+        this.strengthSteal = definition.getInt("str_steal", 2);
     }
 
     @Override

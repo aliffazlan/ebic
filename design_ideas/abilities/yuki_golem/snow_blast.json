@@ -1,7 +1,7 @@
 {
     "name": "Snow Blast",
     "type": "passive",
-    "description": "When this unit dies, applies a longer duration Blizzard debuff to all adjacent enemy units.",
+    "description": "When this unit is destroyed it bursts apart, burying every enemy within %radius% tile in a Blizzard for %duration% turns.",
     "stats": {
         "duration": 4,
         "radius": 1

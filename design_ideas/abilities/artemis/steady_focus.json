@@ -1,0 +1,11 @@
+{
+    "name": "Steady Focus",
+    "type": "active",
+    "description": "Takes aim for %duration% turns, gaining %bonus_range% bonus attack range but becoming rooted in place. While focused, this unit cannot attack anything closer than %min_range% tiles.",
+    "stats": {
+        "cooldown": 5,
+        "duration": 2,
+        "bonus_range": 3,
+        "min_range": 3
+    }
+}

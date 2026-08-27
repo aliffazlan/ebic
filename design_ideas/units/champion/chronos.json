@@ -5,6 +5,7 @@
     "strength": 70,
     "agility": 110,
     "intelligence" : 60,
+    "attack_range": 1,
     "abilities": [
         "backtrack", "dilation", "timeless_strike"
     ]

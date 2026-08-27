@@ -32,7 +32,23 @@ public class SummonedUnit extends Unit {
     /** occupiesTile=false for structures like Zenith's Pylons - attackable, but never block a tile. */
     public SummonedUnit(String name, Team team, UnitStats baseStats, HealthPool healthPool,
                          Unit summoner, boolean despawnIfNoAdjacentEnemy, boolean occupiesTile) {
-        super(name, team, summoner.getUnitType(), baseStats, healthPool);
+        this(name, team, summoner.getUnitType(), baseStats, healthPool, summoner, despawnIfNoAdjacentEnemy,
+            occupiesTile);
+    }
+
+    /**
+     * Explicit unit type, for summons built from their own prototype definition
+     * (Branchlings, Pylons) rather than as a copy of their summoner.
+     *
+     * This matters beyond bookkeeping: several rules pay out differently against a
+     * non-BASIC unit - Grivath's Cripple doubles its steal, Valor's Duel multiplies its
+     * win bonus - so a disposable 50 HP Branchling inheriting Branch's ELITE type would
+     * be worth farming. A clone of its summoner (Psychic Projection) should still
+     * inherit, which is what the other constructors do.
+     */
+    public SummonedUnit(String name, Team team, UnitType unitType, UnitStats baseStats, HealthPool healthPool,
+                         Unit summoner, boolean despawnIfNoAdjacentEnemy, boolean occupiesTile) {
+        super(name, team, unitType, baseStats, healthPool);
         this.summoner = summoner;
         this.despawnIfNoAdjacentEnemy = despawnIfNoAdjacentEnemy;
         this.occupiesTile = occupiesTile;

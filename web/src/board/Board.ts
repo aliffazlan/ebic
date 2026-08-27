@@ -6,7 +6,12 @@ import { type AxialCoord, axialToPixel, hexPolygonPoints } from "../hex/HexMath"
 import { UnitIconFactory } from "../units/UnitIconFactory";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
-import type { PlacementUnitSnapshot, UnitSnapshot, VfxEvent } from "../types/contract";
+import type {
+  PlacementUnitSnapshot,
+  TileEffectSnapshot,
+  UnitSnapshot,
+  VfxEvent,
+} from "../types/contract";
 
 export const HEX_SIZE = 34;
 
@@ -40,6 +45,10 @@ export interface BoardCallbacks {
 export class Board {
   readonly root = new Container();
   readonly boardLayer = new Container();
+  // Persistent tile effects (Ember's burning ground). Its own layer, below units
+  // but above the tiles, and untouched by refreshHighlights()'s uiLayer wipe - the
+  // same reasoning as strobeLayer.
+  readonly tileEffectLayer = new Container();
   readonly unitsLayer = new Container();
   readonly vfxLayer = new Container();
   // Pre-encounter strobe rings live in their own layer, separate from
@@ -94,6 +103,7 @@ export class Board {
     this.iconFactory = new UnitIconFactory(app.renderer);
     this.root.addChild(
       this.boardLayer,
+      this.tileEffectLayer,
       this.unitsLayer,
       this.vfxLayer,
       this.strobeLayer,
@@ -213,9 +223,12 @@ export class Board {
     return g;
   }
 
-  private async applySnapshot(snapshot: { mapRadius: number; units: UnitSnapshot[] }): Promise<void> {
+  private async applySnapshot(
+    snapshot: { mapRadius: number; units: UnitSnapshot[]; tileEffects?: TileEffectSnapshot[] },
+  ): Promise<void> {
     this.ensureMap(snapshot.mapRadius);
     this.currentUnits = snapshot.units;
+    this.renderTileEffects(snapshot.tileEffects ?? []);
 
     const seen = new Set<string>();
     for (const unit of snapshot.units) {
@@ -241,6 +254,24 @@ export class Board {
   }
 
   /**
+   * Redraws every tile effect from scratch rather than diffing - there are only ever a
+   * handful, and this mirrors refreshHighlights' own clear-and-redraw approach.
+   */
+  private renderTileEffects(tileEffects: TileEffectSnapshot[]): void {
+    this.tileEffectLayer.removeChildren();
+    for (const effect of tileEffects) {
+      const { x, y } = axialToPixel({ q: effect.q, r: effect.r }, HEX_SIZE);
+      const points = hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - 2);
+      const glow = new Graphics();
+      glow.poly(points).fill({ color: 0xff5722, alpha: 0.28 });
+      glow.poly(points).stroke({ width: 2, color: 0xff8a50, alpha: 0.85 });
+      glow.position.set(x, y);
+      glow.eventMode = "none";
+      this.tileEffectLayer.addChild(glow);
+    }
+  }
+
+  /**
    * Renders this player's own placement-phase units. Reuses the normal
    * snapshot-apply pipeline by synthesizing minimal UnitSnapshots - no
    * hp/status/ability data exists yet at this phase (fog of war means the
@@ -263,6 +294,10 @@ export class Board {
       strength: 0,
       agility: 0,
       intelligence: 0,
+      // Placement snapshots carry no combat data; 1/0 is the plain melee default
+      // rather than a guess, and nothing reads it during this phase anyway.
+      attackRange: 1,
+      minAttackRange: 0,
       dead: false,
       hasMovedThisTurn: false,
       hasAttackedThisTurn: false,

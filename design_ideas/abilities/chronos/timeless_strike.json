@@ -1,8 +1,9 @@
 {
     "name": "Timeless Strike",
     "type": "passive",
-    "description": "On a successful attack, this unit will trigger another attack, which can also trigger this ability again. If the extra attack is successful, the target is stunned for %duration% turn. Each successful attack after the first will increase the stun duration by %duration% turn." ,
+    "description": "A landed attack immediately triggers another one, which can chain again in turn. Chained attacks deal %damage_multiplier:pct%% of their normal damage, and each one adds %duration% turn to a single stun on the target.",
     "stats": {
-        "duration": 1
+        "duration": 1,
+        "damage_multiplier": 0.5
     }
 }

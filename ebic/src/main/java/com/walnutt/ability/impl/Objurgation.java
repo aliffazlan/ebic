@@ -8,14 +8,21 @@ import com.walnutt.game.GameState;
 import com.walnutt.status.Stat;
 import com.walnutt.status.StatModifier;
 
-/** Harbinger - on fatal damage, consume all intelligence and convert a portion into survival HP. */
+/**
+ * Harbinger - on fatal damage, consume a portion of intelligence and convert it into
+ * survival HP. Consumes int_consumed of the current value (not all of it) and returns
+ * int_to_hp HP per point consumed, so at a 1:1 ratio the HP gained is exactly the
+ * intelligence lost.
+ */
 public class Objurgation extends PassiveAbility {
     private final double intelligenceToHealth;
+    private final double intelligenceConsumed;
 
     public Objurgation(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
-        setMaxCooldown(definition.getInt("cooldown", 3));
-        this.intelligenceToHealth = definition.getDouble("int_to_hp", 0.8);
+        setMaxCooldown(definition.getInt("cooldown", 4));
+        this.intelligenceToHealth = definition.getDouble("int_to_hp", 1.0);
+        this.intelligenceConsumed = definition.getDouble("int_consumed", 0.5);
     }
 
     @Override
@@ -24,9 +31,10 @@ public class Objurgation extends PassiveAbility {
             return;
         }
         int intelligence = getOwner().getAttributeValue(Attribute.INTELLIGENCE);
-        int hpGained = (int) Math.round(intelligenceToHealth * intelligence);
+        double consumed = intelligenceConsumed * intelligence;
+        int hpGained = (int) Math.round(intelligenceToHealth * consumed);
 
-        getOwner().addPermanentModifier(StatModifier.percent(Stat.INTELLIGENCE, -1.0, this));
+        getOwner().addPermanentModifier(StatModifier.percent(Stat.INTELLIGENCE, -intelligenceConsumed, this));
         event.preventDeath(hpGained);
         resetToMax();
     }

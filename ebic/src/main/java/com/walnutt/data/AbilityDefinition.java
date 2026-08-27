@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
  */
 public record AbilityDefinition(String name, String type, String description, Map<String, Double> stats) {
 
-    private static final Pattern PLACEHOLDER = Pattern.compile("%([a-zA-Z_]+)%");
+    private static final Pattern PLACEHOLDER = Pattern.compile("%([a-zA-Z_]+)(:pct)?%");
 
     public double getDouble(String key, double fallback) {
         if (stats == null || !stats.containsKey(key)) {
@@ -30,14 +30,13 @@ public record AbilityDefinition(String name, String type, String description, Ma
 
     /**
      * Resolves every {@code %stat_key%} placeholder in {@link #description} against
-     * {@link #stats} (every ability description in design_ideas/ is written this way -
-     * the placeholder name always matches a stats{} key verbatim). This is a faithful,
-     * mechanical substitution, not a smart one: a handful of hand-written descriptions
-     * assume a fraction like 0.5 will read as "50" next to a literal "%" the author
-     * typed themselves, and this deliberately doesn't guess at that - per CLAUDE.md,
-     * design_ideas/ is hand-written content with occasional rough edges, and this is
-     * exactly the kind of inconsistency to tolerate rather than paper over with a
-     * fragile heuristic that would be wrong just as often as it's right.
+     * {@link #stats} (the placeholder name always matches a stats{} key verbatim).
+     *
+     * <p>Percent-valued stats are stored as fractions (0.2 = 20%) because that's the
+     * form the Java ability code actually multiplies by, so a bare {@code %key%} next
+     * to a literal "%" would render "0.2 %". Writing {@code %key:pct%} instead scales
+     * by 100 for display only - the stored stat, and every {@code getDouble} caller,
+     * stay untouched.
      */
     public String formattedDescription() {
         if (description == null || description.isEmpty()) {
@@ -47,6 +46,9 @@ public record AbilityDefinition(String name, String type, String description, Ma
         StringBuilder result = new StringBuilder();
         while (matcher.find()) {
             double value = getDouble(matcher.group(1), 0);
+            if (matcher.group(2) != null) {
+                value *= 100;
+            }
             String formatted = value == Math.rint(value) && !Double.isInfinite(value)
                 ? String.valueOf((long) value)
                 : String.valueOf(value);

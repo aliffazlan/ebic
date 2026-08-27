@@ -1,9 +1,9 @@
 {
     "name": "Counterstrike",
     "type": "passive",
-    "description": "When taking damage from an attack, immediately perform a counter attack, with %damage_reduction% % less damage but %lifesteal% % lifesteal.",
+    "description": "Being hit by an attack provokes an immediate counter-attack, dealing %damage_reduction:pct%% less damage but healing this unit for %lifesteal:pct%% of what it deals.",
     "stats": {
-        "damage_reduction": 0.5,
-        "lifesteal": 1
+        "damage_reduction": 0.2,
+        "lifesteal": 0.25
     }
 }

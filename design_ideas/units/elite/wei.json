@@ -5,6 +5,7 @@
     "strength": 30,
     "agility": 90,
     "intelligence" :20,
+    "attack_range": 1,
     "abilities": [
         "energy_break", "implosion"
     ]

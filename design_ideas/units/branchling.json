@@ -1,0 +1,12 @@
+{
+    "name": "Branchling",
+    "type": "basic",
+    "max_hp": 50,
+    "strength": 0,
+    "agility": 0,
+    "intelligence": 0,
+    "attack_range": 1,
+    "abilities": [
+        "branchling_aura"
+    ]
+}

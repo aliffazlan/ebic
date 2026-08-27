@@ -1,7 +1,7 @@
 {
     "name": "Selfless",
     "type": "passive",
-    "description": "Adjacent ally units have %redirect_dmg% % of damage taken redirected to this unit instead.",
+    "description": "Allies within %radius% tile pass %redirect_dmg:pct%% of the damage they take onto this unit instead.",
     "stats": {
         "radius": 1,
         "redirect_dmg": 0.25

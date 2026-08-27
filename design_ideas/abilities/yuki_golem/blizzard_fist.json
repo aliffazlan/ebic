@@ -1,7 +1,7 @@
 {
     "name": "Blizzard Fist",
     "type": "passive",
-    "description": "On a successful attack, apply a shorter duration Blizzard debuff to the attacked target.",
+    "description": "A landed attack buries the target in a short Blizzard, rooting and damaging it for %duration% turn.",
     "stats": {
         "duration": 1
     }

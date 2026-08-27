@@ -1,0 +1,9 @@
+{
+    "name": "Burn",
+    "type": "",
+    "description": "Burning units take %damage% damage per stack at the start of their turn. Fresh stacks refresh the %duration%-turn timer rather than extending it.",
+    "stats": {
+        "damage": 10,
+        "duration": 3
+    }
+}

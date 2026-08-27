@@ -5,6 +5,7 @@
     "strength": 0,
     "agility": 0,
     "intelligence": 0,
+    "attack_range": 1,
     "abilities": [
         "pylon_beam"
     ]

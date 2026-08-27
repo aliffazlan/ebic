@@ -5,6 +5,7 @@
     "strength": 15,
     "agility": 120,
     "intelligence" : 30,
+    "attack_range": 1,
     "abilities": [
         "cloak_and_dagger", "backstab"
     ]

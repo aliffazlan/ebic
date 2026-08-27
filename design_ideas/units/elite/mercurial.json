@@ -5,6 +5,7 @@
     "strength": 40,
     "agility": 40,
     "intelligence" : 30,
+    "attack_range": 1,
     "abilities": [
         "dispersion", "manifestation"
     ]

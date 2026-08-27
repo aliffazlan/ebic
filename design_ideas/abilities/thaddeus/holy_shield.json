@@ -1,7 +1,7 @@
 {
     "name": "Holy Shield",
     "type": "active",
-    "description": "Shields a targetted ally, giving them a %barrier_hp% HP barrier lasting %duration% turns. If the barrier is destroyed before it expires, the ally has its debuffs cleared, and deals %damage% damage to adjacent enemy units.",
+    "description": "Wraps an ally within %cast_range% tiles in a %barrier_hp% health barrier for %duration% turns. If the barrier is broken before it fades, it erupts - clearing the ally's debuffs and dealing %damage% damage to enemies within %radius% tile.",
     "stats": {
         "cooldown": 4,
         "cast_range": 2,

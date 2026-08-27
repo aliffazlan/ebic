@@ -56,6 +56,16 @@ public class Game {
      * Passing null for either uses the real terminal implementation.
      */
     public static Game newFullDraftMatch(InputHandler input, Renderer renderer) {
+        return newFullDraftMatch(input, renderer, new Random());
+    }
+
+    /**
+     * Seedable variant. The draft pool is shuffled from this Random, so a fixed seed
+     * makes which heroes get offered reproducible - without one, a test asserting on
+     * the drafted roster silently depends on which subset of the pool happened to be
+     * revealed, and only fails some of the time.
+     */
+    public static Game newFullDraftMatch(InputHandler input, Renderer renderer, Random random) {
         JsonDataLoader loader = new JsonDataLoader(JsonDataLoader.locateDesignIdeasRoot());
         Map<String, UnitDefinition> unitDefs = loader.loadAllUnits();
         Map<String, AbilityDefinition> abilityDefs = loader.loadAllAbilities();
@@ -64,7 +74,7 @@ public class Game {
         Player playerOne = new Player("Player One", Team.PLAYER_ONE);
         Player playerTwo = new Player("Player Two", Team.PLAYER_TWO);
 
-        GameState state = new GameState(map, List.of(playerOne, playerTwo), new Random());
+        GameState state = new GameState(map, List.of(playerOne, playerTwo), random);
         state.setUnitDefinitions(unitDefs);
         state.setAbilityDefinitions(abilityDefs);
         InputHandler actualInput = input != null ? input : new TerminalInputHandler(new Scanner(System.in));

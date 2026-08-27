@@ -1,7 +1,7 @@
 {
     "name": "Backstab",
     "type": "passive",
-    "description": "Attacks deal %dmg_bonus% bonus damage per point of agility." ,
+    "description": "Every point of agility this unit has adds %dmg_bonus% damage to its attacks.",
     "stats": {
         "dmg_bonus": 0.4
     }

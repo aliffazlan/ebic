@@ -1,7 +1,7 @@
 {
     "name": "Soul Rip",
     "type": "active",
-    "description": "Deals %str_multiplier% damage per difference in strength between this unit and the target unit. Can also target allied units to heal them instead.",
+    "description": "Tears at the soul of a unit within %cast_range% tiles, dealing %str_multiplier% damage for every point of strength this unit has over it. Cast on an ally instead to heal them by the same amount.",
     "stats": {
         "cooldown": 3,
         "cast_range": 2,
