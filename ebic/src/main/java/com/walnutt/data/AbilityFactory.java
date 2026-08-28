@@ -160,6 +160,7 @@ public final class AbilityFactory {
         // directly in Java (Move, Attack, a summon's internal kit) keeps a null id,
         // which is exactly what makes it uncopyable - see Ability.getDefinitionId.
         ability.setDefinitionId(id);
+        ability.setDefinitionText(definition.formattedDetails(), definition.stats());
         return ability;
     }
 }

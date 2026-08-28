@@ -1,8 +1,15 @@
 {
     "name": "Mimic",
     "type": "active",
-    "description": "This unit studies every ability an enemy casts within %cast_range% tiles of it, remembering it for %steal_window% turns. Cast Mimic on such an enemy to copy the last ability they used, wielding it as its own for %duration% turns. Only %max_abilities% copied ability can be held at a time - taking a new one discards the old, though a discarded copy keeps cooling down and returns with whatever cooldown it had left.",
-    "tags": ["no_copy"],
+    "description": "Copies the last ability an enemy within %cast_range% tiles was seen casting, wielding it as this unit's own for %duration% turns.",
+    "details": [
+        "This unit remembers what each enemy cast for %steal_window% turns after seeing it.",
+        "Only %max_abilities% copied ability can be held at a time - taking a new one hands the old back.",
+        "A discarded copy keeps cooling down in the background and returns with whatever cooldown it had left."
+    ],
+    "tags": [
+        "no_copy"
+    ],
     "stats": {
         "cooldown": 2,
         "cast_range": 3,

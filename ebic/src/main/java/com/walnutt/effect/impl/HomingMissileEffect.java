@@ -42,6 +42,15 @@ public class HomingMissileEffect extends Effect {
         this.category = EffectCategory.DEBUFF;
     }
 
+    /**
+     * Every missile still in flight. It stores no position of its own on purpose - the
+     * impact point is wherever its owner currently stands, which is exactly what makes
+     * the marker the client draws follow the target around for free.
+     */
+    public static List<HomingMissileEffect> activeLocks(GameState state) {
+        return Effect.activeInstances(state, HomingMissileEffect.class);
+    }
+
     @Override
     public String getExtraInfo() {
         int turns = getRemainingTurns();

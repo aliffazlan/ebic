@@ -9,6 +9,7 @@ import com.walnutt.data.UnitDefinition;
 import com.walnutt.effect.impl.DroneLifespanEffect;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Tile;
+import com.walnutt.map.TileType;
 import com.walnutt.unit.HealthPool;
 import com.walnutt.unit.SummonedUnit;
 import com.walnutt.unit.Unit;
@@ -49,8 +50,11 @@ public class KillerDrone extends Ability {
         if (!super.canUse(state, target) || !(target instanceof TileTarget tileTarget)) {
             return false;
         }
+        // Not isWalkable(): a drone occupies no tile, so an enemy standing on the target
+        // one is no reason to refuse the deployment - GameMap.moveUnit stacks it happily.
+        // Terrain is the only real constraint.
         Tile tile = tileTarget.getTile();
-        return tile.isWalkable() && isInRange(state, tile.getPosition());
+        return tile.getType() != TileType.BLOCKED && isInRange(state, tile.getPosition());
     }
 
     @Override

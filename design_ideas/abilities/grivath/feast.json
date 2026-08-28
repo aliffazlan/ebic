@@ -1,7 +1,11 @@
 {
     "name": "Feast",
     "type": "active",
-    "description": "Enters a feeding frenzy for %duration% turns. Each turn this unit makes %attacks% free attack against an adjacent enemy, healing for %lifesteal:pct%% of the damage dealt and rooting the victim for %root_duration% turn. This unit is free to move and act as normal throughout.",
+    "description": "Enters a feeding frenzy for %duration% turns, making %attacks% free attack on an adjacent enemy each turn.",
+    "details": [
+        "Each free attack heals this unit for %lifesteal:pct%% of the damage dealt and roots the victim for %root_duration% turn.",
+        "This unit is free to move and act as normal throughout."
+    ],
     "stats": {
         "cooldown": 7,
         "duration": 3,

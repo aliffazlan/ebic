@@ -1,6 +1,5 @@
 import type { GameStateStore, MatchUiState } from "../state/GameStateStore";
 import type {
-  AbilityPreviewSnapshot,
   AbilitySnapshot,
   Attribute,
   ChoiceOption,
@@ -12,6 +11,8 @@ import type {
 } from "../types/contract";
 import type { MatchActions } from "./MatchActions";
 import { renderUnitPortrait } from "../units/UnitPortrait";
+import { abilityTooltip, Tooltip } from "./Tooltip";
+import { renderUnitCard } from "./UnitCard";
 
 const ATTRIBUTES: Attribute[] = ["STRENGTH", "AGILITY", "INTELLIGENCE"];
 
@@ -25,11 +26,6 @@ function formatRange(unit: UnitSnapshot): string {
   return min > 0 ? `Range ${unit.attackRange} (min ${min})` : `Range ${unit.attackRange}`;
 }
 
-// Large square portrait shown on each draft card (see API_CONTRACT.md /
-// web/public/icons/README.md) - big enough to read clearly in a modal, still
-// comfortably under the recommended 256x256 source art so nothing upscales.
-const DRAFT_ICON_SIZE = 140;
-
 // Mirrors com.walnutt.status.StatusFlag's blocksMovement()/blocksAttack()/
 // blocksAbility() (see CLAUDE.md's "Status flags & stat modifiers" section) -
 // kept in lockstep with that enum by hand, same as this file already mirrors
@@ -41,44 +37,29 @@ const BLOCKS_MOVEMENT = new Set(["STUNNED", "ROOTED", "FROZEN", "DUELING"]);
 const BLOCKS_ATTACK = new Set(["STUNNED", "DISARMED", "FROZEN", "DUELING"]);
 const BLOCKS_ABILITY = new Set(["STUNNED", "SILENCED", "FROZEN", "DUELING"]);
 
-// Move/Attack always report maxCooldown 0 (they have no real cooldown concept -
-// see CLAUDE.md's Cooldowns section) - "Cooldown: 0 turns" would read as
-// confusing on every single hover of either, so 0 gets its own wording.
-function cooldownLabel(cooldown: number): string {
-  if (cooldown <= 0) return "No cooldown";
-  return `Cooldown: ${cooldown} turn${cooldown === 1 ? "" : "s"}`;
-}
-
 export class Hud {
   private unsubscribe: () => void;
   private hudHost: HTMLElement;
   private matchId: string;
   private store: GameStateStore;
   private actions: MatchActions;
-  // A single persistent tooltip element, appended to <body> once rather than
-  // recreated inside render()'s hudHost.innerHTML = "" churn - render() wipes
-  // and rebuilds the whole sidebar on every store update, which would tear
-  // down a tooltip element living inside it mid-hover. Shared by every
-  // hoverable thing in the HUD (effect chips, ability buttons/chips both
-  // in-match and at draft time) - only one can ever be visible at once, so
-  // one element is all that's needed.
-  private tooltipEl: HTMLDivElement;
+  // One tooltip for the whole HUD - see Tooltip, which explains why it cannot live
+  // inside the subtree render() wipes on every store update.
+  private tooltip: Tooltip;
 
   constructor(hudHost: HTMLElement, matchId: string, store: GameStateStore, actions: MatchActions) {
     this.hudHost = hudHost;
     this.matchId = matchId;
     this.store = store;
     this.actions = actions;
-    this.tooltipEl = document.createElement("div");
-    this.tooltipEl.className = "hover-tooltip";
-    document.body.appendChild(this.tooltipEl);
+    this.tooltip = new Tooltip();
     this.unsubscribe = this.store.subscribe((state) => this.render(state));
   }
 
   destroy(): void {
     this.unsubscribe();
     this.hudHost.innerHTML = "";
-    this.tooltipEl.remove();
+    this.tooltip.destroy();
   }
 
   private render(state: MatchUiState): void {
@@ -86,7 +67,7 @@ export class Hud {
     // The chip that was being hovered (if any) just got destroyed by the
     // innerHTML wipe above, so its mouseleave will never fire - hide
     // explicitly rather than leaving a stale tooltip stuck on screen.
-    this.hideTooltip();
+    this.tooltip.hide();
 
     this.hudHost.appendChild(this.renderTopBar(state));
 
@@ -414,9 +395,7 @@ export class Hud {
     }
 
     btn.disabled = disabled;
-    this.attachTooltip(btn, (e) =>
-      this.showAbilityTooltip(ability.name, ability.description, ability.passive, cooldownLabel(ability.maxCooldown), e, reason),
-    );
+    this.tooltip.attachAbility(btn, { ...abilityTooltip(ability), disabledReason: reason });
     btn.addEventListener("click", () => {
       this.actions.selectUnit(unit.id);
       this.actions.selectAbility(ability.id);
@@ -438,109 +417,9 @@ export class Hud {
     chip.className = `effect-chip effect-${effect.category.toLowerCase()}`;
     chip.textContent = effect.name;
 
-    this.attachTooltip(chip, (e) => this.showEffectTooltip(effect, e));
+    this.tooltip.attachEffect(chip, effect);
 
     return chip;
-  }
-
-  /** Wires the shared hover tooltip onto any element - shows on enter, tracks the cursor, hides on leave. */
-  private attachTooltip(el: HTMLElement, show: (event: MouseEvent) => void): void {
-    el.addEventListener("mouseenter", (e) => show(e as MouseEvent));
-    el.addEventListener("mousemove", (e) => this.positionTooltip(e as MouseEvent));
-    el.addEventListener("mouseleave", () => this.hideTooltip());
-  }
-
-  private showEffectTooltip(effect: EffectSnapshot, event: MouseEvent): void {
-    this.tooltipEl.innerHTML = "";
-
-    const title = document.createElement("div");
-    title.className = "hover-tooltip-title";
-    title.textContent = effect.name;
-    this.tooltipEl.appendChild(title);
-
-    const desc = document.createElement("div");
-    desc.textContent = effect.description;
-    this.tooltipEl.appendChild(desc);
-
-    const duration = document.createElement("div");
-    duration.className = "hover-tooltip-meta";
-    duration.textContent = effect.permanent
-      ? "Permanent"
-      : `${effect.remainingTurns} turn${effect.remainingTurns === 1 ? "" : "s"} remaining`;
-    this.tooltipEl.appendChild(duration);
-
-    if (effect.extraInfo) {
-      const extra = document.createElement("div");
-      extra.className = "hover-tooltip-meta";
-      extra.textContent = effect.extraInfo;
-      this.tooltipEl.appendChild(extra);
-    }
-
-    if (effect.statusFlags.length > 0) {
-      const flags = document.createElement("div");
-      flags.className = "hover-tooltip-meta";
-      flags.textContent = `Flags: ${effect.statusFlags.join(", ")}`;
-      this.tooltipEl.appendChild(flags);
-    }
-
-    this.tooltipEl.classList.add("visible");
-    this.positionTooltip(event);
-  }
-
-  /**
-   * Shared by both draft-card ability chips (AbilityPreviewSnapshot, no live
-   * match state) and in-match ability buttons (AbilitySnapshot) - see
-   * API_CONTRACT.md's "Ability tooltips" section. `cooldownLabel` is
-   * precomputed by the caller since the two snapshot shapes name the cooldown
-   * field differently (`cooldown` vs `maxCooldown`) and only one of them also
-   * carries live current-cooldown state. `disabledReason`, when given (only
-   * ever by an in-match button - draft chips are never "disabled"), replaces
-   * the native `title` attribute this button would otherwise need, so there's
-   * only ever one tooltip competing for the hover instead of two.
-   */
-  private showAbilityTooltip(
-    name: string,
-    description: string,
-    passive: boolean,
-    cooldownLabel: string,
-    event: MouseEvent,
-    disabledReason?: string | null,
-  ): void {
-    this.tooltipEl.innerHTML = "";
-
-    const title = document.createElement("div");
-    title.className = "hover-tooltip-title";
-    title.textContent = name;
-    this.tooltipEl.appendChild(title);
-
-    const desc = document.createElement("div");
-    desc.textContent = description;
-    this.tooltipEl.appendChild(desc);
-
-    const meta = document.createElement("div");
-    meta.className = "hover-tooltip-meta";
-    meta.textContent = passive ? "Passive" : cooldownLabel;
-    this.tooltipEl.appendChild(meta);
-
-    if (disabledReason) {
-      const reasonEl = document.createElement("div");
-      reasonEl.className = "hover-tooltip-meta hover-tooltip-reason";
-      reasonEl.textContent = disabledReason;
-      this.tooltipEl.appendChild(reasonEl);
-    }
-
-    this.tooltipEl.classList.add("visible");
-    this.positionTooltip(event);
-  }
-
-  private positionTooltip(event: MouseEvent): void {
-    const offset = 14;
-    this.tooltipEl.style.left = `${event.clientX + offset}px`;
-    this.tooltipEl.style.top = `${event.clientY + offset}px`;
-  }
-
-  private hideTooltip(): void {
-    this.tooltipEl.classList.remove("visible");
   }
 
   private renderCombatLog(state: MatchUiState): HTMLElement {
@@ -660,64 +539,11 @@ export class Hud {
     const cards = document.createElement("div");
     cards.className = "draft-cards";
     for (const def of options) {
-      cards.appendChild(this.renderUnitCard(def, clickable));
+      cards.appendChild(renderUnitCard(def, this.tooltip,
+        clickable ? (picked) => this.actions.sendPick(picked.definitionId) : undefined));
     }
     col.appendChild(cards);
     return col;
-  }
-
-  private renderUnitCard(def: UnitDefinitionSnapshot, clickable: boolean): HTMLElement {
-    const card = document.createElement("div");
-    card.className = clickable ? "unit-card clickable" : "unit-card";
-
-    // No real art dropped in yet for any unit (see web/public/icons/README.md) -
-    // the large initial-letter badge is the deliberate placeholder here, same
-    // fallback UnitIconFactory/renderUnitPortrait already use elsewhere, just
-    // bigger and square instead of the board's small circular sprite. No
-    // `team` yet either - these are still-undrafted candidates, not owned by
-    // anyone, so the badge uses a neutral background instead of guessing one.
-    card.appendChild(
-      renderUnitPortrait({ definitionId: def.definitionId, unitType: def.type, name: def.name }, DRAFT_ICON_SIZE, "square"),
-    );
-
-    const name = document.createElement("h5");
-    name.textContent = def.name;
-    card.appendChild(name);
-
-    const type = document.createElement("div");
-    type.className = "hint";
-    type.textContent = def.type;
-    card.appendChild(type);
-
-    const stats = document.createElement("div");
-    stats.className = "stats";
-    stats.textContent = `HP ${def.maxHp} · STR ${def.strength} · AGI ${def.agility} · INT ${def.intelligence} · Range ${def.attackRange}`;
-    card.appendChild(stats);
-
-    const abilities = document.createElement("div");
-    abilities.className = "abilities";
-    for (const ability of def.abilities) {
-      abilities.appendChild(this.renderAbilityPreviewChip(ability));
-    }
-    card.appendChild(abilities);
-
-    if (clickable) {
-      card.addEventListener("click", () => this.actions.sendPick(def.definitionId));
-    }
-    return card;
-  }
-
-  /** Draft-time counterpart to renderAbilityButton's tooltip wiring - same hover content, no live cooldown/click-to-select. */
-  private renderAbilityPreviewChip(ability: AbilityPreviewSnapshot): HTMLElement {
-    const chip = document.createElement("span");
-    chip.className = "ability-chip";
-    chip.textContent = `${ability.name}${ability.passive ? " (passive)" : ""}`;
-
-    this.attachTooltip(chip, (e) =>
-      this.showAbilityTooltip(ability.name, ability.description, ability.passive, cooldownLabel(ability.cooldown), e),
-    );
-
-    return chip;
   }
 
   private renderPlacementPanel(state: MatchUiState): HTMLElement {
@@ -853,15 +679,14 @@ export class Hud {
       if (!usable) {
         // Disabled alone reads as "broken"; say which stat is missing, using the same
         // hover tooltip everything else in the HUD uses rather than a second mechanism.
-        this.attachTooltip(btn, (e) =>
-          this.showAbilityTooltip(
-            attr,
-            `${self?.name ?? "This unit"} has no ${attr.toLowerCase()} left, so it cannot fight with it.`,
-            false,
-            "",
-            e,
-          ),
-        );
+        this.tooltip.attachAbility(btn, {
+          name: attr,
+          description: `${self?.name ?? "This unit"} has no ${attr.toLowerCase()} left, so it cannot fight with it.`,
+          details: [],
+          stats: {},
+          passive: false,
+          cooldownLabel: "",
+        });
       } else {
         btn.addEventListener("click", () => this.actions.sendAttribute(attr));
       }

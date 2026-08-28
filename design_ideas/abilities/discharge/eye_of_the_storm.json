@@ -1,7 +1,11 @@
 {
     "name": "Eye of the Storm",
     "type": "passive",
-    "description": "At the start of each of this unit's turns, %count% random enemy within %range% tile is struck by lightning for %damage% damage and left with a permanent, stacking vulnerability that adds %bonus_damage% damage to everything that hits it afterwards. A unit held by Static Link is always struck as well.",
+    "description": "At the start of each of this unit's turns, %count% random enemy within %range% tile is struck by lightning for %damage% damage.",
+    "details": [
+        "A struck enemy is left with a permanent, stacking vulnerability adding %bonus_damage% damage to everything that hits it afterwards.",
+        "A unit held by Static Link is always struck as well."
+    ],
     "stats": {
         "count": 1,
         "range": 1,

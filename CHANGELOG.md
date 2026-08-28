@@ -7,7 +7,67 @@ Every version lives in this one file, newest first — the project is small enou
 scrollable history beats hunting through per-version files. Entries are written for players
 rather than for the diff: what changed about playing the game, not which classes moved.
 
-## [Unreleased] — 0.2.0
+## [Unreleased] — 0.2.1
+
+A place to read the roster outside a match, a hero you can promise yourself in every draft,
+shorter ability text with the fine print one key away, and two delayed spells that finally
+show you where they are about to land.
+
+### Unit info
+
+- **A new "Unit info" page**, reachable from the main menu. Every draftable hero — 6
+  champions and 15 elites — with their statline and their full ability list, the same
+  cards you see at draft time, but with nothing to pick and no clock running. Filter by
+  champion or elite, or search by name.
+
+### Favourite units
+
+- **Pick a favourite hero in the main menu and you are guaranteed to be offered them.** A
+  favourite champion always turns up as one of your two options in the champion round; a
+  favourite elite turns up in one of your three elite rounds, chosen at random each match
+  so its position never gives it away. You still have to actually take them — it is one of
+  two options, not a free pick.
+- Your favourite leaves the shared pool the moment it is reserved, so your opponent can
+  never be dealt the same hero.
+- **If both players favourite the same hero, neither of you gets them.** They are withheld
+  from the match entirely rather than handed to whoever happened to be dealt first.
+- "None" is always available, and the computer never has a favourite.
+
+### Ability text
+
+- **Ability descriptions are now a short overview** — one or two sentences on what the
+  ability actually does. The conditions, interactions and edge cases that used to be
+  crammed into the same paragraph have moved out of the way.
+- **Hold Left Alt while hovering an ability** to expand the tooltip: every one of those
+  finer points as its own line, plus a table of the ability's actual numbers. Works on
+  in-match ability buttons, on draft cards, and on the new unit info page. A tooltip that
+  has more to show says so, so there is nothing to discover by accident.
+
+### Interface
+
+- **A pending Sanity's Eclipse is drawn on the board.** The whole blast radius is shaded
+  pale blue for the turn the orb is in the air, so the delay it advertises is a turn you
+  can actually use to walk clear.
+- **A homing missile marks its target.** An orange reticle sits on whichever tile the
+  locked unit is standing on and moves with them, which is the honest way to show an
+  ability whose whole point is that running does not help.
+- **Damage dealt at the end of a turn now appears immediately.** Poison ticks, burning
+  ground and drone strikes used to sit invisible until the other player took their first
+  action, a turn later.
+
+### Fixed
+
+- **Killer Drones would not attack.** Three things at once: a drone was dismantled a moment
+  before its final strike could fire, so it only ever got one turn less than advertised;
+  and with 20 in every attribute its strike lost or tied nearly every matchup, dealing 0.
+  Drones now have a real attacking statline and get every turn they are paid for.
+- **Killer Drones could not be deployed onto, or moved through, an occupied tile.** A drone
+  takes up no space and never blocks anyone — nothing standing in the way should have
+  blocked it either. It now flies over units and deploys wherever you point it.
+- **The draft card's unit type was rendered in lowercase**, against the contract everything
+  else on both sides follows.
+
+## [0.2.0] — 2026-08-28
 
 Two units who play with the shape of the game itself: an elite who **builds his own kit as
 the match goes on**, and a champion who **steals yours**. The roster grows to **6 champions

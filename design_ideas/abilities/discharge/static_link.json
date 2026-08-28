@@ -1,7 +1,11 @@
 {
     "name": "Static Link",
     "type": "active",
-    "description": "Forms a connection with the target. Whilst the link is still active, at the start of every turn, steals %dmg_steal% damage from the target and gives a free attack at the end of each turn. If Discharge is not adjacent to the linked target at the end of his turn, the link will break. The damage buff/debuff lingers for %buff_linger_duration% turns after the link is broken.",
+    "description": "Forms a link with a target within %cast_range% tiles, stealing %dmg_steal% damage from them at the start of every turn and granting a free attack at the end of it.",
+    "details": [
+        "The link breaks if this unit does not end its turn adjacent to the target.",
+        "The damage buff and debuff linger for %buff_linger_duration% turns after the link breaks."
+    ],
     "stats": {
         "cooldown": 7,
         "cast_range": 1,

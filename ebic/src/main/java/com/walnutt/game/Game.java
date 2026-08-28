@@ -106,6 +106,17 @@ public class Game {
      * concurrently, so it keeps using the strictly-sequential path.
      */
     public static Game newConcurrentFullDraftMatch(ConcurrentSetupHandler setupHandler, InputHandler input, Renderer renderer) {
+        return newConcurrentFullDraftMatch(setupHandler, input, renderer, Map.of());
+    }
+
+    /**
+     * As above, plus each team's favourite hero (definition id) - one the player has asked
+     * to always be offered. Only the web bridge has any idea who is playing, so only it
+     * ever passes a non-empty map; see ConcurrentSetupFlow.allocate for what the guarantee
+     * actually means, including what happens when both players name the same hero.
+     */
+    public static Game newConcurrentFullDraftMatch(ConcurrentSetupHandler setupHandler, InputHandler input,
+                                                    Renderer renderer, Map<Team, String> favourites) {
         JsonDataLoader loader = new JsonDataLoader(JsonDataLoader.locateDesignIdeasRoot());
         Map<String, UnitDefinition> unitDefs = loader.loadAllUnits();
         Map<String, AbilityDefinition> abilityDefs = loader.loadAllAbilities();
@@ -119,7 +130,7 @@ public class Game {
         state.setAbilityDefinitions(abilityDefs);
         state.setInputHandler(input);
 
-        ConcurrentSetupFlow.run(state, setupHandler);
+        ConcurrentSetupFlow.run(state, setupHandler, favourites);
 
         return new Game(state, renderer);
     }

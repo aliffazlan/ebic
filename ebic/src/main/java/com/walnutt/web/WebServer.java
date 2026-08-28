@@ -49,13 +49,14 @@ public final class WebServer {
 
     private final AuthService auth;
     private final MatchService matches;
+    private final UnitCatalog catalog = new UnitCatalog();
     private final GameSessionManager sessions;
     private final Javalin app;
 
     public WebServer(Database db) {
         this.auth = new AuthService(db);
         this.matches = new MatchService(db);
-        this.sessions = new GameSessionManager(matches);
+        this.sessions = new GameSessionManager(matches, auth, catalog);
         this.app = Javalin.create(cfg -> {
             cfg.showJavalinBanner = false;
             cfg.jetty.modifyWebSocketServletFactory(factory -> factory.setIdleTimeout(WS_IDLE_TIMEOUT));
@@ -83,6 +84,8 @@ public final class WebServer {
         app.post("/api/login", this::handleLogin);
         app.post("/api/logout", this::handleLogout);
         app.get("/api/me", this::handleMe);
+        app.put("/api/me/favourite", this::handleSetFavouriteUnit);
+        app.get("/api/units", this::handleUnits);
         app.post("/api/matches", this::handleCreateMatch);
         app.post("/api/matches/bot", this::handleCreateBotMatch);
         app.post("/api/matches/join", this::handleJoinMatch);
@@ -134,6 +137,35 @@ public final class WebServer {
         JsonObject payload = new JsonObject();
         payload.addProperty("userId", user.userId());
         payload.addProperty("username", user.username());
+        payload.addProperty("favouriteUnit", auth.getFavouriteUnit(user.userId()));
+        sendJson(ctx, 200, payload);
+    }
+
+    /**
+     * A null/absent definitionId clears the favourite, which is what the client's "None"
+     * option sends. Validated against the same catalogue the info page serves, so a hero
+     * nobody can be dealt (Shawl, a summon prototype) can never be stored either.
+     */
+    private void handleSetFavouriteUnit(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        String definitionId = JsonSupport.optString(readJsonBody(ctx), "definitionId");
+        if (definitionId != null && definitionId.isBlank()) {
+            definitionId = null;
+        }
+        if (definitionId != null && !catalog.isDraftable(definitionId)) {
+            throw new ApiException(400, "no such draftable unit");
+        }
+        auth.setFavouriteUnit(user.userId(), definitionId);
+        JsonObject payload = new JsonObject();
+        payload.addProperty("favouriteUnit", definitionId);
+        sendJson(ctx, 200, payload);
+    }
+
+    /** The whole draftable roster as static design data - stats plus ability text, no match needed. */
+    private void handleUnits(Context ctx) {
+        requireAuth(ctx);
+        JsonObject payload = new JsonObject();
+        payload.add("units", JsonSupport.GSON.toJsonTree(catalog.draftableUnits()));
         sendJson(ctx, 200, payload);
     }
 

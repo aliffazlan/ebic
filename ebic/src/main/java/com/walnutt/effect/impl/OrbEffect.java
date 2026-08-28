@@ -1,5 +1,8 @@
 package com.walnutt.effect.impl;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.walnutt.combat.Attribute;
 import com.walnutt.effect.Effect;
 import com.walnutt.event.DamageEvent;
@@ -40,6 +43,30 @@ public class OrbEffect extends Effect {
         this.targetPosition = targetPosition;
         this.radius = radius;
         this.intDiffMultiplier = intDiffMultiplier;
+    }
+
+    public Position getTargetPosition() {
+        return targetPosition;
+    }
+
+    public int getRadius() {
+        return radius;
+    }
+
+    /**
+     * Every orb still in the air. Unlike most effects this one is not about the unit it
+     * sits on - it remembers a patch of board - so the client needs it flattened onto
+     * tiles the same way burning ground is. A detonated-but-not-yet-removed orb is
+     * skipped: the blast has already happened.
+     */
+    public static List<OrbEffect> activeOrbs(GameState state) {
+        List<OrbEffect> orbs = new ArrayList<>();
+        for (OrbEffect orb : Effect.activeInstances(state, OrbEffect.class)) {
+            if (!orb.resolved && !orb.caster.isDead()) {
+                orbs.add(orb);
+            }
+        }
+        return orbs;
     }
 
     @Override

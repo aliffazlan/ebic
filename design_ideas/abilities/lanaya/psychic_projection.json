@@ -1,7 +1,11 @@
 {
     "name": "Psychic Projection",
     "type": "active",
-    "description": "Projects an invulnerable copy of this unit onto a tile within %cast_range% tiles for %duration% turns. The copy moves and attacks freely and takes no damage, but this unit is stunned for as long as it exists.",
+    "description": "Projects an invulnerable copy of this unit onto a tile within %cast_range% tiles for %duration% turns.",
+    "details": [
+        "The copy moves and attacks freely and takes no damage.",
+        "This unit is stunned for as long as the copy exists."
+    ],
     "tags": [
         "no_copy"
     ],

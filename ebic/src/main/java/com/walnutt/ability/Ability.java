@@ -2,6 +2,7 @@ package com.walnutt.ability;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.walnutt.TriggerHandler;
 import com.walnutt.ability.target.MultiTarget;
@@ -43,6 +44,16 @@ public abstract class Ability extends TriggerHandler {
      * normalizes to sanity_s_eclipse, not its filename sanity_eclipse).
      */
     private String definitionId;
+    /**
+     * The long-form bullet points and the raw tuning numbers behind {@link
+     * #getDescription()}, both stamped alongside definitionId in {@link
+     * com.walnutt.data.AbilityFactory#create} and both empty for anything constructed
+     * directly in Java (Move, Attack, DroneAutoAttack, the Pylon's internal kit). The
+     * client shows them only when the player asks for the verbose tooltip, which is what
+     * lets the description itself stay to one or two sentences.
+     */
+    private List<String> details = List.of();
+    private Map<String, Double> stats = Map.of();
     protected Unit owner;
     private int maxCooldown;
     private int currentCooldown;
@@ -65,6 +76,20 @@ public abstract class Ability extends TriggerHandler {
     /** Called only by AbilityFactory, immediately after construction. */
     public void setDefinitionId(String definitionId) {
         this.definitionId = definitionId;
+    }
+
+    public List<String> getDetails() {
+        return this.details;
+    }
+
+    public Map<String, Double> getStats() {
+        return this.stats;
+    }
+
+    /** Called only by AbilityFactory, immediately after construction - see the field comment. */
+    public void setDefinitionText(List<String> details, Map<String, Double> stats) {
+        this.details = details == null ? List.of() : List.copyOf(details);
+        this.stats = stats == null ? Map.of() : Map.copyOf(stats);
     }
 
     public Unit getOwner() {

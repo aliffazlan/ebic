@@ -41,7 +41,16 @@ public final class ConcurrentSetupFlow {
     }
 
     public static void run(GameState state, ConcurrentSetupHandler handler) {
-        Map<Team, List<List<UnitDefinition>>> allocation = allocate(state);
+        run(state, handler, Map.of());
+    }
+
+    /**
+     * `favourites` maps a team to a hero definition id that player has asked to always be
+     * offered. Empty for terminal mode and for every existing test; only the web bridge
+     * knows who is sitting in a seat.
+     */
+    public static void run(GameState state, ConcurrentSetupHandler handler, Map<Team, String> favourites) {
+        Map<Team, List<List<UnitDefinition>>> allocation = allocate(state, favourites);
 
         List<Thread> threads = new ArrayList<>();
         List<Throwable> failures = Collections.synchronizedList(new ArrayList<>());
@@ -80,25 +89,106 @@ public final class ConcurrentSetupFlow {
      * determined as the game begins" requirement, and it's what lets each player's
      * thread proceed afterward with zero further contention on the shared RNG/pool.
      */
-    private static Map<Team, List<List<UnitDefinition>>> allocate(GameState state) {
+    private static Map<Team, List<List<UnitDefinition>>> allocate(GameState state, Map<Team, String> favourites) {
         Map<String, UnitDefinition> unitDefs = state.getUnitDefinitions();
         DraftService draftService = new DraftService();
         Random random = state.getRandom();
 
-        List<UnitDefinition> championPool = shuffled(draftService.getAvailableChampions(unitDefs), unitDefs, random);
-        List<UnitDefinition> elitePool = shuffled(draftService.getAvailableElites(unitDefs), unitDefs, random);
+        List<String> championIds = new ArrayList<>(draftService.getAvailableChampions(unitDefs));
+        List<String> eliteIds = new ArrayList<>(draftService.getAvailableElites(unitDefs));
+        Map<Team, String> claimed = resolveFavourites(favourites, championIds, eliteIds);
+
+        // Both players naming the same hero means neither may have it, so it leaves the
+        // pool entirely and cannot even turn up by chance. A claimed favourite leaves too,
+        // because it is dealt to its own player by hand below - which is also what keeps
+        // "no hero appears in both rosters" true here.
+        List<String> withheld = new ArrayList<>(contestedFavourites(favourites));
+        withheld.addAll(claimed.values());
+        championIds.removeAll(withheld);
+        eliteIds.removeAll(withheld);
+
+        List<UnitDefinition> championPool = shuffled(championIds, unitDefs, random);
+        List<UnitDefinition> elitePool = shuffled(eliteIds, unitDefs, random);
 
         Map<Team, List<List<UnitDefinition>>> allocation = new HashMap<>();
         for (Player player : state.getPlayers()) {
+            String favourite = claimed.get(player.getTeam());
+            UnitDefinition favouriteDef = favourite == null ? null : unitDefs.get(favourite);
+            if (favourite != null && favouriteDef == null) {
+                throw new IllegalStateException("Favourite '" + favourite + "' has no unit definition");
+            }
+            boolean favouriteIsChampion = favouriteDef != null
+                && "champion".equalsIgnoreCase(favouriteDef.type());
+            // Which elite round hosts an elite favourite is rolled rather than fixed, so
+            // the round it appears in isn't itself a tell to an opponent who knows the rule.
+            int favouriteEliteRound = favouriteDef != null && !favouriteIsChampion
+                ? 1 + random.nextInt(ELITE_ROUNDS)
+                : -1;
+
             List<List<UnitDefinition>> rounds = new ArrayList<>();
-            rounds.add(drawTwo(championPool));
-            for (int i = 0; i < ELITE_ROUNDS; i++) {
-                rounds.add(drawTwo(elitePool));
+            rounds.add(favouriteIsChampion
+                ? pairWithFavourite(favouriteDef, championPool, random)
+                : drawTwo(championPool));
+            for (int i = 1; i <= ELITE_ROUNDS; i++) {
+                rounds.add(i == favouriteEliteRound
+                    ? pairWithFavourite(favouriteDef, elitePool, random)
+                    : drawTwo(elitePool));
             }
             allocation.put(player.getTeam(), rounds);
         }
         return allocation;
     }
+
+    /** Favourites worth honouring: known to the pool, and not wanted by both players at once. */
+    private static Map<Team, String> resolveFavourites(Map<Team, String> favourites, List<String> championIds,
+                                                        List<String> eliteIds) {
+        Map<Team, String> resolved = new HashMap<>();
+        if (favourites == null || favourites.isEmpty()) {
+            return resolved;
+        }
+        List<String> contested = contestedFavourites(favourites);
+        for (Map.Entry<Team, String> entry : favourites.entrySet()) {
+            String id = entry.getValue();
+            if (id == null || contested.contains(id)) {
+                continue;
+            }
+            if (championIds.contains(id) || eliteIds.contains(id)) {
+                resolved.put(entry.getKey(), id);
+            }
+        }
+        return resolved;
+    }
+
+    /** Ids more than one team asked for - nobody gets these. */
+    private static List<String> contestedFavourites(Map<Team, String> favourites) {
+        List<String> contested = new ArrayList<>();
+        if (favourites == null) {
+            return contested;
+        }
+        List<String> seen = new ArrayList<>();
+        for (String id : favourites.values()) {
+            if (id == null) {
+                continue;
+            }
+            if (seen.contains(id) && !contested.contains(id)) {
+                contested.add(id);
+            }
+            seen.add(id);
+        }
+        return contested;
+    }
+
+    /** The guaranteed hero plus one ordinary draw, shuffled so the favourite isn't always listed first. */
+    private static List<UnitDefinition> pairWithFavourite(UnitDefinition favourite, List<UnitDefinition> pool,
+                                                           Random random) {
+        if (pool.isEmpty()) {
+            throw new IllegalStateException("Not enough units left in the pool to offer a pick");
+        }
+        List<UnitDefinition> pair = new ArrayList<>(List.of(favourite, pool.remove(0)));
+        Collections.shuffle(pair, random);
+        return List.copyOf(pair);
+    }
+
 
     private static void runOnePlayerSetup(GameState state, Player player, List<List<UnitDefinition>> rounds,
                                            List<List<UnitDefinition>> opponentRounds, ConcurrentSetupHandler handler) {

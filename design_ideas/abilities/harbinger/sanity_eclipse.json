@@ -1,7 +1,11 @@
 {
     "name": "Sanity's Eclipse",
     "type": "active",
-    "description": "Hurls an orb of psionic energy at a tile within %cast_range% tiles. After %delay% turn it detonates, dealing %int_diff_dmg% damage to every enemy within %radius% tile for each point of intelligence this unit has over them. The blast reaches units held by Oblivion Confinement.",
+    "description": "Hurls a psionic orb at a tile within %cast_range% tiles. After %delay% turn it detonates, dealing %int_diff_dmg% damage to every enemy within %radius% tile for each point of intelligence this unit has over them.",
+    "details": [
+        "The area the blast will cover is marked on the board while the orb is in the air.",
+        "It reaches units held by Oblivion Confinement."
+    ],
     "stats": {
         "cooldown": 9,
         "cast_range": 4,

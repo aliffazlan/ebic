@@ -1,6 +1,5 @@
 package com.walnutt.effect.impl;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.walnutt.effect.Effect;
@@ -52,18 +51,7 @@ public class BurningGroundEffect extends Effect {
      * so owners that are dead are skipped.
      */
     public static List<BurningGroundEffect> activeGrounds(GameState state) {
-        List<BurningGroundEffect> grounds = new ArrayList<>();
-        for (Unit unit : state.getAllActiveUnits()) {
-            if (unit.isDead()) {
-                continue;
-            }
-            for (Effect effect : unit.getEffects()) {
-                if (!effect.isExpired() && effect instanceof BurningGroundEffect ground) {
-                    grounds.add(ground);
-                }
-            }
-        }
-        return grounds;
+        return Effect.activeInstances(state, BurningGroundEffect.class);
     }
 
     /** True if `position` is already alight - Eruption refuses to re-ignite it. */

@@ -1,7 +1,11 @@
 {
     "name": "Homing Missile",
     "type": "active",
-    "description": "Locks a missile onto an enemy up to %cast_range% tiles away. It strikes after %delay% turn, tracking the target wherever it moves, dealing %damage% damage on impact and %aoe_damage% to enemies adjacent to it. Cleansing the lock before then shoots the missile down.",
+    "description": "Locks a missile onto an enemy up to %cast_range% tiles away. It lands after %delay% turn for %damage% damage, plus %aoe_damage% to enemies beside them.",
+    "details": [
+        "It tracks the target wherever they go, so running is no escape - the tile it will hit is marked on the board.",
+        "Cleansing the lock before impact shoots the missile down."
+    ],
     "stats": {
         "cooldown": 6,
         "cast_range": 8,

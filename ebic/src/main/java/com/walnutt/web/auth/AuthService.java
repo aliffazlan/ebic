@@ -135,6 +135,39 @@ public final class AuthService {
         }
     }
 
+    /**
+     * The hero this user wants guaranteed in their draft, or null for none. Kept off
+     * AuthedUser deliberately: resolveSession runs on every request and every WS upgrade,
+     * while only the two handlers that read or write a favourite ever need this.
+     */
+    public String getFavouriteUnit(long userId) {
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "SELECT favourite_unit FROM users WHERE id = ?")) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString("favourite_unit") : null;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to read favourite unit", e);
+        }
+    }
+
+    /** A null definitionId clears the favourite - that is what the "None" option sends. */
+    public void setFavouriteUnit(long userId, String definitionId) {
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "UPDATE users SET favourite_unit = ? WHERE id = ?")) {
+            if (definitionId == null) {
+                ps.setNull(1, java.sql.Types.VARCHAR);
+            } else {
+                ps.setString(1, definitionId);
+            }
+            ps.setLong(2, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to store favourite unit", e);
+        }
+    }
+
     private void deleteSession(String token) {
         try (PreparedStatement ps = db.connection().prepareStatement("DELETE FROM sessions WHERE token = ?")) {
             ps.setString(1, token);

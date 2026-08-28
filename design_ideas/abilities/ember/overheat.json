@@ -1,7 +1,11 @@
 {
     "name": "Overheat",
     "type": "passive",
-    "description": "Tracks the damage this unit deals to each enemy. Once one has accumulated %threshold% damage it overheats, applying %burn_stacks% stack of Burn to every other enemy within %radius% tile. Overheat triggers at most once per turn, and any damage past the threshold carries over toward the next one.",
+    "description": "Tracks the damage this unit deals to each enemy. Once one has accumulated %threshold% damage it overheats, applying %burn_stacks% stack of Burn to every other enemy within %radius% tile.",
+    "details": [
+        "An overheating unit never burns itself, only its neighbours.",
+        "Each enemy can overheat at most once per turn, and damage past the threshold carries over toward the next one."
+    ],
     "stats": {
         "threshold": 50,
         "radius": 1,

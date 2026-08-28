@@ -9,8 +9,10 @@ import type {
   BotLevel,
   CreateBotMatchResponse,
   CreateMatchResponse,
+  FavouriteUnitResponse,
   JoinMatchResponse,
   MatchInfo,
+  UnitsResponse,
 } from "../types/contract";
 
 export class ApiError extends Error {
@@ -73,6 +75,19 @@ export const api = {
 
   me(): Promise<AuthUser> {
     return request<AuthUser>("/me");
+  },
+
+  /** The whole draftable roster as static design data - no match needed, so the codex can use it. */
+  getUnits(): Promise<UnitsResponse> {
+    return request<UnitsResponse>("/units");
+  },
+
+  /** null clears the favourite - that is what the "None" option sends. */
+  setFavouriteUnit(definitionId: string | null): Promise<FavouriteUnitResponse> {
+    return request<FavouriteUnitResponse>("/me/favourite", {
+      method: "PUT",
+      body: JSON.stringify({ definitionId }),
+    });
   },
 
   createMatch(): Promise<CreateMatchResponse> {

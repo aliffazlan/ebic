@@ -1,7 +1,10 @@
 {
     "name": "Dislocation",
     "type": "active",
-    "description": "Teleports to one of this unit's own pylons and consumes it, reducing every ability cooldown by 1 turn and granting a %barrier_hp% health barrier for %barrier_duration% turns. A pylon sharing its tile with another unit cannot be used.",
+    "description": "Teleports to one of this unit's own pylons and consumes it, cutting every ability cooldown by 1 turn and granting a %barrier_hp% health barrier for %barrier_duration% turns.",
+    "details": [
+        "A pylon sharing its tile with another unit cannot be used."
+    ],
     "stats": {
         "cooldown": 1,
         "barrier_hp": 50,

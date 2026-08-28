@@ -12,6 +12,17 @@ export type Attribute = "STRENGTH" | "AGILITY" | "INTELLIGENCE";
 export interface AuthUser {
   userId: number;
   username: string;
+  // The hero this player has asked to always be offered in the draft, or null for none.
+  // See "Favourite unit" in API_CONTRACT.md for what the guarantee actually promises.
+  favouriteUnit: string | null;
+}
+
+export interface UnitsResponse {
+  units: UnitDefinitionSnapshot[];
+}
+
+export interface FavouriteUnitResponse {
+  favouriteUnit: string | null;
 }
 
 export interface CreateMatchResponse {
@@ -60,6 +71,11 @@ export interface AbilitySnapshot {
   // substituted server-side) - shown on hover, see "Ability tooltips" in
   // API_CONTRACT.md.
   description: string;
+  // The verbose half of the tooltip, shown only while the expand key is held: one bullet
+  // per rule or interaction lifted out of the description, plus this ability's raw tuning
+  // numbers. Both empty for Move/Attack and anything else not built from a JSON definition.
+  details: string[];
+  stats: Record<string, number>;
   passive: boolean;
   ready: boolean;
   // True when this one ability is locked for the rest of the turn by an effect
@@ -89,6 +105,9 @@ export interface AbilityPreviewSnapshot {
   id: string;
   name: string;
   description: string;
+  // See AbilitySnapshot.details/stats - the same verbose-tooltip payload, before the match.
+  details: string[];
+  stats: Record<string, number>;
   passive: boolean;
   cooldown: number;
 }
@@ -155,7 +174,10 @@ export interface GameStateSnapshot {
 export interface TileEffectSnapshot {
   q: number;
   r: number;
-  kind: "burning" | string;
+  // "burning" is Ember's ground fire; "eclipse" and "missile" are warnings about something
+  // that has not landed yet (a pending Sanity's Eclipse blast, a homing missile's current
+  // impact tile). Open-ended: an unrecognised kind draws a generic overlay.
+  kind: "burning" | "eclipse" | "missile" | string;
   name: string;
   remainingTurns: number;
 }

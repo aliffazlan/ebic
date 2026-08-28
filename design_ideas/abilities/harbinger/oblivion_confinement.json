@@ -1,7 +1,10 @@
 {
     "name": "Oblivion Confinement",
     "type": "active",
-    "description": "Banishes an enemy within %cast_range% tiles for %duration% turns, stunning it but leaving it invulnerable, and stealing %int_steal:pct%% of its intelligence. Another %int_steal:pct%% is torn away when it returns.",
+    "description": "Banishes an enemy within %cast_range% tiles for %duration% turns, stunning it but leaving it invulnerable, and stealing %int_steal:pct%% of its intelligence.",
+    "details": [
+        "Another %int_steal:pct%% is torn away when it returns."
+    ],
     "stats": {
         "cooldown": 3,
         "cast_range": 2,

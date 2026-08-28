@@ -1,7 +1,11 @@
 {
     "name": "Pylon",
     "type": "active",
-    "description": "Drops an orbital pylon onto any tile on the map. Pylons can be attacked but never block movement, and each one fires alongside this unit whenever it casts Orbital Beam. A destroyed pylon detonates, dealing %death_damage% damage to adjacent enemies and stunning them for %death_duration% turn.",
+    "description": "Drops an orbital pylon onto any tile on the map. Each one fires alongside this unit whenever it casts Orbital Beam.",
+    "details": [
+        "Pylons can be attacked but never block movement.",
+        "A destroyed pylon detonates for %death_damage% damage to adjacent enemies, stunning them for %death_duration% turn."
+    ],
     "stats": {
         "cooldown": 4,
         "death_damage": 50,

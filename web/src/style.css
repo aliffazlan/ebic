@@ -345,6 +345,46 @@ input {
   color: #fbbf24;
 }
 
+/* Holding the expand key swaps the short description for the full rules, which need
+   noticeably more room than the one-line overview the collapsed tooltip is sized for. */
+.hover-tooltip.expanded {
+  max-width: 420px;
+}
+
+.hover-tooltip-hint {
+  color: #64748b;
+  font-style: italic;
+  margin-top: 6px;
+}
+
+.hover-tooltip-details {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #cbd5e1;
+}
+
+.hover-tooltip-details li {
+  margin-bottom: 4px;
+}
+
+.hover-tooltip-stats {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #334155;
+}
+
+.hover-tooltip-stat-key {
+  color: #94a3b8;
+}
+
+.hover-tooltip-stat-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- combat log ---- */
 
 .combat-log-section {
@@ -630,4 +670,49 @@ input {
 .game-over-panel h2 {
   font-size: 22px;
   margin-bottom: 8px;
+}
+
+/* ---- unit info (codex) ---- */
+
+/* Full-window rather than the lobby's fixed-width .card - the whole point is seeing many
+   heroes side by side. The toolbar stays put while the grid below it scrolls. */
+.codex-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px 24px;
+  gap: 16px;
+}
+
+.codex-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.codex-toolbar h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.codex-toolbar input {
+  margin-left: auto;
+  width: 200px;
+}
+
+.codex-filters {
+  display: flex;
+  gap: 6px;
+}
+
+.codex-grid {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-content: flex-start;
+  padding-bottom: 20px;
 }

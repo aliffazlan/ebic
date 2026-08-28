@@ -1,5 +1,6 @@
 import { api } from "../net/api";
 import { AuthScreen } from "../ui/AuthScreen";
+import { CodexScreen } from "../ui/CodexScreen";
 import { FixtureScreen } from "../ui/FixtureScreen";
 import { LobbyScreen } from "../ui/LobbyScreen";
 import { MatchScreen } from "../ui/MatchScreen";
@@ -58,12 +59,22 @@ export class App {
     this.setScreen(
       new LobbyScreen(this.root, this.currentUser!, {
         onMatchReady: (matchId, yourTeam) => this.showMatch(matchId, yourTeam),
+        onOpenCodex: () => this.showCodex(),
         onLogout: () => {
           this.currentUser = null;
           this.showAuth();
         },
       }),
     );
+  }
+
+  /**
+   * A screen of its own rather than a lobby sub-view: the lobby is a fixed-width card and
+   * the roster wants the whole window. Coming back rebuilds the lobby, which also re-reads
+   * the account - so a favourite changed here would be reflected there.
+   */
+  private showCodex(): void {
+    this.setScreen(new CodexScreen(this.root, () => this.showLobby()));
   }
 
   private showMatch(matchId: string, yourTeam: Team): void {

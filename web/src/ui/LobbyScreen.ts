@@ -1,5 +1,5 @@
 import { api, ApiError } from "../net/api";
-import type { AuthUser, BotLevel, Team } from "../types/contract";
+import type { AuthUser, BotLevel, Team, UnitDefinitionSnapshot } from "../types/contract";
 import type { Screen } from "./Screen";
 
 const POLL_INTERVAL_MS = 2000;
@@ -11,6 +11,7 @@ const BOT_LEVELS: ReadonlyArray<{ value: BotLevel; label: string }> = [
 
 export interface LobbyCallbacks {
   onMatchReady(matchId: string, yourTeam: Team): void;
+  onOpenCodex(): void;
   onLogout(): void;
 }
 
@@ -61,12 +62,15 @@ export class LobbyScreen implements Screen {
     header.style.alignItems = "center";
     const title = document.createElement("h1");
     title.textContent = "EBIC";
+    const codexBtn = document.createElement("button");
+    codexBtn.textContent = "Unit info";
+    codexBtn.addEventListener("click", () => this.callbacks.onOpenCodex());
     const logoutBtn = document.createElement("button");
     logoutBtn.textContent = "Log out";
     logoutBtn.addEventListener("click", () => {
       void api.logout().finally(() => this.callbacks.onLogout());
     });
-    header.append(title, logoutBtn);
+    header.append(title, codexBtn, logoutBtn);
     card.appendChild(header);
 
     const welcome = document.createElement("div");
@@ -81,6 +85,8 @@ export class LobbyScreen implements Screen {
     const setError = (err: unknown) => {
       errorText.textContent = err instanceof ApiError ? err.message : "Something went wrong.";
     };
+
+    card.appendChild(this.renderFavouritePicker(setError));
 
     // Play vs the computer - listed first because it is the only option that needs
     // nobody else: no join code to share, no waiting for an opponent to connect.
@@ -187,6 +193,64 @@ export class LobbyScreen implements Screen {
     this.el = wrap;
   }
 
+  /**
+   * The hero this account always wants offered. Saved on change rather than behind a
+   * button - there is one setting and no way to get it half-right, so a Save step would
+   * only be something to forget.
+   *
+   * The list is the same GET /api/units the codex uses, so what can be favourited and what
+   * can be drafted are one question with one answer.
+   */
+  private renderFavouritePicker(setError: (err: unknown) => void): HTMLElement {
+    const section = document.createElement("div");
+
+    const heading = document.createElement("h2");
+    heading.textContent = "Favourite unit";
+    section.appendChild(heading);
+
+    const select = document.createElement("select");
+    select.style.width = "100%";
+    select.disabled = true;
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "None";
+    select.appendChild(none);
+    section.appendChild(select);
+
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = "Always offered as one of your two options in the matching draft round. "
+      + "If your opponent has picked the same favourite, neither of you is offered them.";
+    section.appendChild(hint);
+
+    void api.getUnits()
+      .then(({ units }) => {
+        select.appendChild(optgroupFor("Champions", units.filter((u) => u.type === "CHAMPION")));
+        select.appendChild(optgroupFor("Elites", units.filter((u) => u.type === "ELITE")));
+        select.value = this.user.favouriteUnit ?? "";
+        select.disabled = false;
+      })
+      .catch(setError);
+
+    select.addEventListener("change", () => {
+      const chosen = select.value === "" ? null : select.value;
+      select.disabled = true;
+      void api.setFavouriteUnit(chosen)
+        .then((res) => {
+          this.user = { ...this.user, favouriteUnit: res.favouriteUnit };
+        })
+        .catch((err) => {
+          setError(err);
+          select.value = this.user.favouriteUnit ?? "";
+        })
+        .finally(() => {
+          select.disabled = false;
+        });
+    });
+
+    return section;
+  }
+
   private renderWaitingForOpponent(matchId: string, joinCode: string): void {
     this.el?.remove();
 
@@ -236,4 +300,16 @@ export class LobbyScreen implements Screen {
       }
     }, POLL_INTERVAL_MS);
   }
+}
+
+function optgroupFor(label: string, units: UnitDefinitionSnapshot[]): HTMLOptGroupElement {
+  const group = document.createElement("optgroup");
+  group.label = label;
+  for (const unit of units) {
+    const option = document.createElement("option");
+    option.value = unit.definitionId;
+    option.textContent = unit.name;
+    group.appendChild(option);
+  }
+  return group;
 }

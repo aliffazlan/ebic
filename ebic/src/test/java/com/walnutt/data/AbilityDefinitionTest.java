@@ -55,11 +55,23 @@ class AbilityDefinitionTest {
         assertEquals("Deals 0 damage.", def.formattedDescription());
     }
 
+    @Test
+    void detailsResolvePlaceholdersToo_andAreEmptyWhenTheJsonOmitsThem() {
+        AbilityDefinition withDetails = new AbilityDefinition("Test", "active", "Short.",
+            Map.of("radius", 2.0), List.of(), List.of("Hits everything within %radius% tiles."));
+
+        assertEquals(List.of("Hits everything within 2 tiles."), withDetails.formattedDetails());
+        assertEquals(List.of(), withStats("Short.", Map.of()).formattedDetails());
+    }
+
     /**
      * The silent-failure guard: a placeholder naming a key that isn't in stats{}
      * renders as "0" with no error anywhere, so a typo in a hand-written description
      * only ever surfaces as a wrong number in a tooltip. This walks the real
      * design_ideas/ content so any such typo fails the build instead.
+     *
+     * Details are checked alongside descriptions: they are the same hand-written text with
+     * the same placeholders, just shown on request rather than up front.
      */
     @Test
     void everyPlaceholderInEveryRealAbilityJsonResolvesToAnActualStatKey() {
@@ -71,14 +83,20 @@ class AbilityDefinitionTest {
 
         List<String> problems = new ArrayList<>();
         abilities.forEach((id, def) -> {
-            if (def.description() == null) {
-                return;
+            List<String> texts = new ArrayList<>();
+            if (def.description() != null) {
+                texts.add(def.description());
             }
-            Matcher matcher = placeholder.matcher(def.description());
-            while (matcher.find()) {
-                String key = matcher.group(1);
-                if (def.stats() == null || !def.stats().containsKey(key)) {
-                    problems.add(id + ".json references %" + key + "% but has no such stats{} key");
+            if (def.details() != null) {
+                texts.addAll(def.details());
+            }
+            for (String text : texts) {
+                Matcher matcher = placeholder.matcher(text);
+                while (matcher.find()) {
+                    String key = matcher.group(1);
+                    if (def.stats() == null || !def.stats().containsKey(key)) {
+                        problems.add(id + ".json references %" + key + "% but has no such stats{} key");
+                    }
                 }
             }
         });

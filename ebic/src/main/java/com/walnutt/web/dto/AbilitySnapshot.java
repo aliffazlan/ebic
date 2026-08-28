@@ -1,9 +1,17 @@
 package com.walnutt.web.dto;
 
+import java.util.List;
+import java.util.Map;
+
 public record AbilitySnapshot(
     String id,
     String name,
     String description,
+    // The verbose half of the tooltip: one bullet per rule or interaction that was lifted
+    // out of the description to keep it short, plus this ability's raw tuning numbers.
+    // Both empty for Move/Attack and anything else not built from a JSON definition.
+    List<String> details,
+    Map<String, Double> stats,
     boolean passive,
     boolean ready,
     // True when this specific ability is locked for the rest of the turn by an effect

@@ -1,7 +1,10 @@
 {
     "name": "Energy Break",
     "type": "passive",
-    "description": "Every encounter drains an opponent's energy, pushing all of their ability cooldowns up by %cooldown_increase%, or by %bonus_increase% instead on a landed attack. Cooldowns driven up this way can exceed their normal maximum.",
+    "description": "Every encounter drains an opponent's energy, pushing all of their ability cooldowns up by %cooldown_increase%, or by %bonus_increase% on a landed attack.",
+    "details": [
+        "Cooldowns driven up this way can exceed their normal maximum."
+    ],
     "stats": {
         "cooldown_increase": 1,
         "bonus_increase": 3

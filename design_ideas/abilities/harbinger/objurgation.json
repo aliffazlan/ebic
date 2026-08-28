@@ -1,7 +1,10 @@
 {
     "name": "Objurgation",
     "type": "passive",
-    "description": "Cheats death: on taking a fatal blow this unit burns %int_consumed:pct%% of its intelligence and converts it into %int_to_hp% health per point, surviving on what it gains. Can only save this unit once every %cooldown% turns.",
+    "description": "Cheats death: on taking a fatal blow this unit burns %int_consumed:pct%% of its intelligence and survives on the %int_to_hp% health each point becomes.",
+    "details": [
+        "Can only save this unit once every %cooldown% turns."
+    ],
     "stats": {
         "cooldown": 4,
         "int_to_hp": 1,

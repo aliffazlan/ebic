@@ -70,6 +70,7 @@ public final class Database {
         // CREATE TABLE IF NOT EXISTS silently leaves an existing table alone, so columns
         // added after a database already exists need their own guarded ALTER.
         addColumnIfMissing("matches", "bot_level", "TEXT");
+        addColumnIfMissing("users", "favourite_unit", "TEXT");
     }
 
     /** Idempotent ALTER for a column added to a table that may already exist in a dev database. */

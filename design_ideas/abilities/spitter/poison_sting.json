@@ -1,7 +1,10 @@
 {
     "name": "Poison Sting",
     "type": "passive",
-    "description": "Attacks leave poison on the target for %duration% turns, dealing %dmg_per_duration% damage for every turn still remaining on it. Attacking an already-poisoned target extends the poison instead of restacking it.",
+    "description": "Attacks leave poison on the target for %duration% turns, dealing %dmg_per_duration% damage for every turn still remaining on it.",
+    "details": [
+        "Attacking an already-poisoned target extends the poison instead of restacking it."
+    ],
     "stats": {
         "duration": 2,
         "dmg_per_duration": 5

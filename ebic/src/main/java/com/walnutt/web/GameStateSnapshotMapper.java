@@ -9,8 +9,11 @@ import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.effect.Effect;
 import com.walnutt.effect.impl.BurningGroundEffect;
+import com.walnutt.effect.impl.HomingMissileEffect;
+import com.walnutt.effect.impl.OrbEffect;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Position;
+import com.walnutt.map.Tile;
 import com.walnutt.status.Stat;
 import com.walnutt.status.StatusFlag;
 import com.walnutt.unit.Unit;
@@ -55,6 +58,11 @@ public final class GameStateSnapshotMapper {
     /**
      * Tile-bound effects are stored on the unit that created them (see
      * BurningGroundEffect), so this sweeps every active unit rather than the map.
+     *
+     * Two of these describe something that has not happened yet rather than something
+     * already on the ground - a pending Sanity's Eclipse and a missile in flight. Both
+     * exist purely so the delay they advertise is something a player can actually see and
+     * react to; a delayed blast nobody can locate is just a surprise.
      */
     private static List<TileEffectSnapshot> collectTileEffects(GameState state) {
         List<TileEffectSnapshot> tileEffects = new ArrayList<>();
@@ -65,6 +73,31 @@ public final class GameStateSnapshotMapper {
                 "burning",
                 ground.getName(),
                 ground.getRemainingTurns()));
+        }
+        for (OrbEffect orb : OrbEffect.activeOrbs(state)) {
+            // One entry per real tile in the blast, asked of the map rather than derived
+            // from the coordinates: the match board is row-trimmed, so hexDistance <= radius
+            // does not imply a tile exists there.
+            for (Tile tile : state.getMap().getTilesInRadius(orb.getTargetPosition(), orb.getRadius())) {
+                tileEffects.add(new TileEffectSnapshot(
+                    tile.getPosition().getQ(),
+                    tile.getPosition().getR(),
+                    "eclipse",
+                    orb.getName(),
+                    orb.getRemainingTurns()));
+            }
+        }
+        for (HomingMissileEffect missile : HomingMissileEffect.activeLocks(state)) {
+            Position impact = missile.getOwner() == null ? null : missile.getOwner().getPosition();
+            if (impact == null) {
+                continue;
+            }
+            tileEffects.add(new TileEffectSnapshot(
+                impact.getQ(),
+                impact.getR(),
+                "missile",
+                missile.getName(),
+                missile.getRemainingTurns()));
         }
         return tileEffects;
     }
@@ -133,6 +166,8 @@ public final class GameStateSnapshotMapper {
             Identifiers.normalize(ability.getName()),
             ability.getName(),
             ability.getDescription(),
+            ability.getDetails(),
+            ability.getStats(),
             ability.isPassive(),
             ability.isReady(),
             // Read off the ability's own owner rather than a passed-in unit: an ability
@@ -167,7 +202,10 @@ public final class GameStateSnapshotMapper {
         return new UnitDefinitionSnapshot(
             Identifiers.normalize(def.name()),
             def.name(),
-            def.type(),
+            // Uppercased to match the contract's "CHAMPION" | "ELITE" - the JSON itself
+            // spells these lowercase, and passing that straight through was a live
+            // mismatch with both API_CONTRACT.md and the client's own type.
+            def.type() == null ? null : def.type().toUpperCase(java.util.Locale.ROOT),
             def.maxHp(),
             def.strength(),
             def.agility(),
@@ -179,8 +217,9 @@ public final class GameStateSnapshotMapper {
 
     private static AbilityPreviewSnapshot toAbilityPreviewSnapshot(String id, AbilityDefinition def) {
         if (def == null) {
-            return new AbilityPreviewSnapshot(id, id, "", false, 0);
+            return new AbilityPreviewSnapshot(id, id, "", List.of(), Map.of(), false, 0);
         }
-        return new AbilityPreviewSnapshot(id, def.name(), def.formattedDescription(), def.isPassive(), def.getInt("cooldown", 0));
+        return new AbilityPreviewSnapshot(id, def.name(), def.formattedDescription(), def.formattedDetails(),
+            def.stats() == null ? Map.of() : def.stats(), def.isPassive(), def.getInt("cooldown", 0));
     }
 }

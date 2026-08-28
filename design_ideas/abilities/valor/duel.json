@@ -1,7 +1,12 @@
 {
     "name": "Duel",
     "type": "active",
-    "description": "Locks an adjacent enemy into single combat for %duration% turns. Neither unit may act, and each is forced to attack the other at the end of its turn. The survivor permanently gains %duel_bonus% to every attribute and heals %duel_heal:pct%% of its maximum health, multiplied by %win_multiplier% if the loser was more than a basic unit. Separating the duellists ends it early with no reward.",
+    "description": "Locks an adjacent enemy into single combat for %duration% turns. Neither unit may act, and each is forced to attack the other at the end of its turn.",
+    "details": [
+        "The survivor permanently gains %duel_bonus% to every attribute and heals %duel_heal:pct%% of its maximum health.",
+        "That reward is multiplied by %win_multiplier% if the loser was more than a basic unit.",
+        "Separating the duellists ends it early, with no reward for either."
+    ],
     "stats": {
         "cooldown": 6,
         "cast_range": 1,

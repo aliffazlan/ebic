@@ -65,4 +65,20 @@ public class Tile {
         }
         return true;
     }
+
+    /**
+     * Walkability from a particular mover's point of view. isWalkable() only ever asks
+     * about the OCCUPANTS, which is right for placing an ordinary unit but wrong for one
+     * that takes up no space itself: a Killer Drone never blocks a tile, so nothing on a
+     * tile should block it either. Terrain still does.
+     */
+    public boolean isWalkableFor(Unit mover) {
+        if (type == TileType.BLOCKED) {
+            return false;
+        }
+        if (mover != null && !mover.occupiesTile()) {
+            return true;
+        }
+        return isWalkable();
+    }
 }

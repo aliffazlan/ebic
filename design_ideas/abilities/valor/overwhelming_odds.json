@@ -1,7 +1,10 @@
 {
     "name": "Overwhelming Odds",
     "type": "active",
-    "description": "Counts allies against enemies within %radius% tiles. If allies outnumber them, every enemy in the area takes %diff_dmg% damage per unit of that advantage; if this unit is outnumbered instead, every ally in the area is healed %diff_heal% per unit of the deficit.",
+    "description": "Counts allies against enemies within %radius% tiles. Outnumbering them deals %diff_dmg% damage to every enemy in the area for each unit of the advantage.",
+    "details": [
+        "Being outnumbered instead heals every ally in the area %diff_heal% for each unit of the deficit."
+    ],
     "stats": {
         "cooldown": 5,
         "radius": 3,

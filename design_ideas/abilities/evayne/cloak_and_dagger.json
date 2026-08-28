@@ -1,7 +1,11 @@
 {
     "name": "Cloak and Dagger",
     "type": "active",
-    "description": "Vanishes onto a tile up to %cast_range% tiles away and ambushes anyone already standing there. For %duration% turns this unit stays hidden and untouchable, ambushing any enemy that steps onto the tile. Ambushes deal %dmg_penalty:pct%% less base damage, though Backstab contributes %backstab_bonus:pct%% more.",
+    "description": "Vanishes onto a tile up to %cast_range% tiles away for %duration% turns, hidden and untouchable, ambushing anyone already standing there and anyone who later steps on.",
+    "details": [
+        "Ambushes deal %dmg_penalty:pct%% less base damage, though Backstab contributes %backstab_bonus:pct%% more.",
+        "When the cloak ends this unit reappears on the nearest completely free tile."
+    ],
     "stats": {
         "cooldown": 5,
         "cast_range": 2,

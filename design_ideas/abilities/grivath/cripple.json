@@ -1,7 +1,12 @@
 {
     "name": "Cripple",
     "type": "passive",
-    "description": "A landed attack drains %stat_steal% point of every attribute from the target and transfers it to this unit, plus %defended_bonus% extra points of whichever attribute the target defended with, along with %hp_steal% maximum and current health. Against anything tougher than a basic unit every amount is multiplied by %non_basic_multiplier%. An attack that is successfully defended still shaves %stat_steal% point off the defending attribute, but drains no health.",
+    "description": "A landed attack drains %stat_steal% point of every attribute and %hp_steal% maximum and current health from the target, transferring it all to this unit.",
+    "details": [
+        "A further %defended_bonus% points are taken from whichever attribute the target defended with.",
+        "Against anything tougher than a basic unit every amount is multiplied by %non_basic_multiplier%.",
+        "An attack that is successfully defended still shaves %stat_steal% point off the defending attribute, but drains no health."
+    ],
     "stats": {
         "stat_steal": 1,
         "defended_bonus": 3,

@@ -1,7 +1,11 @@
 {
     "name": "Capacitor Bank",
     "type": "passive",
-    "description": "Banks %charge_per_turn% charge at the start of each of this unit's turns, holding up to %max_charges%. Casting an ability spends a charge instead of an action, so a full bank is %max_charges% abilities cast for free in a single turn - and none of them cost this unit its move or its attack.",
+    "description": "Banks %charge_per_turn% charge at the start of each of this unit's turns, up to %max_charges%. Each charge pays for an ability instead of an action.",
+    "details": [
+        "A full bank is %max_charges% abilities cast in one turn with every move point still in hand.",
+        "Charges never pay for this unit's move or its attack."
+    ],
     "stats": {
         "charge_per_turn": 1,
         "max_charges": 3

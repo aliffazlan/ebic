@@ -2,6 +2,7 @@ package com.walnutt.web.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,6 +34,20 @@ class AuthServiceTest {
     void tearDown() throws IOException {
         db.close();
         Files.deleteIfExists(dbFile);
+    }
+
+    @Test
+    void favouriteUnitStartsUnsetAndRoundTrips() {
+        long userId = auth.register("favouriter", "password123").user().userId();
+
+        assertNull(auth.getFavouriteUnit(userId), "a new account has no favourite");
+
+        auth.setFavouriteUnit(userId, "valor");
+        assertEquals("valor", auth.getFavouriteUnit(userId));
+
+        // Null is what the client's "None" option sends - it clears rather than storing "".
+        auth.setFavouriteUnit(userId, null);
+        assertNull(auth.getFavouriteUnit(userId));
     }
 
     @Test

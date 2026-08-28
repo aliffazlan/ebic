@@ -29,7 +29,15 @@
           "passive": true,
           "ready": true,
           "currentCooldown": 0,
-          "maxCooldown": 0
+          "maxCooldown": 0,
+          "description": "Answers every attack this unit survives with a free counter-attack.",
+          "details": [
+            "The counter deals reduced damage and cannot itself be countered.",
+            "It answers a chained attack once, not once per hit."
+          ],
+          "stats": {
+            "damage_reduction": 0.2
+          }
         },
         {
           "id": "duel",
@@ -228,6 +236,71 @@
       "hasAttackedThisTurn": false,
       "statusFlags": [],
       "abilities": []
+    }
+  ],
+  "tileEffects": [
+    {
+      "q": 0,
+      "r": 0,
+      "kind": "burning",
+      "name": "Eruption",
+      "remainingTurns": 2
+    },
+    {
+      "q": 1,
+      "r": -1,
+      "kind": "eclipse",
+      "name": "Sanity's Eclipse (pending)",
+      "remainingTurns": 1
+    },
+    {
+      "q": 1,
+      "r": 0,
+      "kind": "eclipse",
+      "name": "Sanity's Eclipse (pending)",
+      "remainingTurns": 1
+    },
+    {
+      "q": 2,
+      "r": -1,
+      "kind": "eclipse",
+      "name": "Sanity's Eclipse (pending)",
+      "remainingTurns": 1
+    },
+    {
+      "q": 2,
+      "r": 0,
+      "kind": "eclipse",
+      "name": "Sanity's Eclipse (pending)",
+      "remainingTurns": 1
+    },
+    {
+      "q": 1,
+      "r": 1,
+      "kind": "eclipse",
+      "name": "Sanity's Eclipse (pending)",
+      "remainingTurns": 1
+    },
+    {
+      "q": 2,
+      "r": -2,
+      "kind": "eclipse",
+      "name": "Sanity's Eclipse (pending)",
+      "remainingTurns": 1
+    },
+    {
+      "q": 0,
+      "r": 1,
+      "kind": "eclipse",
+      "name": "Sanity's Eclipse (pending)",
+      "remainingTurns": 1
+    },
+    {
+      "q": 3,
+      "r": -1,
+      "kind": "missile",
+      "name": "Missile Lock",
+      "remainingTurns": 1
     }
   ]
 }

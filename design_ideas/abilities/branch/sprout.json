@@ -1,7 +1,10 @@
 {
     "name": "Sprout",
     "type": "active",
-    "description": "Plants a Branchling on any tile on the map. After %delay% turns this unit teleports to it and consumes it, granting a %barrier% health barrier to itself and every adjacent ally. Destroying the Branchling before then cancels the teleport.",
+    "description": "Plants a Branchling anywhere on the map. After %delay% turns this unit teleports to it and consumes it, granting a %barrier% health barrier to itself and every adjacent ally.",
+    "details": [
+        "Destroying the Branchling before then cancels the teleport."
+    ],
     "stats": {
         "cooldown": 6,
         "delay": 1,

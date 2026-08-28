@@ -1,7 +1,10 @@
 {
     "name": "Decay",
     "type": "passive",
-    "description": "At the start of each of this unit's turns, every unit within %radius% tile - ally and enemy alike - permanently loses %health_steal% maximum health and %str_steal% strength, transferred to this unit, and takes %health_steal% damage.",
+    "description": "At the start of each of this unit's turns, every unit within %radius% tile takes %health_steal% damage and permanently loses %health_steal% maximum health and %str_steal% strength, all transferred to this unit.",
+    "details": [
+        "Allies are drained exactly as enemies are - the rot does not tell friend from foe."
+    ],
     "stats": {
         "radius": 1,
         "health_steal": 5,

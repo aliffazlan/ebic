@@ -1,20 +1,26 @@
 package com.walnutt.web;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.walnutt.ai.BotLevel;
 import com.walnutt.game.Team;
+import com.walnutt.web.auth.AuthService;
 import com.walnutt.web.match.MatchService;
 
 /** matchId -> GameSession, one per in-progress match, lazily created on first WS connect. */
 public final class GameSessionManager {
     private final Map<String, GameSession> sessions = new ConcurrentHashMap<>();
     private final MatchService matchService;
+    private final AuthService auth;
+    private final UnitCatalog catalog;
 
-    public GameSessionManager(MatchService matchService) {
+    public GameSessionManager(MatchService matchService, AuthService auth, UnitCatalog catalog) {
         this.matchService = matchService;
+        this.auth = auth;
+        this.catalog = catalog;
     }
 
     /**
@@ -40,10 +46,37 @@ public final class GameSessionManager {
             }
 
             GameSession session = new GameSession(id, participants.playerOneId(), participants.playerTwoId(),
-                matchService, botTeam, level == null ? null : level.config());
+                matchService, botTeam, level == null ? null : level.config(), favourites(participants, botTeam));
             session.start();
             return session;
         });
+    }
+
+    /**
+     * Each seat's favourite hero, keyed by team. This is the only layer that can build it:
+     * nothing under game/ knows about users at all, and the user-to-team mapping is the
+     * positional player_one/player_two one GameSession.teamFor already relies on.
+     *
+     * A bot seat is skipped outright rather than trusted to have a null column - the
+     * computer has no favourites, and giving it one would quietly hand it a guaranteed pick.
+     * A stored id that is no longer draftable (a hero pulled from the pool since it was
+     * chosen) is dropped here rather than failing the match.
+     */
+    private Map<Team, String> favourites(MatchService.MatchParticipants participants, Team botTeam) {
+        Map<Team, String> favourites = new HashMap<>();
+        putFavourite(favourites, Team.PLAYER_ONE, participants.playerOneId(), botTeam);
+        putFavourite(favourites, Team.PLAYER_TWO, participants.playerTwoId(), botTeam);
+        return favourites;
+    }
+
+    private void putFavourite(Map<Team, String> favourites, Team team, long userId, Team botTeam) {
+        if (team == botTeam) {
+            return;
+        }
+        String favourite = auth.getFavouriteUnit(userId);
+        if (favourite != null && catalog.isDraftable(favourite)) {
+            favourites.put(team, favourite);
+        }
     }
 
     /**

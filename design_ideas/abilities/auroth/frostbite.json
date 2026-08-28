@@ -1,7 +1,10 @@
 {
     "name": "Frostbite",
     "type": "passive",
-    "description": "Damaging a unit frostbites it for %duration% turns, cutting it off from all healing. A frostbitten unit shatters and dies instantly the moment it falls below %kill_threshold:pct%% of its maximum health.",
+    "description": "Damaging a unit frostbites it for %duration% turns, cutting it off from all healing.",
+    "details": [
+        "A frostbitten unit shatters and dies instantly the moment it falls below %kill_threshold:pct%% of its maximum health."
+    ],
     "stats": {
         "duration": 2,
         "kill_threshold": 0.1

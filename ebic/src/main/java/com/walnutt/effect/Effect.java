@@ -43,6 +43,28 @@ public abstract class Effect extends TriggerHandler {
         this.remainingTurns = remainingTurns;
     }
 
+    /**
+     * Every unexpired effect of a given kind currently in play, on any living unit. Some
+     * effects describe something that isn't attached to their owner at all - a patch of
+     * burning ground, a pending orb, a missile in flight - and the only way to find those
+     * is to sweep the units carrying them. A dead unit keeps its effects (see
+     * GameState.removeUnit), so the dead are skipped.
+     */
+    public static <T extends Effect> List<T> activeInstances(GameState state, Class<T> type) {
+        List<T> found = new ArrayList<>();
+        for (Unit unit : state.getAllActiveUnits()) {
+            if (unit.isDead()) {
+                continue;
+            }
+            for (Effect effect : unit.getEffects()) {
+                if (!effect.isExpired() && type.isInstance(effect)) {
+                    found.add(type.cast(effect));
+                }
+            }
+        }
+        return found;
+    }
+
     public String getName() {
         return this.name;
     }

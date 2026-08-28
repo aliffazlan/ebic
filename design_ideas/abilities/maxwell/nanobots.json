@@ -1,7 +1,10 @@
 {
     "name": "Nanobots",
     "type": "active",
-    "description": "Injects medical nanobots into this unit or an ally within %cast_range% tile. Immediately, and again at the start of each of their turns for %duration% turns, every debuff that can be cleansed is stripped from them and they are healed for %heal% health.",
+    "description": "Injects nanobots into this unit or an ally within %cast_range% tile, cleansing and healing %heal% health immediately and again at the start of each of their turns for %duration% turns.",
+    "details": [
+        "Only debuffs that can be cleansed are stripped."
+    ],
     "stats": {
         "cooldown": 7,
         "cast_range": 1,

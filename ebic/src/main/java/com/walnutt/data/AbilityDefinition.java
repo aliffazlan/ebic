@@ -1,5 +1,6 @@
 package com.walnutt.data;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -11,7 +12,7 @@ import java.util.regex.Pattern;
  * hand-written Ability/Effect subclass knows which keys it needs.
  */
 public record AbilityDefinition(String name, String type, String description, Map<String, Double> stats,
-                               List<String> tags) {
+                               List<String> tags, List<String> details) {
 
     private static final Pattern PLACEHOLDER = Pattern.compile("%([a-zA-Z_]+)(:pct)?%");
 
@@ -25,7 +26,16 @@ public record AbilityDefinition(String name, String type, String description, Ma
 
     /** Tags are optional in the JSON; every definition written before they existed has none. */
     public AbilityDefinition(String name, String type, String description, Map<String, Double> stats) {
-        this(name, type, description, stats, List.of());
+        this(name, type, description, stats, List.of(), List.of());
+    }
+
+    /**
+     * Details are optional too - only the abilities whose text was long enough to be worth
+     * splitting carry them, and a short one-line ability is expected to have none at all.
+     */
+    public AbilityDefinition(String name, String type, String description, Map<String, Double> stats,
+                              List<String> tags) {
+        this(name, type, description, stats, tags, List.of());
     }
 
     /**
@@ -63,10 +73,31 @@ public record AbilityDefinition(String name, String type, String description, Ma
      * stay untouched.
      */
     public String formattedDescription() {
-        if (description == null || description.isEmpty()) {
-            return description;
+        return resolvePlaceholders(description);
+    }
+
+    /**
+     * The long-form bullet points behind {@link #formattedDescription()}, placeholders
+     * resolved the same way. The client shows these only on request (holding the expand
+     * key over an ability), which is the whole reason the short description can stay
+     * short. Empty for any ability that never needed splitting up.
+     */
+    public List<String> formattedDetails() {
+        if (details == null || details.isEmpty()) {
+            return List.of();
         }
-        Matcher matcher = PLACEHOLDER.matcher(description);
+        List<String> resolved = new ArrayList<>(details.size());
+        for (String detail : details) {
+            resolved.add(resolvePlaceholders(detail));
+        }
+        return List.copyOf(resolved);
+    }
+
+    private String resolvePlaceholders(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        Matcher matcher = PLACEHOLDER.matcher(text);
         StringBuilder result = new StringBuilder();
         while (matcher.find()) {
             double value = getDouble(matcher.group(1), 0);

@@ -1,12 +1,16 @@
 package com.walnutt.game;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -17,6 +21,7 @@ import com.walnutt.map.Position;
 import com.walnutt.ui.ConcurrentSetupHandler;
 import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitType;
+import com.walnutt.web.Identifiers;
 
 /**
  * Correctness (and, critically, *concurrency*) coverage for ConcurrentSetupFlow -
@@ -82,6 +87,79 @@ class ConcurrentSetupFlowTest {
                 + "this strongly suggests the two players are being processed sequentially, not in parallel");
     }
 
+    @Test
+    @Timeout(10)
+    void aFavouriteChampionIsAlwaysOneOfThatPlayersTwoChampionOptions() {
+        RecordingPickHandler handler = new RecordingPickHandler();
+        Game.newConcurrentFullDraftMatch(handler, noOpInputHandler(), silentRenderer(),
+            Map.of(Team.PLAYER_ONE, "valor"));
+
+        assertTrue(handler.offered(Team.PLAYER_ONE).get(0).contains("valor"),
+            "the champion round should have been dealt the favourite, got "
+                + handler.offered(Team.PLAYER_ONE).get(0));
+        assertFalse(handler.allOffered(Team.PLAYER_TWO).contains("valor"),
+            "a claimed favourite leaves the pool, so the opponent can never be offered it too");
+    }
+
+    /**
+     * Which of the three elite rounds hosts it is rolled per match on purpose - pinning a
+     * specific round here would be pinning the roll, not the guarantee.
+     */
+    @Test
+    @Timeout(10)
+    void aFavouriteEliteTurnsUpInExactlyOneOfTheThreeEliteRounds() {
+        RecordingPickHandler handler = new RecordingPickHandler();
+        Game.newConcurrentFullDraftMatch(handler, noOpInputHandler(), silentRenderer(),
+            Map.of(Team.PLAYER_TWO, "spitter"));
+
+        List<List<String>> rounds = handler.offered(Team.PLAYER_TWO);
+        long eliteRoundsOffering = rounds.subList(1, 4).stream().filter(r -> r.contains("spitter")).count();
+        assertEquals(1, eliteRoundsOffering, "exactly one elite round should offer it, got " + rounds);
+        assertFalse(rounds.get(0).contains("spitter"), "and never the champion round");
+    }
+
+    /** Both players wanting the same hero means neither may have it - it leaves the match entirely. */
+    @Test
+    @Timeout(10)
+    void aHeroBothPlayersFavouriteIsOfferedToNeitherOfThem() {
+        RecordingPickHandler handler = new RecordingPickHandler();
+        Game.newConcurrentFullDraftMatch(handler, noOpInputHandler(), silentRenderer(),
+            Map.of(Team.PLAYER_ONE, "yuki", Team.PLAYER_TWO, "yuki"));
+
+        assertFalse(handler.allOffered(Team.PLAYER_ONE).contains("yuki"));
+        assertFalse(handler.allOffered(Team.PLAYER_TWO).contains("yuki"),
+            "a contested favourite is withheld from the pool, not merely un-guaranteed");
+    }
+
+    /**
+     * Shawl is real content in design_ideas/ but is in DraftService.EXCLUDED, so he must be
+     * ignored rather than injected - the same goes for any id that stops being draftable
+     * after someone has already stored it.
+     */
+    @Test
+    @Timeout(10)
+    void anUndraftableFavouriteIsIgnoredRatherThanBreakingTheDraft() {
+        RecordingPickHandler handler = new RecordingPickHandler();
+        Game game = Game.newConcurrentFullDraftMatch(handler, noOpInputHandler(), silentRenderer(),
+            Map.of(Team.PLAYER_ONE, "shawl"));
+
+        assertFalse(handler.allOffered(Team.PLAYER_ONE).contains("shawl"));
+        assertEquals(14, game.getState().getPlayers().get(0).getUnits().size());
+    }
+
+    @Test
+    @Timeout(10)
+    void favouritesOnBothSidesStillLeaveTheTwoRostersDisjoint() {
+        RecordingPickHandler handler = new RecordingPickHandler();
+        Game game = Game.newConcurrentFullDraftMatch(handler, noOpInputHandler(), silentRenderer(),
+            Map.of(Team.PLAYER_ONE, "chronos", Team.PLAYER_TWO, "maxwell"));
+        GameState state = game.getState();
+
+        Set<String> overlap = new HashSet<>(heroNames(state.getPlayers().get(0)));
+        overlap.retainAll(heroNames(state.getPlayers().get(1)));
+        assertTrue(overlap.isEmpty(), "same hero drafted by both players: " + overlap);
+    }
+
     private long countOfType(Player player, UnitType type) {
         return player.getUnits().stream().filter(u -> u.getUnitType() == type).count();
     }
@@ -107,6 +185,35 @@ class ConcurrentSetupFlowTest {
         @Override
         public Map<Unit, Position> arrangePlacement(GameState state, Player player, Map<Unit, Position> defaultArrangement) {
             return defaultArrangement;
+        }
+    }
+
+    /** Picks the first option like InstantPickHandler, but remembers every pair it was offered. */
+    private static class RecordingPickHandler implements ConcurrentSetupHandler {
+        private final Map<Team, List<List<String>>> rounds = new ConcurrentHashMap<>();
+
+        @Override
+        public UnitDefinition choosePick(GameState state, Player player, String roundLabel,
+                                          List<UnitDefinition> options, List<UnitDefinition> opponentOptions) {
+            rounds.computeIfAbsent(player.getTeam(), team -> java.util.Collections.synchronizedList(new ArrayList<>()))
+                .add(options.stream().map(def -> Identifiers.normalize(def.name())).toList());
+            return options.get(0);
+        }
+
+        @Override
+        public Map<Unit, Position> arrangePlacement(GameState state, Player player, Map<Unit, Position> defaultArrangement) {
+            return defaultArrangement;
+        }
+
+        /** The four rounds this team was offered, in order, as definition ids. */
+        List<List<String>> offered(Team team) {
+            return new ArrayList<>(rounds.getOrDefault(team, List.of()));
+        }
+
+        Set<String> allOffered(Team team) {
+            Set<String> all = new LinkedHashSet<>();
+            offered(team).forEach(all::addAll);
+            return all;
         }
     }
 

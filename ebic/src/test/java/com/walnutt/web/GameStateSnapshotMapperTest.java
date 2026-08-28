@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import com.walnutt.ability.Attack;
 import com.walnutt.ability.Move;
 import com.walnutt.effect.Effect;
+import com.walnutt.effect.impl.HomingMissileEffect;
+import com.walnutt.effect.impl.OrbEffect;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
@@ -26,10 +28,68 @@ import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitStats;
 import com.walnutt.web.dto.EffectSnapshot;
 import com.walnutt.web.dto.GameStateSnapshot;
+import com.walnutt.web.dto.TileEffectSnapshot;
 import com.walnutt.web.dto.UnitSnapshot;
 
 /** Pure mapper test - hand-build a small GameState, no JSON/engine loop involved. */
 class GameStateSnapshotMapperTest {
+
+    /**
+     * Both of these describe something that has not happened yet, which is the whole
+     * reason they are on the wire at all: a delay only gives the opponent a chance to
+     * react if they can see where the blast is going to be.
+     */
+    @Test
+    void flattensAPendingEclipseOverItsWholeBlastRadius() {
+        GameMap map = new GameMap(5);
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        Unit harbinger = new ChampionUnit("Harbinger", Team.PLAYER_ONE, new UnitStats(40, 40, 90, 1000));
+        p1.addUnit(harbinger);
+        map.moveUnit(harbinger, map.getTile(new Position(0, 0)));
+        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+
+        harbinger.addEffect(new OrbEffect(harbinger, new Position(0, 2), 1, 1, 1.0));
+        List<TileEffectSnapshot> eclipse = new GameStateSnapshotMapper(new UnitIdRegistry())
+            .toSnapshot(state).tileEffects().stream().filter(t -> t.kind().equals("eclipse")).toList();
+
+        // A radius-1 blast covers the centre plus its six neighbours, all of which exist
+        // on a plain radius-5 board.
+        assertEquals(7, eclipse.size());
+        assertTrue(eclipse.stream().anyMatch(t -> t.q() == 0 && t.r() == 2), "the centre is painted too");
+    }
+
+    @Test
+    void marksAHomingMissileOnWhicheverTileItsTargetIsCurrentlyStandingOn() {
+        GameMap map = new GameMap(5);
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        Unit maxwell = new ChampionUnit("Maxwell", Team.PLAYER_ONE, new UnitStats(18, 12, 84, 510));
+        Unit victim = new BasicUnit("Victim", Team.PLAYER_TWO, new UnitStats(20, 20, 20, 300));
+        p1.addUnit(maxwell);
+        p2.addUnit(victim);
+        map.moveUnit(maxwell, map.getTile(new Position(0, 0)));
+        map.moveUnit(victim, map.getTile(new Position(0, 3)));
+        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+
+        victim.addEffect(new HomingMissileEffect(maxwell, 1, 50, 20));
+        GameStateSnapshotMapper mapper = new GameStateSnapshotMapper(new UnitIdRegistry());
+
+        List<TileEffectSnapshot> before = missileMarkers(mapper.toSnapshot(state));
+        assertEquals(1, before.size());
+        assertEquals(3, before.get(0).r());
+
+        // The effect stores no position of its own, so the marker follows the target
+        // simply by being recomputed from wherever they now are.
+        map.moveUnit(victim, map.getTile(new Position(0, 1)));
+        List<TileEffectSnapshot> after = missileMarkers(mapper.toSnapshot(state));
+        assertEquals(1, after.size());
+        assertEquals(1, after.get(0).r());
+    }
+
+    private static List<TileEffectSnapshot> missileMarkers(GameStateSnapshot snapshot) {
+        return snapshot.tileEffects().stream().filter(t -> t.kind().equals("missile")).toList();
+    }
 
     @Test
     void mapsUnitPositionsStatsAndAbilities() {

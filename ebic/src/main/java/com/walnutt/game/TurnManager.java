@@ -58,6 +58,10 @@ public class TurnManager {
             unit.endTurn(state);
         }
         state.getEventBus().publish(state, new TurnEndEvent(player.getTeam()));
+        // Everything that happens on the way out of a turn - poison ticks, burning ground,
+        // a Killer Drone's strike - lands after the action loop's last render(), so without
+        // this it stayed invisible until the OTHER player's first render, a turn later.
+        renderer.render(state);
 
         if (!state.isGameOver()) {
             state.switchCurrentPlayer();

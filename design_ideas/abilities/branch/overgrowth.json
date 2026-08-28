@@ -1,7 +1,11 @@
 {
     "name": "Overgrowth",
     "type": "active",
-    "description": "Rings the targeted tile, up to %cast_range% tiles away, with Branchlings that take root for %duration% turns. Tiles that are already occupied are skipped. Each Branchling deals %branch_dmg% damage to adjacent enemies and heals adjacent allies for %branch_heal% every turn, and overlapping Branchlings stack.",
+    "description": "Rings a tile up to %cast_range% tiles away with Branchlings for %duration% turns, each dealing %branch_dmg% damage to adjacent enemies and healing adjacent allies %branch_heal% every turn.",
+    "details": [
+        "Tiles that are already occupied are skipped.",
+        "Overlapping Branchlings stack, so a unit beside two of them is hit or healed twice."
+    ],
     "stats": {
         "cooldown": 4,
         "duration": 3,

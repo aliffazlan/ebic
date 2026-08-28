@@ -41,6 +41,25 @@ const MOVE_TWEEN_FRAMES = 20; // ~330ms at 60fps - short slide, not a full anima
 const PLACEMENT_MAP_RADIUS = 7;
 const PLACEMENT_MAP_ROW_LIMIT = 5;
 
+/**
+ * How each kind of tile effect paints. `kind` is open-ended per API_CONTRACT.md, so an
+ * unrecognised one falls back to a neutral overlay instead of breaking the board.
+ *
+ * The insets follow the file's existing convention (tiles HEX_SIZE-1, highlights -3) so
+ * two overlays on one hex stay individually legible. Eclipse is deliberately a different
+ * hue and a far lower alpha than CAST_RANGE_COLOR - "a blast is coming here" must not
+ * read as "the ability you are aiming reaches here".
+ */
+const TILE_EFFECT_STYLES: Record<string, {
+  fill: number; fillAlpha: number; stroke: number; strokeAlpha: number; inset: number;
+  reticle?: boolean; aboveUnits?: boolean;
+}> = {
+  burning: { fill: 0xff5722, fillAlpha: 0.28, stroke: 0xff8a50, strokeAlpha: 0.85, inset: 2 },
+  eclipse: { fill: 0x93c5fd, fillAlpha: 0.16, stroke: 0xbfdbfe, strokeAlpha: 0.45, inset: 2 },
+  missile: { fill: 0xfb923c, fillAlpha: 0.18, stroke: 0xf97316, strokeAlpha: 0.9, inset: 5, reticle: true, aboveUnits: true },
+  unknown: { fill: 0x94a3b8, fillAlpha: 0.2, stroke: 0xcbd5e1, strokeAlpha: 0.6, inset: 2 },
+};
+
 export interface BoardCallbacks {
   onTileClick(coord: AxialCoord): void;
   onUnitClick(unit: UnitSnapshot): void;
@@ -54,6 +73,10 @@ export class Board {
   // same reasoning as strobeLayer.
   readonly tileEffectLayer = new Container();
   readonly unitsLayer = new Container();
+  // Tile effects that mark a unit rather than the ground - a homing missile's impact tile
+  // is always the tile its target is standing on, so drawn under unitsLayer the marker
+  // would be permanently hidden by the very sprite it is pointing at.
+  readonly tileMarkerLayer = new Container();
   readonly vfxLayer = new Container();
   // Pre-encounter strobe rings live in their own layer, separate from
   // uiLayer, because refreshHighlights() unconditionally clears uiLayer on
@@ -117,6 +140,7 @@ export class Board {
       this.boardLayer,
       this.tileEffectLayer,
       this.unitsLayer,
+      this.tileMarkerLayer,
       this.vfxLayer,
       this.strobeLayer,
       this.uiLayer,
@@ -274,19 +298,31 @@ export class Board {
 
   /**
    * Redraws every tile effect from scratch rather than diffing - there are only ever a
-   * handful, and this mirrors refreshHighlights' own clear-and-redraw approach.
+   * handful, and this mirrors refreshHighlights' own clear-and-redraw approach. Redrawing
+   * from the snapshot every push is also what makes a missile marker follow its target
+   * around for free: the server recomputes the impact tile from wherever the victim now is.
    */
   private renderTileEffects(tileEffects: TileEffectSnapshot[]): void {
     this.tileEffectLayer.removeChildren();
+    this.tileMarkerLayer.removeChildren();
     for (const effect of tileEffects) {
       const { x, y } = axialToPixel({ q: effect.q, r: effect.r }, HEX_SIZE);
-      const points = hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - 2);
+      const style = TILE_EFFECT_STYLES[effect.kind] ?? TILE_EFFECT_STYLES.unknown;
+      const points = hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - style.inset);
       const glow = new Graphics();
-      glow.poly(points).fill({ color: 0xff5722, alpha: 0.28 });
-      glow.poly(points).stroke({ width: 2, color: 0xff8a50, alpha: 0.85 });
+      glow.poly(points).fill({ color: style.fill, alpha: style.fillAlpha });
+      glow.poly(points).stroke({ width: 2, color: style.stroke, alpha: style.strokeAlpha });
+      if (style.reticle) {
+        // A crosshair rather than more shading: this marks where something is about to
+        // land, and needs to read as a target rather than as ground the tile has become.
+        const arm = HEX_SIZE * 0.34;
+        glow.moveTo(-arm, 0).lineTo(arm, 0).moveTo(0, -arm).lineTo(0, arm)
+          .stroke({ width: 2, color: style.stroke, alpha: style.strokeAlpha });
+        glow.circle(0, 0, arm * 0.55).stroke({ width: 2, color: style.stroke, alpha: style.strokeAlpha });
+      }
       glow.position.set(x, y);
       glow.eventMode = "none";
-      this.tileEffectLayer.addChild(glow);
+      (style.aboveUnits ? this.tileMarkerLayer : this.tileEffectLayer).addChild(glow);
     }
   }
 

@@ -1,7 +1,11 @@
 {
     "name": "Shrink Ray",
     "type": "active",
-    "description": "Fires a shrinking beam at an enemy within %cast_range% tiles for %duration% turns, cutting %stat_reduction:pct%% from each of its attributes and %hp_reduction:pct%% from both its current and its maximum health. Recasting shrinks the target again from its new size and refreshes the duration. Everything taken is returned exactly when the beam wears off, whatever else has happened in between.",
+    "description": "Shrinks an enemy within %cast_range% tiles for %duration% turns, cutting %stat_reduction:pct%% from each of its attributes and %hp_reduction:pct%% from both its current and its maximum health.",
+    "details": [
+        "Recasting shrinks the target again from its new size and refreshes the duration.",
+        "Everything taken is returned exactly when the beam wears off, whatever else has happened in between."
+    ],
     "stats": {
         "cooldown": 6,
         "cast_range": 2,

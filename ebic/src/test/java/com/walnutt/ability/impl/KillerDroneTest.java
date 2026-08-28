@@ -64,6 +64,24 @@ class KillerDroneTest {
         return f.playerOne().getUnits().stream().filter(u -> u.getName().equals("Drone")).findFirst().orElse(null);
     }
 
+    /**
+     * The whole turn boundary as TurnManager runs it: every roster unit's endTurn, and only
+     * then the TurnEndEvent. Tests that call onTurnEnd directly cannot see an ordering bug
+     * between those two, and there was one - the drone used to be dismantled by the first
+     * half before the second half could fire its last strike.
+     */
+    private static void endTurnFor(Fixture f, Team team) {
+        for (Player player : f.state().getPlayers()) {
+            if (player.getTeam() != team) {
+                continue;
+            }
+            for (Unit unit : List.copyOf(player.getUnits())) {
+                unit.endTurn(f.state());
+            }
+        }
+        f.state().getEventBus().publish(f.state(), new TurnEndEvent(team));
+    }
+
     @Test
     void deploysABasicThatJoinsTheRosterCanMoveAndHasNoAttack() {
         Fixture f = fixture();
@@ -84,17 +102,12 @@ class KillerDroneTest {
     void strikesAnAdjacentEnemyAtTheEndOfItsOwnControllersTurn() {
         Fixture f = fixture();
         f.ability().onUse(f.state(), new TileTarget(f.map().getTile(new Position(0, 1))));
-        Unit drone = deployedDrone(f);
 
         // The opponent's turn ending must not make it fire.
-        for (Ability ability : drone.getAbilities()) {
-            ability.onTurnEnd(f.state(), new TurnEndEvent(Team.PLAYER_TWO));
-        }
+        endTurnFor(f, Team.PLAYER_TWO);
         assertEquals(500, f.enemy().getHealth());
 
-        for (Ability ability : drone.getAbilities()) {
-            ability.onTurnEnd(f.state(), new TurnEndEvent(Team.PLAYER_ONE));
-        }
+        endTurnFor(f, Team.PLAYER_ONE);
         assertEquals(470, f.enemy().getHealth(), "30 Strength beats 40 Intelligence for full damage");
     }
 
@@ -103,12 +116,9 @@ class KillerDroneTest {
     void countsAnEnemyStandingOnItsOwnTile() {
         Fixture f = fixture();
         f.ability().onUse(f.state(), new TileTarget(f.map().getTile(new Position(0, 1))));
-        Unit drone = deployedDrone(f);
         f.map().moveUnit(f.enemy(), f.map().getTile(new Position(0, 1)));
 
-        for (Ability ability : drone.getAbilities()) {
-            ability.onTurnEnd(f.state(), new TurnEndEvent(Team.PLAYER_ONE));
-        }
+        endTurnFor(f, Team.PLAYER_ONE);
 
         assertEquals(470, f.enemy().getHealth(), "distance 0 is within a strike range of 1");
     }
@@ -120,14 +130,61 @@ class KillerDroneTest {
         Unit drone = deployedDrone(f);
         assertTrue(f.map().getTile(new Position(0, 1)).getOccupants().contains(drone));
 
-        // Duration 3, ticked by the drone's own turns - which it only gets because it is
-        // in the roster rather than the summon registry.
+        // Duration 3, counted down by the TurnEndEvent hook rather than the ordinary tick -
+        // see DroneLifespanEffect for why that ordering matters.
         for (int i = 0; i < 3; i++) {
-            drone.startTurn(f.state());
-            drone.endTurn(f.state());
+            endTurnFor(f, Team.PLAYER_ONE);
         }
 
         assertFalse(f.playerOne().getUnits().contains(drone), "gone from the roster");
         assertFalse(f.map().getTile(new Position(0, 1)).getOccupants().contains(drone), "and off the board");
+    }
+
+    /**
+     * The bug this pins: expiry used to run inside TurnManager's endTurn loop, which is
+     * before TurnEndEvent is published, so on the drone's last turn it was already off the
+     * board when its strike would have fired - it only ever got duration-1 strikes.
+     */
+    @Test
+    void stillStrikesOnTheVeryTurnItsPowerCellRunsOut() {
+        Fixture f = fixture();
+        f.ability().onUse(f.state(), new TileTarget(f.map().getTile(new Position(0, 1))));
+
+        for (int i = 0; i < 3; i++) {
+            endTurnFor(f, Team.PLAYER_ONE);
+        }
+
+        assertEquals(410, f.enemy().getHealth(), "three turns of life is three strikes, not two");
+        assertEquals(null, deployedDrone(f), "and it is dismantled afterwards, not before");
+    }
+
+    /** A drone occupies no tile, so an enemy standing on the target one is no reason to refuse. */
+    @Test
+    void canBeDeployedOntoATileAnEnemyIsStandingOn() {
+        Fixture f = fixture();
+
+        assertTrue(f.ability().canUse(f.state(), new TileTarget(f.map().getTile(new Position(0, 2)))),
+            "the enemy's own tile is a legal deployment");
+
+        f.ability().onUse(f.state(), new TileTarget(f.map().getTile(new Position(0, 2))));
+        Unit drone = deployedDrone(f);
+        assertNotNull(drone);
+        assertTrue(f.map().getTile(new Position(0, 2)).getOccupants().contains(drone), "it stacks onto them");
+    }
+
+    /** Same rule one level down: nothing on a tile blocks a unit that takes up no space itself. */
+    @Test
+    void canMoveThroughATileAnEnemyIsStandingOn() {
+        Fixture f = fixture();
+        f.ability().onUse(f.state(), new TileTarget(f.map().getTile(new Position(0, 1))));
+        Unit drone = deployedDrone(f);
+        f.state().setRemainingMoves(3);
+
+        Ability move = drone.getAbilities().stream().filter(a -> a instanceof Move).findFirst().orElseThrow();
+        assertTrue(move.canUse(f.state(), new TileTarget(f.map().getTile(new Position(0, 2)))),
+            "the enemy's tile is adjacent and the drone flies over it");
+
+        move.onUse(f.state(), new TileTarget(f.map().getTile(new Position(0, 2))));
+        assertEquals(new Position(0, 2), drone.getPosition());
     }
 }

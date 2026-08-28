@@ -1,7 +1,10 @@
 {
     "name": "Holy Shield",
     "type": "active",
-    "description": "Wraps an ally within %cast_range% tiles in a %barrier_hp% health barrier for %duration% turns. If the barrier is broken before it fades, it erupts - clearing the ally's debuffs and dealing %damage% damage to enemies within %radius% tile.",
+    "description": "Wraps an ally within %cast_range% tiles in a %barrier_hp% health barrier for %duration% turns.",
+    "details": [
+        "If the barrier is broken before it fades it erupts, clearing the ally's debuffs and dealing %damage% damage to enemies within %radius% tile."
+    ],
     "stats": {
         "cooldown": 4,
         "cast_range": 2,

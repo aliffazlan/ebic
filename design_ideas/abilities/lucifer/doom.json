@@ -1,7 +1,10 @@
 {
     "name": "Doom",
     "type": "active",
-    "description": "Curses an enemy within %cast_range% tiles, silencing it and dealing %base_dmg% damage per turn, escalating by %dmg_increase% each turn. The curse has no duration - it lifts only once the cursed unit claims a kill of its own.",
+    "description": "Curses an enemy within %cast_range% tiles, silencing it and dealing %base_dmg% damage per turn, escalating by %dmg_increase% each turn.",
+    "details": [
+        "The curse has no duration - it lifts only once the cursed unit claims a kill of its own."
+    ],
     "stats": {
         "cooldown": 11,
         "cast_range": 1,

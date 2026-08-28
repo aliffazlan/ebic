@@ -1,7 +1,11 @@
 {
     "name": "Timeless Strike",
     "type": "passive",
-    "description": "A landed attack immediately triggers another one, which can chain again in turn. Chained attacks deal %damage_multiplier:pct%% of their normal damage, and each one adds %duration% turn to a single stun on the target.",
+    "description": "A landed attack immediately triggers another one, which can chain again in turn.",
+    "details": [
+        "Chained attacks deal %damage_multiplier:pct%% of their normal damage.",
+        "Each chained hit adds %duration% turn to a single stun on the target."
+    ],
     "stats": {
         "duration": 1,
         "damage_multiplier": 0.5

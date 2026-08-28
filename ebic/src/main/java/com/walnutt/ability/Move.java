@@ -49,7 +49,9 @@ public class Move extends Ability {
             return false;
         }
         Tile tile = tileTarget.getTile();
-        return state.getMap().areAdjacent(owner.getPosition(), tile.getPosition()) && tile.isWalkable();
+        // isWalkableFor, not isWalkable: a unit that occupies no tile of its own (a Killer
+        // Drone) is not stopped by whoever is standing on the one it is moving onto.
+        return state.getMap().areAdjacent(owner.getPosition(), tile.getPosition()) && tile.isWalkableFor(owner);
     }
 
     @Override
