@@ -1,0 +1,11 @@
+{
+    "name": "Energy Shield",
+    "type": "active",
+    "description": "Fits this unit or an ally within %cast_range% tiles with a barrier that absorbs %barrier% damage before it reaches their health, lasting %duration% turns.",
+    "stats": {
+        "cooldown": 4,
+        "cast_range": 3,
+        "barrier": 80,
+        "duration": 5
+    }
+}

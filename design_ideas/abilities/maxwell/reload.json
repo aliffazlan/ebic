@@ -1,0 +1,7 @@
+{
+    "name": "Reload",
+    "type": "passive",
+    "description": "If this unit neither acts nor takes damage for a full round, it spends the time reloading: every one of its ability cooldowns is refreshed at the start of its next turn. Damage fully absorbed by a barrier does not interrupt it.",
+    "stats": {
+    }
+}

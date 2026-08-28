@@ -25,6 +25,18 @@ public class Move extends Ability {
         return owner != null && owner.getUnitType() == UnitType.BASIC ? 0 : 1;
     }
 
+    /**
+     * Movement is always to an adjacent tile, so a cast-range bonus must not touch it -
+     * Ability.getRange() would otherwise add Stat.CAST_RANGE (Maxwell's Gyroscope) and the
+     * client would draw a band promising a two-tile step that canUse below still refuses.
+     * Attack overrides this for the same reason, reading ATTACK_RANGE instead: between the
+     * two overrides, "a basic Move or Attack ignores cast range" holds by construction.
+     */
+    @Override
+    public int getRange() {
+        return 1;
+    }
+
     @Override
     public boolean canUse(GameState state, Target target) {
         if (owner == null || owner.hasMovedThisTurn() || owner.isBlockedFrom(ActionKind.MOVE)) {

@@ -1,0 +1,12 @@
+{
+    "name": "Joker",
+    "type": "champion",
+    "max_hp": 990,
+    "strength": 54,
+    "agility": 68,
+    "intelligence" : 85,
+    "attack_range": 2,
+    "abilities": [
+        "perplexing_shot", "superior_mastery", "mimic"
+    ]
+}

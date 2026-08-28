@@ -12,5 +12,16 @@ public enum Stat {
      * A minimum range is deliberately NOT a Stat: minimums aggregate by max, not by
      * sum, so that lives on Effect.getMinAttackRange() instead.
      */
-    ATTACK_RANGE
+    ATTACK_RANGE,
+    /**
+     * Bonus tiles added to every one of a unit's ability ranges (Maxwell's Gyroscope).
+     * Base 0 for everyone - unlike the other stats there is no per-unit value in
+     * UnitStats, since "how far does this ability reach" belongs to the ability, not the
+     * unit. Ability.getRange() adds this on top, so a unit-level bonus lifts every
+     * ability it owns at once, including any gained later in the match.
+     *
+     * A basic Attack is deliberately unaffected: Attack overrides getRange() to read
+     * ATTACK_RANGE instead, so the two ranges stay separately tunable.
+     */
+    CAST_RANGE
 }

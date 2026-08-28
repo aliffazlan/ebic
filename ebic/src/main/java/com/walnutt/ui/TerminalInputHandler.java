@@ -110,14 +110,21 @@ public class TerminalInputHandler implements InputHandler {
 
     @Override
     public Attribute chooseAttribute(GameState state, Unit unit, Unit opponent) {
-        System.out.printf("%s (%s) vs %s (%s) - choose an attribute: [0] Strength [1] Agility [2] Intelligence: ",
+        List<Attribute> usable = unit.getUsableAttributes();
+        if (usable.isEmpty()) {
+            return null;
+        }
+        System.out.printf("%s (%s) vs %s (%s) - choose an attribute:",
             unit.getName(), unit.getTeam(), opponent.getName(), opponent.getTeam());
-        String line = scanner.nextLine().trim();
-        return switch (line) {
-            case "1" -> Attribute.AGILITY;
-            case "2" -> Attribute.INTELLIGENCE;
-            default -> Attribute.STRENGTH;
-        };
+        for (int i = 0; i < usable.size(); i++) {
+            System.out.printf(" [%d] %s", i, usable.get(i));
+        }
+        System.out.print(": ");
+
+        int index = parseIndex(scanner.nextLine().trim(), usable.size());
+        // An attribute the unit has none of was never on the menu, so any unparseable
+        // answer falls back to its first usable one rather than to Strength.
+        return usable.get(index < 0 ? 0 : index);
     }
 
     private int parseIndex(String input, int size) {
@@ -127,6 +134,30 @@ public class TerminalInputHandler implements InputHandler {
         } catch (NumberFormatException e) {
             return -1;
         }
+    }
+
+    /** Numbered menu, same shape as choosePick below. Re-prompts rather than accepting a bad index. */
+    @Override
+    public ChoiceOption chooseOption(GameState state, Unit unit, String title, List<ChoiceOption> options) {
+        if (options.isEmpty()) {
+            return null;
+        }
+        System.out.println();
+        System.out.println(unit.getName() + " - " + title + ":");
+        for (int i = 0; i < options.size(); i++) {
+            ChoiceOption option = options.get(i);
+            System.out.printf("  [%d] %s%s%n", i, option.name(),
+                option.detail() == null ? "" : " (" + option.detail() + ")");
+            System.out.println("      " + option.description());
+        }
+        System.out.print("Your choice: ");
+
+        int index = parseIndex(scanner.nextLine().trim(), options.size());
+        if (index < 0) {
+            System.out.println("Invalid choice.");
+            return chooseOption(state, unit, title, options);
+        }
+        return options.get(index);
     }
 
     @Override

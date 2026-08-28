@@ -1,5 +1,6 @@
 package com.walnutt.data;
 
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -9,9 +10,32 @@ import java.util.regex.Pattern;
  * map (not a fixed record) because every ability tunes different numbers - the
  * hand-written Ability/Effect subclass knows which keys it needs.
  */
-public record AbilityDefinition(String name, String type, String description, Map<String, Double> stats) {
+public record AbilityDefinition(String name, String type, String description, Map<String, Double> stats,
+                               List<String> tags) {
 
     private static final Pattern PLACEHOLDER = Pattern.compile("%([a-zA-Z_]+)(:pct)?%");
+
+    /**
+     * Marks an ability that must never be copied onto another unit by Joker's Mimic (or
+     * any future copy mechanic). Reserved for abilities whose machinery assumes it stays
+     * on the unit it was built for - see the tagged files in design_ideas/ for the
+     * specific reason each one carries it.
+     */
+    public static final String NO_COPY = "no_copy";
+
+    /** Tags are optional in the JSON; every definition written before they existed has none. */
+    public AbilityDefinition(String name, String type, String description, Map<String, Double> stats) {
+        this(name, type, description, stats, List.of());
+    }
+
+    /**
+     * Null-tolerant: Gson builds records through the canonical constructor, so a
+     * definition whose JSON simply omits "tags" arrives here with null rather than an
+     * empty list.
+     */
+    public boolean hasTag(String tag) {
+        return tags != null && tags.contains(tag);
+    }
 
     public double getDouble(String key, double fallback) {
         if (stats == null || !stats.containsKey(key)) {

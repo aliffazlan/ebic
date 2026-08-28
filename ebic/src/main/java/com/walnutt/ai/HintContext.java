@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.walnutt.ability.Ability;
+import com.walnutt.ability.target.MultiTarget;
 import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.TileTarget;
 import com.walnutt.ability.target.UnitTarget;
@@ -22,18 +23,32 @@ public record HintContext(GameState state, Unit user, Ability ability, Target ta
 
     /** The targeted unit, or null when this ability aims at a tile or at nothing. */
     public Unit targetUnit() {
-        return target instanceof UnitTarget unitTarget ? unitTarget.getUnit() : null;
+        return primary() instanceof UnitTarget unitTarget ? unitTarget.getUnit() : null;
     }
 
-    /** Where this cast lands: the target unit's tile, the target tile, or the caster's own tile. */
+    /**
+     * Where this cast lands: the target unit's tile, the target tile, or the caster's own
+     * tile. For a MultiTarget it is the DESTINATION (Translocation's whole point is where
+     * the unit ends up), while targetUnit() above reports who is being moved.
+     */
     public Position aimPosition() {
-        if (target instanceof UnitTarget unitTarget) {
+        Target aim = target instanceof MultiTarget multi ? multi.secondary() : target;
+        if (aim instanceof UnitTarget unitTarget) {
             return unitTarget.getUnit().getPosition();
         }
-        if (target instanceof TileTarget tileTarget) {
+        if (aim instanceof TileTarget tileTarget) {
             return tileTarget.getTile().getPosition();
         }
         return user.getPosition();
+    }
+
+    /**
+     * The subject of the cast, unwrapping a MultiTarget. Without this a two-part ability
+     * would look target-less to every hint, including the generic fallback, which would
+     * then score it as a tile cast and never notice it was aimed at a unit at all.
+     */
+    private Target primary() {
+        return target instanceof MultiTarget multi ? multi.primary() : target;
     }
 
     public boolean isEnemy(Unit unit) {

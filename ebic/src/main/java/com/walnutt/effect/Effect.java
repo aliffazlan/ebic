@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.walnutt.TriggerHandler;
+import com.walnutt.ability.Ability;
 import com.walnutt.game.GameState;
 import com.walnutt.status.EffectCategory;
 import com.walnutt.status.StatModifier;
@@ -139,6 +140,32 @@ public abstract class Effect extends TriggerHandler {
 
     public Set<StatusFlag> getStatusFlags() {
         return flags;
+    }
+
+    /**
+     * How many casts this effect will pay for in place of a move point (Maxwell's Capacitor
+     * Bank). Default 0, so no existing effect changes anything.
+     *
+     * Read by Unit.hasFreeCastCharge and consulted in Ability.getMoveCost. Move and Attack
+     * override getMoveCost outright, so they are outside this by construction - the same
+     * property that keeps Joker's Superior Mastery off them.
+     */
+    public int freeCastCharges() {
+        return 0;
+    }
+
+    /**
+     * True if this effect forbids its owner from using one SPECIFIC ability right now,
+     * as opposed to a StatusFlag's blanket "no abilities at all". Default false, so no
+     * existing effect changes behaviour.
+     *
+     * The only user today is Joker's Superior Mastery, which locks each of his abilities
+     * to one cast per turn. Aggregated by Unit.isAbilityRestricted and checked in
+     * Ability.canUse, so a locked ability also reports no legal targets - the client
+     * greys it out and the bot skips it without either of them learning a new rule.
+     */
+    public boolean restrictsAbility(Ability ability) {
+        return false;
     }
 
     /**

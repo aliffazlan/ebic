@@ -1,0 +1,9 @@
+{
+    "name": "Gyroscope",
+    "type": "passive",
+    "description": "A stabilising gyroscope steadies every weapon and instrument this unit carries, granting %attack_range_boost% bonus attack range and %cast_range_boost% bonus cast range on every one of its abilities, including any constructed later.",
+    "stats": {
+        "cast_range_boost": 1,
+        "attack_range_boost": 1
+    }
+}

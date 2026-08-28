@@ -38,7 +38,7 @@ public final class GameStateSnapshotMapper {
 
     public GameStateSnapshot toSnapshot(GameState state) {
         List<UnitSnapshot> units = state.getAllActiveUnits().stream()
-            .map(this::toUnitSnapshot)
+            .map(unit -> toUnitSnapshot(unit, state))
             .toList();
 
         return new GameStateSnapshot(
@@ -69,10 +69,19 @@ public final class GameStateSnapshotMapper {
         return tileEffects;
     }
 
+    /**
+     * Convenience for callers with no GameState to hand (the mapper's own tests). The state
+     * is only ever passed on to Ability.getMoveCost, which no implementation actually reads
+     * it in, so a null is safe here - but the real path threads the real state through.
+     */
     public UnitSnapshot toUnitSnapshot(Unit unit) {
+        return toUnitSnapshot(unit, null);
+    }
+
+    public UnitSnapshot toUnitSnapshot(Unit unit, GameState state) {
         Position pos = unit.getPosition();
         List<AbilitySnapshot> abilities = unit.getAbilities().stream()
-            .map(this::toAbilitySnapshot)
+            .map(ability -> toAbilitySnapshot(ability, state))
             .toList();
         List<String> statusFlags = java.util.Arrays.stream(StatusFlag.values())
             .filter(unit::hasStatus)
@@ -119,15 +128,20 @@ public final class GameStateSnapshotMapper {
         );
     }
 
-    public AbilitySnapshot toAbilitySnapshot(Ability ability) {
+    public AbilitySnapshot toAbilitySnapshot(Ability ability, GameState state) {
         return new AbilitySnapshot(
             Identifiers.normalize(ability.getName()),
             ability.getName(),
             ability.getDescription(),
             ability.isPassive(),
             ability.isReady(),
+            // Read off the ability's own owner rather than a passed-in unit: an ability
+            // always knows who holds it, and this keeps the public single-argument
+            // signature every existing caller and test uses.
+            ability.getOwner() != null && ability.getOwner().isAbilityRestricted(ability),
             ability.getCurrentCooldown(),
             ability.getMaxCooldown(),
+            ability.getMoveCost(state),
             ability.getRange(),
             ability.getMinRange()
         );

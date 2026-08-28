@@ -1,0 +1,12 @@
+{
+    "name": "Translocation",
+    "type": "active",
+    "description": "Grabs a unit within %cast_range% tiles and sets it down on another tile. This unit can relocate itself up to %self_range% tiles, an ally up to %ally_range%, and an enemy up to %enemy_range%. The destination must be a free tile.",
+    "stats": {
+        "cooldown": 5,
+        "cast_range": 3,
+        "self_range": 4,
+        "ally_range": 3,
+        "enemy_range": 2
+    }
+}

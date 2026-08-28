@@ -11,6 +11,7 @@ import com.walnutt.game.Team;
 import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.ui.ActionChoice;
+import com.walnutt.ui.ChoiceOption;
 import com.walnutt.ui.ConcurrentSetupHandler;
 import com.walnutt.ui.InputHandler;
 import com.walnutt.unit.Unit;
@@ -86,6 +87,15 @@ public final class TeamRoutingHandler implements InputHandler, ConcurrentSetupHa
             answers[1] = defenderHandler.chooseAttribute(state, defender, attacker);
         }
         return answers;
+    }
+
+    /**
+     * Unlike the attribute encounter, one dialogue belongs to exactly one seat - whoever
+     * owns the casting unit - so plain team dispatch is all this needs.
+     */
+    @Override
+    public ChoiceOption chooseOption(GameState state, Unit unit, String title, List<ChoiceOption> options) {
+        return input.get(unit.getTeam()).chooseOption(state, unit, title, options);
     }
 
     @Override

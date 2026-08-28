@@ -1,0 +1,11 @@
+{
+    "name": "Plasma Cannon",
+    "type": "active",
+    "description": "Fires a charged plasma bolt at an enemy within %cast_range% tiles, dealing %damage% damage and disarming them for %duration% turns.",
+    "stats": {
+        "cooldown": 4,
+        "cast_range": 2,
+        "damage": 60,
+        "duration": 2
+    }
+}

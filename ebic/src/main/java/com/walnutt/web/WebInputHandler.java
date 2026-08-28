@@ -11,6 +11,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import com.walnutt.ability.Ability;
+import com.walnutt.ability.target.MultiTarget;
 import com.walnutt.ability.target.NoTarget;
 import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.TileTarget;
@@ -24,6 +25,7 @@ import com.walnutt.game.Team;
 import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.ui.ActionChoice;
+import com.walnutt.ui.ChoiceOption;
 import com.walnutt.ui.ConcurrentSetupHandler;
 import com.walnutt.ui.InputHandler;
 import com.walnutt.unit.Unit;
@@ -117,10 +119,22 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
 
     @Override
     public Attribute chooseAttribute(GameState state, Unit unit, Unit opponent) {
+        List<Attribute> usable = unit.getUsableAttributes();
+        if (usable.isEmpty()) {
+            return null; // nothing to bring to the encounter - never prompt for a non-choice
+        }
         Team team = unit.getTeam();
         JsonObject prompt = promptOf("attribute", team);
         prompt.addProperty("unitId", ids.idFor(unit));
         prompt.addProperty("opponentUnitId", ids.idFor(opponent));
+        // The client greys out anything not in here rather than deriving the rule from the
+        // unit's stats itself - same "the client never computes legality" principle as
+        // legalTargets.
+        JsonArray selectable = new JsonArray();
+        for (Attribute attribute : usable) {
+            selectable.add(attribute.name());
+        }
+        prompt.add("selectableAttributes", selectable);
         sendPrompt(team, prompt);
 
         while (true) {
@@ -129,14 +143,24 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
                 continue;
             }
             String value = JsonSupport.optString(msg, "value");
+            Attribute attribute = null;
             try {
-                Attribute attribute = Attribute.valueOf(value);
-                hub.clearPrompt(team);
-                return attribute;
+                attribute = Attribute.valueOf(value);
             } catch (IllegalArgumentException | NullPointerException e) {
-                hub.sendTo(team, JsonSupport.messageEnvelope("Choose STRENGTH, AGILITY, or INTELLIGENCE."));
+                attribute = null;
             }
+            if (attribute == null || !usable.contains(attribute)) {
+                hub.sendTo(team, JsonSupport.messageEnvelope(
+                    "This unit can only attack or defend with: " + describe(usable) + "."));
+                continue;
+            }
+            hub.clearPrompt(team);
+            return attribute;
         }
+    }
+
+    private static String describe(List<Attribute> attributes) {
+        return attributes.stream().map(Attribute::name).collect(java.util.stream.Collectors.joining(", "));
     }
 
     /**
@@ -163,6 +187,49 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             throw new IllegalStateException("Interrupted while waiting for attribute choices", e);
         }
         return results;
+    }
+
+    /**
+     * The generic option dialogue, raised from inside an ability's own onUse (Maxwell's
+     * Eureka). Blocks this match's thread on the acting team's queue exactly like every
+     * other prompt, so a mid-cast dialogue behaves the same as an attribute encounter -
+     * including reconnect, since ChannelHub caches the outstanding prompt and replays it.
+     */
+    @Override
+    public ChoiceOption chooseOption(GameState state, Unit unit, String title, List<ChoiceOption> options) {
+        if (options.isEmpty()) {
+            return null;
+        }
+        Team team = unit.getTeam();
+        JsonObject prompt = promptOf("choice", team);
+        prompt.addProperty("unitId", ids.idFor(unit));
+        prompt.addProperty("title", title);
+        JsonArray optionArray = new JsonArray();
+        for (ChoiceOption option : options) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("id", option.id());
+            entry.addProperty("name", option.name());
+            entry.addProperty("description", option.description());
+            entry.addProperty("detail", option.detail());
+            optionArray.add(entry);
+        }
+        prompt.add("options", optionArray);
+        sendPrompt(team, prompt);
+
+        while (true) {
+            JsonObject msg = awaitTyped(team, "choice");
+            if (msg == null) {
+                continue;
+            }
+            String optionId = JsonSupport.optString(msg, "optionId");
+            for (ChoiceOption option : options) {
+                if (option.id().equals(optionId)) {
+                    hub.clearPrompt(team);
+                    return option;
+                }
+            }
+            hub.sendTo(team, JsonSupport.messageEnvelope("That isn't one of the options offered."));
+        }
     }
 
     @Override
@@ -449,22 +516,50 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
         boolean noTarget = false;
         JsonArray unitIds = new JsonArray();
         JsonArray tiles = new JsonArray();
+        // Two-part candidates are grouped by their subject, so the client can highlight
+        // the pickable units first and then only that unit's own legal destinations.
+        // LinkedHashMap keeps the enumeration order stable between pushes.
+        Map<String, JsonArray> destinationsByPrimary = new LinkedHashMap<>();
+
         for (Target target : targets) {
             if (target instanceof NoTarget) {
                 noTarget = true;
             } else if (target instanceof UnitTarget unitTarget) {
                 unitIds.add(ids.idFor(unitTarget.getUnit()));
             } else if (target instanceof TileTarget tileTarget) {
-                JsonObject t = new JsonObject();
-                t.addProperty("q", tileTarget.getTile().getPosition().getQ());
-                t.addProperty("r", tileTarget.getTile().getPosition().getR());
-                tiles.add(t);
+                tiles.add(tileJson(tileTarget));
+            } else if (target instanceof MultiTarget multi
+                && multi.primary() instanceof UnitTarget primary
+                && multi.secondary() instanceof TileTarget destination) {
+                destinationsByPrimary
+                    .computeIfAbsent(ids.idFor(primary.getUnit()), key -> new JsonArray())
+                    .add(tileJson(destination));
             }
         }
+
         obj.addProperty("noTarget", noTarget);
         obj.add("unitIds", unitIds);
         obj.add("tiles", tiles);
+        if (!destinationsByPrimary.isEmpty()) {
+            JsonObject multi = new JsonObject();
+            JsonArray primaryUnitIds = new JsonArray();
+            JsonObject destinations = new JsonObject();
+            destinationsByPrimary.forEach((unitId, tileArray) -> {
+                primaryUnitIds.add(unitId);
+                destinations.add(unitId, tileArray);
+            });
+            multi.add("primaryUnitIds", primaryUnitIds);
+            multi.add("destinationsByPrimary", destinations);
+            obj.add("multi", multi);
+        }
         return obj;
+    }
+
+    private static JsonObject tileJson(TileTarget tileTarget) {
+        JsonObject t = new JsonObject();
+        t.addProperty("q", tileTarget.getTile().getPosition().getQ());
+        t.addProperty("r", tileTarget.getTile().getPosition().getR());
+        return t;
     }
 
     private JsonObject promptOf(String kind, Team team) {
@@ -514,15 +609,29 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
                 yield target == null ? null : new UnitTarget(target);
             }
             case "tile" -> {
-                Integer q = JsonSupport.optInt(msg, "q");
-                Integer r = JsonSupport.optInt(msg, "r");
-                if (q == null || r == null) {
-                    yield null;
-                }
-                Tile tile = state.getMap().getTile(new Position(q, r));
+                Tile tile = resolveTile(state, msg);
                 yield tile == null ? null : new TileTarget(tile);
+            }
+            // A two-part cast (Translocation): a unit AND a destination tile, carried in
+            // the same message rather than over two round trips - the client has both by
+            // the time it submits, having picked them from the prompt's own `multi` block.
+            case "multi" -> {
+                Unit subject = ids.resolve(JsonSupport.optString(msg, "targetUnitId"));
+                Tile tile = resolveTile(state, msg);
+                yield subject == null || tile == null
+                    ? null
+                    : new MultiTarget(new UnitTarget(subject), new TileTarget(tile));
             }
             default -> null;
         };
+    }
+
+    private Tile resolveTile(GameState state, JsonObject msg) {
+        Integer q = JsonSupport.optInt(msg, "q");
+        Integer r = JsonSupport.optInt(msg, "r");
+        if (q == null || r == null) {
+            return null;
+        }
+        return state.getMap().getTile(new Position(q, r));
     }
 }

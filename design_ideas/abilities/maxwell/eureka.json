@@ -1,0 +1,15 @@
+{
+    "name": "Eureka",
+    "type": "active",
+    "description": "Gains %passive_inspiration% Inspiration at the end of each of this unit's turns, plus %bonus_inspiration% more if it acted that turn. Inspiration is spent to construct a gadget, permanently adding it to this unit's kit. The first costs %cost% Inspiration and every one after that costs %cost_increase% more; this ability cannot be used until the next gadget is affordable.",
+    "tags": [
+        "no_copy"
+    ],
+    "stats": {
+        "cooldown": 1,
+        "passive_inspiration": 2,
+        "bonus_inspiration": 1,
+        "cost": 6,
+        "cost_increase": 10
+    }
+}

@@ -9,6 +9,7 @@ import com.walnutt.ability.impl.Backtrack;
 import com.walnutt.ability.impl.Blizzard;
 import com.walnutt.ability.impl.BlizzardFist;
 import com.walnutt.ability.impl.BranchlingAura;
+import com.walnutt.ability.impl.CapacitorBank;
 import com.walnutt.ability.impl.CloakAndDagger;
 import com.walnutt.ability.impl.ColdEmbrace;
 import com.walnutt.ability.impl.Counterstrike;
@@ -20,37 +21,50 @@ import com.walnutt.ability.impl.Dispersion;
 import com.walnutt.ability.impl.Doom;
 import com.walnutt.ability.impl.Duel;
 import com.walnutt.ability.impl.EnergyBreak;
+import com.walnutt.ability.impl.EnergyShield;
 import com.walnutt.ability.impl.Eruption;
+import com.walnutt.ability.impl.Eureka;
 import com.walnutt.ability.impl.EyeOfTheStorm;
 import com.walnutt.ability.impl.Feast;
 import com.walnutt.ability.impl.Fireblast;
 import com.walnutt.ability.impl.Frostbite;
+import com.walnutt.ability.impl.Gyroscope;
 import com.walnutt.ability.impl.HolyShield;
+import com.walnutt.ability.impl.HomingMissile;
 import com.walnutt.ability.impl.Implosion;
 import com.walnutt.ability.impl.InfernalBlade;
+import com.walnutt.ability.impl.KillerDrone;
 import com.walnutt.ability.impl.Longshot;
 import com.walnutt.ability.impl.Manifestation;
+import com.walnutt.ability.impl.Mimic;
+import com.walnutt.ability.impl.Nanobots;
 import com.walnutt.ability.impl.Objurgation;
 import com.walnutt.ability.impl.OblivionConfinement;
 import com.walnutt.ability.impl.OrbitalBeam;
 import com.walnutt.ability.impl.Overgrowth;
 import com.walnutt.ability.impl.Overheat;
 import com.walnutt.ability.impl.OverwhelmingOdds;
+import com.walnutt.ability.impl.PerplexingShot;
+import com.walnutt.ability.impl.PlasmaCannon;
 import com.walnutt.ability.impl.PoisonBloom;
 import com.walnutt.ability.impl.PoisonSting;
 import com.walnutt.ability.impl.PsychicProjection;
 import com.walnutt.ability.impl.PylonAbility;
 import com.walnutt.ability.impl.PylonOrbitalBeam;
 import com.walnutt.ability.impl.Refraction;
+import com.walnutt.ability.impl.Reload;
 import com.walnutt.ability.impl.SanityEclipse;
 import com.walnutt.ability.impl.Selfless;
+import com.walnutt.ability.impl.ShrinkRay;
 import com.walnutt.ability.impl.SnowBlast;
 import com.walnutt.ability.impl.SnowGolem;
 import com.walnutt.ability.impl.SoulRip;
 import com.walnutt.ability.impl.Sprout;
 import com.walnutt.ability.impl.StaticLink;
 import com.walnutt.ability.impl.SteadyFocus;
+import com.walnutt.ability.impl.SuperiorMastery;
 import com.walnutt.ability.impl.TimelessStrike;
+import com.walnutt.ability.impl.Translocation;
 
 /**
  * Registry mapping an ability's JSON id (a design_ideas/abilities/<unit>/<id>.json
@@ -108,7 +122,24 @@ public final class AbilityFactory {
         Map.entry("steady_focus", SteadyFocus::new),
         Map.entry("overgrowth", Overgrowth::new),
         Map.entry("sprout", Sprout::new),
-        Map.entry("branchling_aura", BranchlingAura::new)
+        Map.entry("branchling_aura", BranchlingAura::new),
+        Map.entry("eureka", Eureka::new),
+        // Maxwell's nine gadgets. Not listed by any unit's JSON - they reach a unit only
+        // through Eureka, whose GADGET_IDS is the list; MaxwellGadgetPoolTest keeps the
+        // two in step.
+        Map.entry("energy_shield", EnergyShield::new),
+        Map.entry("gyroscope", Gyroscope::new),
+        Map.entry("homing_missile", HomingMissile::new),
+        Map.entry("killer_drone", KillerDrone::new),
+        Map.entry("nanobots", Nanobots::new),
+        Map.entry("plasma_cannon", PlasmaCannon::new),
+        Map.entry("reload", Reload::new),
+        Map.entry("shrink_ray", ShrinkRay::new),
+        Map.entry("translocation", Translocation::new),
+        Map.entry("perplexing_shot", PerplexingShot::new),
+        Map.entry("superior_mastery", SuperiorMastery::new),
+        Map.entry("mimic", Mimic::new),
+        Map.entry("capacitor_bank", CapacitorBank::new)
     );
 
     private AbilityFactory() {
@@ -124,6 +155,11 @@ public final class AbilityFactory {
             throw new IllegalArgumentException(
                 "No Ability implementation registered for '" + id + "' yet - add one to AbilityFactory.");
         }
-        return constructor.apply(definition);
+        Ability ability = constructor.apply(definition);
+        // The one place a definition id is stamped onto an ability. Anything built
+        // directly in Java (Move, Attack, a summon's internal kit) keeps a null id,
+        // which is exactly what makes it uncopyable - see Ability.getDefinitionId.
+        ability.setDefinitionId(id);
+        return ability;
     }
 }

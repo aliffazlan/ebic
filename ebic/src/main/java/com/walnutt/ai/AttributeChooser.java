@@ -1,5 +1,7 @@
 package com.walnutt.ai;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Random;
 
 import com.walnutt.combat.Attribute;
@@ -28,8 +30,6 @@ public final class AttributeChooser {
     /** Which side of the encounter the chooser is picking for. The matrix is not symmetric, so this matters. */
     public enum Role { ATTACKER, DEFENDER }
 
-    private static final Attribute[] ATTRIBUTES = Attribute.values();
-
     private AttributeChooser() {
     }
 
@@ -37,13 +37,21 @@ public final class AttributeChooser {
      * {@code [attackerAttribute][defenderAttribute] -> damage dealt}, mirroring
      * combat.EncounterResolver.calculateDamage: a winning attribute deals its own
      * value, a losing one deals nothing, and a mirror match deals the difference.
+     *
+     * Rows and columns cover only each side's USABLE attributes (see
+     * Unit.getUsableAttributes), not all three - an attribute a unit has none of is not a
+     * strategy available to it, and including it as a zero-value row would let the solver
+     * hand back a mixture that plays it. Use {@link #attackerOptions}/{@link
+     * #defenderOptions} to map an index back to an attribute.
      */
     public static double[][] payoffMatrix(Unit attacker, Unit defender) {
-        double[][] payoff = new double[ATTRIBUTES.length][ATTRIBUTES.length];
-        for (int i = 0; i < ATTRIBUTES.length; i++) {
-            for (int j = 0; j < ATTRIBUTES.length; j++) {
-                Attribute attackAttr = ATTRIBUTES[i];
-                Attribute defendAttr = ATTRIBUTES[j];
+        List<Attribute> rows = attacker.getUsableAttributes();
+        List<Attribute> cols = defender.getUsableAttributes();
+        double[][] payoff = new double[rows.size()][cols.size()];
+        for (int i = 0; i < rows.size(); i++) {
+            for (int j = 0; j < cols.size(); j++) {
+                Attribute attackAttr = rows.get(i);
+                Attribute defendAttr = cols.get(j);
                 if (attackAttr.beats(defendAttr)) {
                     payoff[i][j] = attacker.getAttributeValue(attackAttr);
                 } else if (defendAttr.beats(attackAttr)) {
@@ -57,6 +65,16 @@ public final class AttributeChooser {
         return payoff;
     }
 
+    /** The attributes the payoff matrix's rows stand for, in order. */
+    public static List<Attribute> attackerOptions(Unit attacker) {
+        return attacker.getUsableAttributes();
+    }
+
+    /** The attributes the payoff matrix's columns stand for, in order. */
+    public static List<Attribute> defenderOptions(Unit defender) {
+        return defender.getUsableAttributes();
+    }
+
     /**
      * Damage this encounter is worth if both sides play optimally - the value of the
      * game. {@link ActionScorer} uses it to price an attack, which means the bot values
@@ -64,29 +82,50 @@ public final class AttributeChooser {
      * by a best case it has no way to force.
      */
     public static double expectedDamage(Unit attacker, Unit defender) {
+        List<Attribute> attackerUsable = attacker.getUsableAttributes();
+        if (attackerUsable.isEmpty()) {
+            return 0; // nothing to swing with
+        }
+        if (!defender.hasUsableAttribute()) {
+            // Undefendable: whichever attribute the attacker picks lands in full, so the
+            // encounter is worth its best one. Solving a zero-column matrix is undefined.
+            return attackerUsable.stream().mapToDouble(attacker::getAttributeValue).max().orElse(0);
+        }
         return MatrixGameSolver.solve(payoffMatrix(attacker, defender)).value();
     }
 
-    /** Samples this side's equilibrium mixture. */
+    /** Samples this side's equilibrium mixture, restricted to attributes it can actually use. */
     public static Attribute choose(Unit self, Unit opponent, Role role, Random random) {
+        List<Attribute> own = self.getUsableAttributes();
+        if (own.isEmpty()) {
+            return null; // cannot bring anything - see combat.EncounterResolver
+        }
+        if (!opponent.hasUsableAttribute()) {
+            // The opponent has no strategy to solve against. As attacker, just take the
+            // biggest hit available; as defender, nothing can be blocked anyway.
+            return role == Role.ATTACKER
+                ? own.stream().max(Comparator.comparingInt(self::getAttributeValue)).orElse(own.get(0))
+                : own.get(0);
+        }
+
         double[][] payoff = role == Role.ATTACKER
             ? payoffMatrix(self, opponent)
             : payoffMatrix(opponent, self);
         MatrixGameSolver.Solution solution = MatrixGameSolver.solve(payoff);
         double[] mixture = role == Role.ATTACKER ? solution.rowStrategy() : solution.columnStrategy();
-        return sample(mixture, random);
+        return sample(own, mixture, random);
     }
 
-    private static Attribute sample(double[] mixture, Random random) {
+    private static Attribute sample(List<Attribute> options, double[] mixture, Random random) {
         double roll = random.nextDouble();
         double cumulative = 0;
-        for (int i = 0; i < mixture.length; i++) {
+        for (int i = 0; i < mixture.length && i < options.size(); i++) {
             cumulative += mixture[i];
             if (roll < cumulative) {
-                return ATTRIBUTES[i];
+                return options.get(i);
             }
         }
         // Floating-point drift only; the mixture is normalized, so this is the last bucket.
-        return ATTRIBUTES[ATTRIBUTES.length - 1];
+        return options.get(options.size() - 1);
     }
 }

@@ -1,5 +1,7 @@
 package com.walnutt.combat;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -44,17 +46,36 @@ class WeightedEncounterTest {
         assertWithinTolerance(intelligence, trials * 0.2);
     }
 
+    /**
+     * A unit with every attribute at 0 brings nothing to the encounter at all - it does
+     * not get to "roll" one it does not have. This used to fall back to a uniform pick,
+     * which let a Branchling defend with an attribute worth nothing to it; null is what
+     * EncounterResolver reads as "undefended".
+     */
     @Test
-    void fallsBackToUniformRandom_whenAllAttributesAreZero() {
+    void returnsNoAttribute_whenAllAttributesAreZero() {
         Unit unit = new BasicUnit("Statless", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
         GameState state = new GameState(new GameMap(2),
             List.of(new Player("P1", Team.PLAYER_ONE), new Player("P2", Team.PLAYER_TWO)), new Random(1));
 
         WeightedEncounter encounter = new WeightedEncounter(unit, unit);
-        // Should not throw (no division by zero) and should return a valid attribute every time.
+        // Must not throw (no division by zero) and must never invent an attribute.
         for (int i = 0; i < 100; i++) {
-            Attribute result = encounter.resolveAttackerAttribute(state);
-            assertTrue(result == Attribute.STRENGTH || result == Attribute.AGILITY || result == Attribute.INTELLIGENCE);
+            assertNull(encounter.resolveAttackerAttribute(state));
+            assertNull(encounter.resolveDefenderAttribute(state));
+        }
+    }
+
+    /** A partially-drained unit still rolls, but only among what it actually has left. */
+    @Test
+    void neverRollsAnAttributeTheUnitHasNoneOf() {
+        Unit unit = new BasicUnit("Drained", Team.PLAYER_ONE, new UnitStats(30, 0, 10, 100));
+        GameState state = new GameState(new GameMap(2),
+            List.of(new Player("P1", Team.PLAYER_ONE), new Player("P2", Team.PLAYER_TWO)), new Random(1));
+
+        WeightedEncounter encounter = new WeightedEncounter(unit, unit);
+        for (int i = 0; i < 500; i++) {
+            assertNotEquals(Attribute.AGILITY, encounter.resolveAttackerAttribute(state));
         }
     }
 

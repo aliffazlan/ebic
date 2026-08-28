@@ -1,0 +1,12 @@
+{
+    "name": "Acidic Brew",
+    "type": "active",
+    "description": "Spills a pool of acid on the targetted tile. Enemy units standing in acid take %bonus_damage% extra damage from all sources. Take %damage% damage if ending their turn in acid.",
+    "stats": {
+        "cast_range": 2,
+        "cooldown": 3,
+        "duration": 3,
+        "damage": 5,
+        "bonus_damage": 10
+    }
+}

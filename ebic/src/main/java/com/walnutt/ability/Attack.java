@@ -4,6 +4,9 @@ import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.combat.Attribute;
 import com.walnutt.combat.CombatEngine;
+import com.walnutt.combat.Encounter;
+import com.walnutt.combat.NormalEncounter;
+import com.walnutt.combat.WeightedEncounter;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Position;
 import com.walnutt.status.Stat;
@@ -72,24 +75,61 @@ public class Attack extends Ability {
         if (!(target instanceof UnitTarget unitTarget)) {
             return false;
         }
+        // Nothing to attack with: every attribute at 0 (stripped by Cripple, Decay or
+        // Shrink Ray). Refusing here also removes it from getLegalTargets, so neither the
+        // client's highlighting nor the bot offers an attack that could only deal 0.
+        if (!owner.hasUsableAttribute()) {
+            return false;
+        }
         Unit defender = unitTarget.getUnit();
+        // Repeated from Ability.canUse because Attack deliberately doesn't call super -
+        // a sealed-off unit (cloaked, frozen, imprisoned) can't be swung at either.
+        if (!defender.isTargetable()) {
+            return false;
+        }
         if (defender.isDead() || defender.getTeam() == owner.getTeam()) {
             return false;
         }
         return canReach(state, owner, defender);
     }
 
+    /**
+     * Basic units fight on instinct: an encounter with one on either side is rolled
+     * automatically rather than put to the players.
+     *
+     * This is the single biggest pacing lever in the game - ten of a side's fourteen units
+     * are Basics, so most encounters in a match now resolve with no modal for anyone.
+     */
+    private static boolean isAutomatic(Unit attacker, Unit defender) {
+        return attacker.getUnitType() == UnitType.BASIC || defender.getUnitType() == UnitType.BASIC;
+    }
+
     @Override
     public void onUse(GameState state, Target target) {
         Unit defender = ((UnitTarget) target).getUnit();
 
-        Attribute[] choices = state.getInputHandler().chooseAttributePair(state, owner, defender);
-        Attribute attackerChoice = choices[0];
-        Attribute defenderChoice = choices[1];
-
-        CombatEngine.performAttack(state, owner, defender, attackerChoice, defenderChoice);
+        CombatEngine.performAttack(state, buildEncounter(state, defender));
 
         owner.markAttacked();
         state.spendMoves(getMoveCost(state));
+    }
+
+    /**
+     * Which of the three encounter shapes this attack is, and therefore who gets asked
+     * anything. Kept in one place so the "who is prompted" rule can't drift from the
+     * "how is the attribute chosen" rule.
+     */
+    private Encounter buildEncounter(GameState state, Unit defender) {
+        if (isAutomatic(owner, defender)) {
+            return new WeightedEncounter(owner, defender);
+        }
+        if (!defender.hasUsableAttribute()) {
+            // Nothing to defend with, so there is no decision to put to the defender - but
+            // the attacker still picks, since which attribute they swing decides the damage.
+            Attribute attackerChoice = state.getInputHandler().chooseAttribute(state, owner, defender);
+            return new NormalEncounter(owner, defender, attackerChoice, null);
+        }
+        Attribute[] choices = state.getInputHandler().chooseAttributePair(state, owner, defender);
+        return new NormalEncounter(owner, defender, choices[0], choices[1]);
     }
 }

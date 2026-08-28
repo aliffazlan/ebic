@@ -1,0 +1,9 @@
+{
+    "name": "Superior Mastery",
+    "type": "passive",
+    "description": "Mastery of the arcane extends this unit's reach by %cast_range_bonus% tiles. Every ability it casts sharpens the rest, cutting %cooldown_reduction% turn from each of its other abilities - but no ability of its own may be cast more than once in the same turn, however quickly it comes back up.",
+    "stats": {
+        "cast_range_bonus": 2,
+        "cooldown_reduction": 1
+    }
+}

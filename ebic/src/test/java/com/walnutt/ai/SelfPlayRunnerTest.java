@@ -75,16 +75,16 @@ class SelfPlayRunnerTest {
      */
     @Test
     void takingFreeAttacksBeatsIgnoringThem() {
-        // The cap has to be high enough for matches to actually resolve. Basics move for
-        // free now as well as attacking, so games run longer; at the old 60-turn cap most
-        // of them hit the ceiling and got scored on surviving army strength instead, where
-        // simply never advancing your basics looks just as good and the series went 50/50.
-        // Measured across three seeds and two sample sizes, 120 is decisive and 60 is not.
-        SelfPlayRunner runner = new SelfPlayRunner(120);
+        // Sample size, not turn cap, is what makes this decisive. Taking the free attacks
+        // is worth roughly 65-90% depending on the draft, and an 8-match series lands on
+        // 4-4 often enough to fail by luck alone - seed 300 did exactly that, at every cap
+        // from 120 to 200. Measured across six seeds: 8 and 12 matches fail on 2 of 6,
+        // 24 matches is decisive on 6 of 6 and costs about three seconds.
+        SelfPlayRunner runner = new SelfPlayRunner(200);
         BotConfig standard = BotConfig.standard();
 
         SelfPlayRunner.SeriesResult series =
-            runner.playSeries(standard, standard.withTakeFreeAttacks(false), 8, 300L);
+            runner.playSeries(standard, standard.withTakeFreeAttacks(false), 24, 300L);
 
         assertTrue(series.playerOneWins() > series.playerTwoWins(),
             "the config that takes its free attacks should win the series, but it went " + series);

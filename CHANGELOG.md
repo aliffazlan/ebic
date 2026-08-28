@@ -3,7 +3,158 @@
 All notable changes to EBIC are documented here. This project follows the spirit of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+Every version lives in this one file, newest first — the project is small enough that one
+scrollable history beats hunting through per-version files. Entries are written for players
+rather than for the diff: what changed about playing the game, not which classes moved.
+
+## [Unreleased] — 0.2.0
+
+Two units who play with the shape of the game itself: an elite who **builds his own kit as
+the match goes on**, and a champion who **steals yours**. The roster grows to **6 champions
+and 15 elites**.
+
+### New units
+
+**Joker** — a jester and a thief, whose best spells are other people's.
+
+- *Perplexing Shot* — an erratic bolt for 30 damage at range 2, which then ricochets up
+  to twice more to a random unit standing beside its last victim, hitting 20 harder each
+  jump: 30, then 50, then 70. It never hits the same unit twice and fizzles out if there
+  is nothing to jump to — but it does not care whose side anyone is on. Fired into a
+  cluster of enemies with nothing of yours nearby it is the hardest single spell in the
+  game; fired into a scrum it will happily finish on your own champion.
+- *Superior Mastery* (passive) — **+2 cast range on everything he holds**, and every
+  ability he casts takes a turn off the cooldown of all his others, copied abilities
+  included. The price is that **no ability of his may be cast twice in one turn**, however
+  quickly it comes back up — a button whose cooldown reads 0 will still refuse, with the
+  reason on hover.
+- *Mimic* — he watches every ability an enemy casts within 3 tiles (5, with Superior
+  Mastery) and remembers it for 3 turns. Cast Mimic on that enemy to **copy the last
+  ability they used** and wield it yourself for 10 turns. A first theft arrives ready to
+  use immediately. Only one copy at a time: taking a new one hands the old back — but he
+  never really forgets it, and a discarded copy **keeps cooling down in the background**,
+  so stealing it again later returns it exactly as he left it.
+
+**Maxwell** — a tinker who starts with almost nothing and constructs whatever the game
+turns out to need.
+
+- *Eureka* — his only starting ability. He gains **2 Inspiration at the end of each of his
+  turns**, plus **1 more if he did something that turn**. Spend it to permanently build a
+  gadget, chosen from a dialogue listing everything he hasn't built yet. The first costs
+  **6**, and every one after that costs **10 more** — so a fourth gadget is a real
+  investment, not a formality. Eureka is greyed out until the next one is affordable, with
+  the running total shown on his effects panel.
+- Ten gadgets to build, in any order you like:
+  - *Plasma Cannon* — 60 damage at range 2, and disarms for 2 turns.
+  - *Energy Shield* — an 80-damage barrier on himself or an ally, for 5 turns.
+    Recasting on someone who already has one tops it back up rather than stacking a
+    second shield.
+  - *Shrink Ray* — cuts 20% off an enemy's attributes and 10% off both its current and
+    maximum health for 4 turns. Cast it again and it shrinks them further from their new
+    size. Whatever else happens in the meantime, it hands back exactly what it took.
+  - *Killer Drone* — deploys a drone for 8 turns. Drones can be moved freely and never
+    block movement, but have no attack you can order: each one strikes a random adjacent
+    enemy at the end of every turn, including one standing on its own tile.
+  - *Homing Missile* — locks onto an enemy up to 8 tiles away and lands a turn later for
+    50 damage, plus 20 to everything beside it. It follows the target, so running is no
+    escape — but cleansing the lock shoots the missile down.
+  - *Translocation* — picks a unit up and sets it down elsewhere. He can throw himself 4
+    tiles, an ally 3, and an enemy 2.
+  - *Nanobots* — cleanses and heals an adjacent ally for 40, immediately and again at
+    the start of each of their turns. The short reach is the price of how strong it is:
+    Maxwell has to walk up, or the wounded unit has to fall back to him.
+  - *Gyroscope* (passive) — +1 attack range and +1 cast range on **everything**, including
+    gadgets built after it.
+  - *Reload* (passive) — if he neither acts nor takes damage for a full round, every one of
+    his cooldowns comes back. Damage a barrier absorbs entirely doesn't interrupt it.
+  - *Capacitor Bank* (passive) — banks a charge at the start of each of his turns, up to
+    3, and each charge pays for an ability instead of an action. That is a free cast
+    every turn, and a full bank is three abilities in one turn with all three move
+    points still in hand. It is the answer to how little he can do early: let the game
+    run long and Maxwell gets turns nobody else can have. Charges never pay for his move
+    or his attack.
+
+### Rules — untouchable units
+
+- **Invulnerable now means untargetable.** Previously you could attack a vanished Evayne,
+  a frozen unit or an imprisoned one and simply deal 0 — the swing was wasted but legal.
+  Those units are now no longer valid targets at all: nothing can be aimed at them, by
+  either side, so they aren't highlighted and a click does nothing. This covers Cloak and
+  Dagger, Lanaya's psychic clone, Auroth's Cold Embrace and Harbinger's Oblivion
+  Confinement, and it cuts both ways — you can't heal or shield an ally you have sealed
+  off either.
+- **Area abilities still reach them**, and are still absorbed to nothing, exactly as
+  before. Sanity's Eclipse still punches through, as its own text promises.
+- **Evayne can no longer act while cloaked.** She was invisible, untouchable and still
+  free to move, attack and cast from total safety. She is now genuinely out of the game
+  for the duration — the ambush on her tile is the only thing she does.
+
+### Rules — copying
+
+- **Some abilities can never be copied.** A handful break outright if they leave the unit
+  they were built for, so they are marked uncopyable in the design files and Joker simply
+  cannot take them: **Psychic Projection**, **Eureka**, and Mimic itself. Enemies holding
+  those are not valid Mimic targets at all, rather than being targets that fail on click.
+- Movement and basic attacks are never copyable either — Mimic steals spells, not walking.
+- **Wei still only burns what you are actually holding.** Energy Break and Implosion price
+  a unit by its cooldowns, and a copy Joker has set aside is deliberately out of their
+  reach. Superior Mastery is the one thing that reaches a set-aside copy.
+
+### Rules — encounters
+
+- **Basic units now fight on instinct.** An attack with a basic unit on *either* side is
+  resolved automatically, weighted by each unit's own attributes, with **no attribute
+  prompt for either player**. Ten of your fourteen units are basics, so most of the combat
+  in a match now happens without a modal — a measured bot match produced 167 attacks and
+  only 22 prompts, all of them between champions and elites. Encounters between two
+  non-basic units are unchanged.
+- **You can't fight with an attribute you don't have.** An attribute at 0 is no longer a
+  legal choice; those buttons appear greyed out with an explanation. A unit whose
+  attributes have all been stripped — a Branchling, or a victim of enough Cripple, Decay
+  or Shrink Ray — **cannot defend itself at all**: the attacker still picks, gets no
+  opposing choice to beat, and lands full damage. Such a unit also **cannot attack**.
+
+### Interface
+
+- **A new construction dialogue.** Casting Eureka opens a card for every gadget still
+  available, with its full description and cooldown, and builds whichever you click.
+- **Two-click targeting for abilities that need two targets.** Translocation highlights the
+  units it can move; pick one and the board switches to showing only where *that* unit can
+  go. Clicking it again backs out.
+- **Abilities locked for the turn say so.** Under Superior Mastery a spent ability's button
+  greys out with "Already used this turn", so a cooldown reading 0 never looks like a bug.
+  Joker's effects panel also lists what he has spent this turn, and what he is currently
+  wielding a copy of.
+
+### Fixed
+
+- **Gyroscope's bonus range appeared to apply to movement.** The board drew a two-tile
+  move range while the game still only allowed one, because Move was picking up the
+  cast-range bonus it should never have had. Movement and basic attacks now ignore cast
+  range entirely — attack range is still raised by Gyroscope, through its own stat.
+- **Chronos could send an opponent's cooldowns to absurd numbers.** Timeless Strike chains
+  up to nine attacks from a single click, and Wei's Energy Break was charging for every one
+  of them. Both Energy Break and Valor's Counterstrike now answer a chain **once**, the way
+  they answer any other attack.
+- **Lanaya's Psychic Projection was misspelled** ("Pyschic") everywhere it appeared.
+- **Sanity's Eclipse went off before the opponent could react.** Harbinger's orb detonated
+  the instant he ended the turn he cast it on, so the delay it advertised gave nobody a
+  chance to walk clear. It now lands at the start of his *next* turn, leaving the
+  opponent a full turn to move — which is what the delay was always for.
+- **The fallen no longer clutter the battlefield.** Dead units used to sit on the tile
+  they died on, faintly drawn and still clickable. They now move to a column at the edge
+  of the board and stack up as they fall, like captured chess pieces — still clickable to
+  inspect, but out of the way of the tile underneath them.
+
+### Notes
+
+- The computer opponent **won't draft Maxwell or Joker** for now. It plays both legally,
+  but choosing a gadget to build, or an ability worth stealing for later, is a long-term
+  investment decision it can't yet reason about, so it takes the other option in those
+  draft rounds.
+- **Shawl** is designed but not implemented, and is not in the draft pool.
+
+## [0.1.0] — 2026-08-28
 
 You can now play on your own against the computer. The roster grows to **5 champions and
 14 elites**, basic attacks gain real range, and five existing units get reworked or

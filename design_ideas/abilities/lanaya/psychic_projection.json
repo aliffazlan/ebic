@@ -1,7 +1,10 @@
 {
-    "name": "Pyschic Projection",
+    "name": "Psychic Projection",
     "type": "active",
     "description": "Projects an invulnerable copy of this unit onto a tile within %cast_range% tiles for %duration% turns. The copy moves and attacks freely and takes no damage, but this unit is stunned for as long as it exists.",
+    "tags": [
+        "no_copy"
+    ],
     "stats": {
         "cooldown": 6,
         "cast_range": 4,

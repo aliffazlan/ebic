@@ -29,8 +29,10 @@ public record WeightedEncounter(Unit attacker, Unit defender) implements Encount
         int total = strength + agility + intelligence;
 
         if (total <= 0) {
-            Attribute[] values = Attribute.values();
-            return values[state.getRandom().nextInt(values.length)];
+            // Every attribute at 0: this unit has nothing to bring to the encounter at all.
+            // Picking one uniformly would let a Branchling "defend" with an attribute it
+            // does not have - see EncounterResolver for what null resolves to.
+            return null;
         }
 
         int roll = state.getRandom().nextInt(total);

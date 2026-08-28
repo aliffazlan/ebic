@@ -67,7 +67,9 @@ public class TimelessStrike extends PassiveAbility {
 
         depth++;
         try {
-            CombatEngine.performAttack(state, new WeightedEncounter(getOwner(), defender));
+            // chained=true: this is a follow-up within one cast, not a fresh attack, so
+            // once-per-cast passives (Energy Break, Counterstrike) skip it.
+            CombatEngine.performAttack(state, new WeightedEncounter(getOwner(), defender), true);
         } finally {
             depth--;
         }

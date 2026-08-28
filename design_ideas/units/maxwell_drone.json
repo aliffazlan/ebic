@@ -1,0 +1,10 @@
+{
+    "name": "Drone",
+    "type": "basic",
+    "max_hp": 100,
+    "strength": 20,
+    "agility": 20,
+    "intelligence": 20,
+    "attack_range": 1,
+    "abilities": []
+}

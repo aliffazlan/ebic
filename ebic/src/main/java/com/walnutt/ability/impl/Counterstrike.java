@@ -35,6 +35,11 @@ public class Counterstrike extends PassiveAbility {
 
     @Override
     public void onPostAttack(GameState state, PostAttackEvent event) {
+        // One counter per attack cast. A chain (Timeless Strike) republishes a
+        // PostAttackEvent per hit, which would otherwise buy a free counter for each.
+        if (event.chained()) {
+            return;
+        }
         if (event.defender() != getOwner() || getOwner().isDead()) {
             return;
         }

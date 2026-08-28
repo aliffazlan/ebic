@@ -41,6 +41,10 @@ export interface MatchUiState {
   // overlap in time, so one field covers both without any ambiguity.
   selectedUnitId: string | null;
   selectedAbilityId: string | null;
+  // First half of a two-part cast (Translocation): the unit picked to be moved,
+  // while the board waits for a destination click. Null at every other moment,
+  // including for ordinary single-click abilities.
+  multiPrimaryUnitId: string | null;
 }
 
 const MAX_MESSAGES = 50;
@@ -78,6 +82,7 @@ export class GameStateStore extends Store<MatchUiState> {
       gameOver: null,
       selectedUnitId: null,
       selectedAbilityId: null,
+      multiPrimaryUnitId: null,
     });
   }
 

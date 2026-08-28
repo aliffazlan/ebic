@@ -18,7 +18,7 @@ import com.walnutt.data.UnitDefinition;
  *
  * This used to be asserted inside FullDraftMatchTest, over whichever heroes a random
  * draft happened to reveal - which quietly stopped covering the whole pool once the
- * pool grew bigger than one draft consumes (5 champions for 4 slots, 14 elites for
+ * pool grew bigger than one draft consumes (6 champions for 4 slots, 14 elites for
  * 12), and made that test fail only some of the time. Checking the pool directly is
  * both deterministic and strictly broader.
  */

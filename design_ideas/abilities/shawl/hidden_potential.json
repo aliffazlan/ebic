@@ -1,0 +1,13 @@
+{
+    "name": "Hidden Potential",
+    "type": "active",
+    "description": "Whenever damage is dealt, gain a stack of INSIGHT. Once %cost% insight stacks are obtained, cast this ability on an ally to unlock their hidden potential, upgrading that ability.",
+    "tags": [
+        "no_copy"
+    ],
+    "stats": {
+        "cooldown": 1,
+        "cast_range": 4,
+        "cost": 10
+    }
+}

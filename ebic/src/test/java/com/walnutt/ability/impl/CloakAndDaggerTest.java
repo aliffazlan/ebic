@@ -11,8 +11,10 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import com.walnutt.ability.Attack;
 import com.walnutt.ability.Move;
 import com.walnutt.ability.target.TileTarget;
+import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.combat.CombatEngine;
 import com.walnutt.combat.NormalEncounter;
 import com.walnutt.combat.Attribute;
@@ -35,6 +37,50 @@ import com.walnutt.unit.UnitStats;
  * is deterministic (100% chance of that attribute), keeping damage assertions exact.
  */
 class CloakAndDaggerTest {
+
+    /**
+     * She is out of the game while cloaked, not merely hard to kill. Two halves, and both
+     * shipped broken: the enemy could still swing at her (for 0, since invulnerability was
+     * the only thing implemented), and she could still act freely from total safety.
+     */
+    @Test
+    void whileCloakedSheCanNeitherBeTouchedNorAct() {
+        Unit evayne = new BasicUnit("Evayne", Team.PLAYER_ONE, new UnitStats(50, 0, 0, 100));
+        CloakAndDagger ability = newAbility();
+        Move move = new Move();
+        Attack attack = new Attack();
+        evayne.addAbility(move);
+        evayne.addAbility(attack);
+        evayne.addAbility(ability);
+        Unit enemy = new BasicUnit("Enemy", Team.PLAYER_TWO, new UnitStats(0, 0, 50, 200));
+        Attack enemyAttack = new Attack();
+        enemy.addAbility(enemyAttack);
+
+        Player p1 = new Player("P1", Team.PLAYER_ONE);
+        Player p2 = new Player("P2", Team.PLAYER_TWO);
+        p1.addUnit(evayne);
+        p2.addUnit(enemy);
+        GameMap map = new GameMap(5);
+        GameState state = new GameState(map, List.of(p1, p2), new Random(1));
+        state.setRemainingMoves(3);
+        map.moveUnit(evayne, map.getTile(new Position(0, 0)));
+        map.moveUnit(enemy, map.getTile(new Position(1, 0)));
+
+        assertTrue(enemyAttack.canUse(state, new UnitTarget(evayne)), "reachable before she vanishes");
+
+        ability.onUse(state, new TileTarget(map.getTile(new Position(0, 1))));
+
+        assertFalse(evayne.isTargetable());
+        assertFalse(enemyAttack.canUse(state, new UnitTarget(evayne)), "the enemy cannot swing at her");
+        assertTrue(enemyAttack.getLegalTargets(state).isEmpty(), "she is not even offered as a target");
+
+        // And she contributes nothing while she is gone.
+        state.setRemainingMoves(3);
+        evayne.resetTurnFlags();
+        assertFalse(move.canUse(state, new TileTarget(map.getTile(new Position(1, 1)))), "cannot move");
+        assertFalse(attack.canUse(state, new UnitTarget(enemy)), "cannot attack");
+        assertFalse(ability.canUse(state, new TileTarget(map.getTile(new Position(1, 1)))), "cannot cast");
+    }
 
     private CloakAndDagger newAbility() {
         return new CloakAndDagger(new AbilityDefinition("Cloak and Dagger", "active", "desc",

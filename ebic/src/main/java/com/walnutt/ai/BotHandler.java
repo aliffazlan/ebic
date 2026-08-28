@@ -14,6 +14,7 @@ import com.walnutt.game.Player;
 import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.ui.ActionChoice;
+import com.walnutt.ui.ChoiceOption;
 import com.walnutt.ui.ConcurrentSetupHandler;
 import com.walnutt.ui.InputHandler;
 import com.walnutt.unit.Unit;
@@ -124,6 +125,25 @@ public final class BotHandler implements InputHandler, ConcurrentSetupHandler {
             AttributeChooser.choose(attacker, defender, AttributeChooser.Role.ATTACKER, state.getRandom()),
             AttributeChooser.choose(defender, attacker, AttributeChooser.Role.DEFENDER, state.getRandom())
         };
+    }
+
+    /**
+     * Answers a mid-cast dialogue (Maxwell's Eureka choosing a gadget). Guarded like
+     * chooseAction: a throw here would propagate out of the ability's own onUse and abort
+     * the whole match, so a failure degrades to the first legal option instead.
+     */
+    @Override
+    public ChoiceOption chooseOption(GameState state, Unit unit, String title, List<ChoiceOption> options) {
+        if (options.isEmpty()) {
+            return null;
+        }
+        try {
+            ChoiceOption chosen = OptionChooser.choose(options);
+            return chosen == null ? options.get(0) : chosen;
+        } catch (RuntimeException e) {
+            LOG.log(Level.ERROR, "Bot failed while choosing an option; taking the first", e);
+            return options.get(0);
+        }
     }
 
     // ---- InputHandler: the sequential (terminal/self-play) setup path ----

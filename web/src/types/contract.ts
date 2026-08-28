@@ -62,8 +62,17 @@ export interface AbilitySnapshot {
   description: string;
   passive: boolean;
   ready: boolean;
+  // True when this one ability is locked for the rest of the turn by an effect
+  // (Joker's Superior Mastery lets each of his abilities be cast only once per
+  // turn), even though `ready` may read true because the cooldown is clear.
+  usedThisTurn: boolean;
   currentCooldown: number;
   maxCooldown: number;
+  // Move points this cast actually spends, decided server-side. 0 for a passive, for a
+  // BASIC unit's move/attack, and for anything a banked Capacitor Bank charge will pay
+  // for. Render this rather than re-deriving the rule - that is what keeps the button's
+  // "No moves remaining" state honest.
+  moveCost: number;
   // How far this ability reaches, so the client can outline the castable band rather
   // than only marking currently-legal targets. For a basic Attack this is the owner's
   // effective attack range. `minRange` is 0 for everything except an Attack under a
@@ -196,6 +205,14 @@ export interface LegalTargets {
   noTarget: boolean;
   unitIds: string[];
   tiles: { q: number; r: number }[];
+  // Present only for two-part abilities (Translocation): pick a unit, then one of
+  // *that unit's* destinations. Absent for every ordinary ability. The server
+  // enumerates both stages up front, so the client still computes no legality -
+  // it only decides which of the two sets to highlight right now.
+  multi?: {
+    primaryUnitIds: string[];
+    destinationsByPrimary: Record<string, { q: number; r: number }[]>;
+  };
 }
 export type LegalTargetsByUnit = Record<string, Record<string, LegalTargets>>;
 
@@ -206,9 +223,32 @@ export type LegalTargetsByUnit = Record<string, Record<string, LegalTargets>>;
 // `opponentUnitId` (the other party) so the client can look up both
 // UnitSnapshots (already in the last "state" message, no fog of war once
 // combat has started) and render the full encounter - see API_CONTRACT.md.
+// A `choice` prompt is a generic "pick one of these" dialogue raised from inside an
+// ability's own cast (Maxwell's Eureka choosing which gadget to construct). It carries
+// everything needed to render itself, so the client needs no per-ability knowledge -
+// respond with a `choice` message naming the option's id.
+export interface ChoiceOption {
+  id: string;
+  name: string;
+  description: string;
+  // Secondary line, e.g. "Cooldown: 4 turns" or "Passive". May be null.
+  detail: string | null;
+}
+
 export type PromptPayload =
   | { kind: "action"; team: Team; legalTargets: LegalTargetsByUnit }
-  | { kind: "attribute"; team: Team; unitId: string; opponentUnitId: string };
+  // `selectableAttributes` is the subset this unit can actually bring - an attribute it
+  // has none of is not a legal answer. Render the others disabled rather than hiding them,
+  // so the player can see *why* the choice is constrained. A unit with none at all is
+  // never prompted, so this is never empty.
+  | {
+      kind: "attribute";
+      team: Team;
+      unitId: string;
+      opponentUnitId: string;
+      selectableAttributes: Attribute[];
+    }
+  | { kind: "choice"; team: Team; unitId: string; title: string; options: ChoiceOption[] };
 
 // This player's own working placement arrangement only (fog of war - the
 // opponent's roster/positions are never sent here). Pushed once with the
@@ -255,11 +295,15 @@ export type ClientMessage =
       kind: "ability";
       unitId: string;
       abilityId: string;
-      targetKind: "unit" | "tile" | "none";
+      // "multi" carries BOTH halves of a two-part cast in one message - targetUnitId
+      // (who moves) and q/r (where to) - since the client has already picked both from
+      // the prompt's own `multi` block by the time it submits.
+      targetKind: "unit" | "tile" | "none" | "multi";
       targetUnitId?: string;
       q?: number;
       r?: number;
     }
   | { type: "attribute"; value: Attribute }
+  | { type: "choice"; optionId: string }
   | { type: "pick"; definitionId: string }
   | ({ type: "placement_edit" } & PlacementEdit);

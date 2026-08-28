@@ -26,6 +26,15 @@ public final class CombatEngine {
     }
 
     public static DamageEvent performAttack(GameState state, Encounter encounter) {
+        return performAttack(state, encounter, false);
+    }
+
+    /**
+     * {@code chained} marks a follow-up hit inside one ongoing attack chain, so passives
+     * that must fire once per cast can tell it apart from a fresh attack - see
+     * PostAttackEvent. Only Timeless Strike passes true.
+     */
+    public static DamageEvent performAttack(GameState state, Encounter encounter, boolean chained) {
         PreAttackEvent preAttack = new PreAttackEvent(encounter.attacker(), encounter.defender());
         state.getEventBus().publish(state, preAttack);
         if (preAttack.isCancelled()) {
@@ -38,7 +47,8 @@ public final class CombatEngine {
         }
         encounter.defender().takeDamage(state, event);
 
-        state.getEventBus().publish(state, new PostAttackEvent(encounter.attacker(), encounter.defender(), event));
+        state.getEventBus().publish(state,
+            new PostAttackEvent(encounter.attacker(), encounter.defender(), event, chained));
         return event;
     }
 

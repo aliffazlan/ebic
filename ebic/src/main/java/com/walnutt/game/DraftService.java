@@ -22,8 +22,14 @@ public class DraftService {
      * drafted unit's is, not actual pickable champions/elites. "vex" is kept here
      * defensively in case an unfinished vex.json (a past duplicate of valor.json)
      * ever reappears - it doesn't exist in design_ideas/ right now.
+     *
+     * "shawl" is a designed-but-unimplemented hero: shawl.json is real content sitting
+     * in units/elite/, so without this line he'd be draftable as a Move+Attack shell
+     * (and DraftPoolCoverageTest would fail). Delete the entry the moment his kit is
+     * wired into AbilityFactory. Summon prototypes like maxwell_drone/branchling need
+     * no entry - they're type "basic", which both pool queries already filter out.
      */
-    private static final Set<String> EXCLUDED = Set.of("vex", "yuki_golem", "zenith_pylon");
+    private static final Set<String> EXCLUDED = Set.of("vex", "yuki_golem", "zenith_pylon", "shawl");
 
     public List<String> getAvailableChampions(Map<String, UnitDefinition> unitDefs) {
         return unitDefs.entrySet().stream()

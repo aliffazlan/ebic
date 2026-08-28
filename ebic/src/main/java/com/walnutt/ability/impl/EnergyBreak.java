@@ -22,6 +22,11 @@ public class EnergyBreak extends PassiveAbility {
 
     @Override
     public void onPostAttack(GameState state, PostAttackEvent event) {
+        // Once per attack cast, not once per hit: Chronos's Timeless Strike chains up to
+        // nine attacks off a single click, which sent cooldowns to absurd numbers.
+        if (event.chained()) {
+            return;
+        }
         if (event.attacker() == getOwner()) {
             int increase = event.damageEvent().getDamage() > 0 ? bonusIncrease : cooldownIncrease;
             increaseCooldowns(event.defender(), increase);

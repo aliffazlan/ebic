@@ -1,6 +1,7 @@
 package com.walnutt.ai;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.web.Identifiers;
@@ -42,7 +43,35 @@ public final class HeroRatings {
         Map.entry("thaddeus", 45.0)     // The only real barrier/dispel support in the pool
     );
 
+    /**
+     * Heroes the bot refuses to draft, whatever their stats say.
+     *
+     * Maxwell is here on purpose, not because the bot cannot cope with him - self-play
+     * runs him without error and the scoring baselines are unchanged - but because
+     * playing him *well* is a different problem from playing him legally. His whole kit
+     * arrives through Eureka's construction choice, which is a long-horizon investment
+     * decision the greedy scorer has no way to reason about: it cannot see that a gadget
+     * bought now pays off in ten turns. Until the bot can plan that far, offering him is
+     * a worse experience than simply passing.
+     *
+     * Joker is here for the same class of reason. Mimic's payoff is an ability acquired
+     * now for use later, and whether that is worth a cast depends on what the enemy will
+     * do over the following turns - again invisible to a scorer that only looks at the
+     * position in front of it. Superior Mastery compounds it, since playing him well
+     * means sequencing casts to milk the cooldown refunds.
+     *
+     * A draft round always offers two distinct heroes, so declining one always leaves a
+     * pick available. Remove either entry once the bot can evaluate a decision whose
+     * payoff is several turns out.
+     */
+    private static final Set<String> AVOIDED = Set.of("maxwell", "joker");
+
     private HeroRatings() {
+    }
+
+    /** True if the bot should take the other option in this round rather than this one. */
+    public static boolean isAvoided(UnitDefinition definition) {
+        return AVOIDED.contains(Identifiers.normalize(definition.name()));
     }
 
     public static double rate(UnitDefinition definition) {
@@ -62,8 +91,20 @@ public final class HeroRatings {
         return score + KIT_ADJUSTMENTS.getOrDefault(Identifiers.normalize(definition.name()), 0.0);
     }
 
-    /** The better of two offered heroes. Ties go to the first, which is arbitrary but harmless. */
+    /**
+     * The better of two offered heroes. Ties go to the first, which is arbitrary but
+     * harmless.
+     *
+     * An avoided hero loses to any alternative regardless of rating, but still wins
+     * against another avoided one - the caller must always get a real pick back, since
+     * the draft has no "pass" and returning null would abort the match.
+     */
     public static UnitDefinition preferred(UnitDefinition a, UnitDefinition b) {
+        boolean avoidA = isAvoided(a);
+        boolean avoidB = isAvoided(b);
+        if (avoidA != avoidB) {
+            return avoidA ? b : a;
+        }
         return rate(b) > rate(a) ? b : a;
     }
 }

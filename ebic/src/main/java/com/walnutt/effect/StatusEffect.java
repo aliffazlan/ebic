@@ -12,7 +12,13 @@ public class StatusEffect extends Effect {
     }
 
     public StatusEffect(String name, int duration, EffectCategory category, StatusFlag... statusFlags) {
-        super(name, duration);
+        this(name, "", duration, category, statusFlags);
+    }
+
+    /** With player-facing text, so the sidebar tooltip reads as something other than blank. */
+    public StatusEffect(String name, String description, int duration, EffectCategory category,
+                         StatusFlag... statusFlags) {
+        super(name, description, duration);
         this.flags.addAll(Arrays.asList(statusFlags));
         this.category = category;
     }

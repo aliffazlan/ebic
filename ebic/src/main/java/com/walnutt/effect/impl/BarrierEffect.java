@@ -25,6 +25,16 @@ public class BarrierEffect extends Effect {
         return remainingBarrierHp;
     }
 
+    /**
+     * Restores this barrier to a full pool and a full duration, for an ability that
+     * refreshes rather than stacks a second instance of itself (Energy Shield). Lives here
+     * rather than on the subclass because remainingBarrierHp is private to this class.
+     */
+    public void refresh(int barrierHp, int duration) {
+        this.remainingBarrierHp = barrierHp;
+        setRemainingTurns(duration);
+    }
+
     @Override
     public String getExtraInfo() {
         return "Barrier: " + remainingBarrierHp + " HP remaining";

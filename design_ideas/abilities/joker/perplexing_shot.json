@@ -1,0 +1,12 @@
+{
+    "name": "Perplexing Shot",
+    "type": "active",
+    "description": "Fires an erratic bolt at an enemy within %cast_range% tiles for %damage% damage. The bolt then ricochets up to %bounces% times to a random unit beside its last victim - friend or foe - striking %bonus_damage% harder with every jump. It never hits the same unit twice, and fizzles out if there is nothing beside it to jump to.",
+    "stats": {
+        "cast_range": 2,
+        "cooldown": 3,
+        "damage": 30,
+        "bonus_damage": 20,
+        "bounces": 2
+    }
+}

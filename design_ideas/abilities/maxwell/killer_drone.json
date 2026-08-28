@@ -1,0 +1,11 @@
+{
+    "name": "Killer Drone",
+    "type": "active",
+    "description": "Deploys a drone onto any tile up to %cast_range% tiles away, lasting %duration% turns. Drones can be moved freely and never block movement, but have no attack of their own - instead each one strikes a random enemy within %strike_range% tile at the end of every turn, counting an enemy sharing its tile.",
+    "stats": {
+        "cooldown": 4,
+        "cast_range": 5,
+        "duration": 8,
+        "strike_range": 1
+    }
+}

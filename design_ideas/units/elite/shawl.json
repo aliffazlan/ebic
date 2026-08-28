@@ -1,0 +1,12 @@
+{
+    "name": "Shawl",
+    "type": "elite",
+    "max_hp": 760,
+    "strength": 48,
+    "agility": 32,
+    "intelligence" : 54,
+    "attack_range": 1,
+    "abilities": [
+        "hidden_potential", "acidic_brew"
+    ]
+}

@@ -17,7 +17,16 @@ import com.walnutt.unit.Unit;
 public interface InputHandler {
     ActionChoice chooseAction(GameState state, Player player);
 
-    /** {@code opponent} is the other party in this encounter (whichever of attacker/defender isn't {@code unit}) - a UI can use it to show/highlight both sides together. */
+    /**
+     * {@code opponent} is the other party in this encounter (whichever of attacker/defender
+     * isn't {@code unit}) - a UI can use it to show/highlight both sides together.
+     *
+     * The answer must be one of {@code unit.getUsableAttributes()}: a unit cannot bring an
+     * attribute it has none of. No extra parameter carries that set, because every
+     * implementation already has {@code unit} and can ask it directly - which keeps one
+     * source of truth for the rule. A unit with no usable attribute is never asked at all
+     * (see Attack.buildEncounter), so implementations may assume the list is non-empty.
+     */
     Attribute chooseAttribute(GameState state, Unit unit, Unit opponent);
 
     /**
@@ -32,6 +41,26 @@ public interface InputHandler {
         Attribute attackerChoice = chooseAttribute(state, attacker, defender);
         Attribute defenderChoice = chooseAttribute(state, defender, attacker);
         return new Attribute[] { attackerChoice, defenderChoice };
+    }
+
+    /**
+     * Generic "pick one of these" dialogue, raised from inside an ability's own onUse
+     * (Maxwell's Eureka choosing which gadget to construct) the same way Attack.onUse
+     * already raises chooseAttributePair - so no engine code needs to know such a
+     * dialogue exists.
+     *
+     * Defaulted rather than abstract for the same reason chooseAttributePair is: the
+     * scripted InputHandler doubles across the test suite would otherwise all need
+     * updating for a method they never exercise. Taking the first option is a
+     * deterministic, always-legal answer - but it is NOT a real implementation, and any
+     * handler fronting an actual decision-maker (a UI, the bot) must override it.
+     *
+     * @param unit    whose ability raised the dialogue, so a UI can show who is choosing
+     * @param title   what is being chosen, e.g. "Construct a gadget"
+     * @return one of {@code options}; never null unless {@code options} is empty
+     */
+    default ChoiceOption chooseOption(GameState state, Unit unit, String title, List<ChoiceOption> options) {
+        return options.isEmpty() ? null : options.get(0);
     }
 
     /** Draft phase: player picks one of the offered candidates. */

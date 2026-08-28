@@ -68,6 +68,10 @@ export class Board {
   // updates (e.g. a new snapshot arriving) without being torn down mid-pick,
   // it's only ever rebuilt by renderStackPicker() itself.
   readonly stackPickerLayer = new Container();
+  // Fallen units, parked off the hex grid in two columns at the board's edges
+  // like captured chess pieces. Its own layer so a corpse is never mistaken for
+  // a board occupant by anything that walks unitsLayer.
+  readonly graveyardLayer = new Container();
 
   private iconFactory: UnitIconFactory;
   private tileGraphics = new Map<string, Graphics>();
@@ -100,6 +104,9 @@ export class Board {
   // renders a small row of individually-clickable icons above the tile so
   // every occupant becomes reachable.
   private stackPickerTile: AxialCoord | null = null;
+  // Death order per team. A corpse keeps the slot it first got, so a later
+  // casualty is appended below rather than reshuffling the whole column.
+  private graveyard = new Map<string, string[]>();
 
   constructor(app: Application, store: GameStateStore, callbacks: BoardCallbacks) {
     this.app = app;
@@ -114,6 +121,7 @@ export class Board {
       this.strobeLayer,
       this.uiLayer,
       this.stackPickerLayer,
+      this.graveyardLayer,
     );
     this.recenter();
 
@@ -197,6 +205,8 @@ export class Board {
     if (radius === this.mapRadius && rowLimit === this.mapRowLimit) return;
     this.mapRadius = radius;
     this.mapRowLimit = rowLimit;
+    this.graveyard.clear();
+    this.graveyardLayer.removeChildren();
     this.boardLayer.removeChildren();
     this.tileGraphics.clear();
 
@@ -321,6 +331,47 @@ export class Board {
     });
   }
 
+  /**
+   * Parks a fallen unit in its team's column at the board's edge, the way captured
+   * chess pieces sit on the border - off the hex grid entirely, so it can't be
+   * clicked instead of the tile beneath it or counted as an occupant of it.
+   *
+   * The engine keeps dead units in the roster (their position field is never
+   * cleared, a documented gotcha), so they keep arriving in every snapshot with
+   * their last q,r - which is exactly why the client has to move them rather than
+   * simply trusting the coordinates. Note only roster units ever reach here: a
+   * dead summon leaves GameState's registry entirely and just disappears.
+   */
+  private placeInGraveyard(unit: UnitSnapshot, container: Container): void {
+    if (container.parent !== this.graveyardLayer) {
+      this.graveyardLayer.addChild(container);
+    }
+    const column = this.graveyard.get(unit.team) ?? [];
+    if (!column.includes(unit.id)) {
+      column.push(unit.id);
+      this.graveyard.set(unit.team, column);
+    }
+
+    // One column just outside each end of the hex grid. The root is centred on
+    // screen and hexes live in local coordinates around the origin, so a constant
+    // derived from the map width lands cleanly on the border.
+    const edge = (this.mapRadius + 1.6) * HEX_SIZE * 1.5;
+    const slot = column.indexOf(unit.id);
+    const columnTop = -(this.mapRowLimit + 0.5) * HEX_SIZE * 1.732;
+    container.position.set(
+      unit.team === "PLAYER_ONE" ? -edge : edge,
+      columnTop + slot * HEX_SIZE * 0.8,
+    );
+
+    // No slide into the tray: a corpse crossing the whole board would read as a
+    // move. Cancel any tween still in flight from its last living step.
+    const tick = this.activeMoveTicks.get(unit.id);
+    if (tick) {
+      Ticker.shared.remove(tick);
+      this.activeMoveTicks.delete(unit.id);
+    }
+  }
+
   private async upsertUnit(unit: UnitSnapshot): Promise<void> {
     // Knowable before the lookup/creation branch below - covers both a
     // unit's very first appearance and a fog-of-war reveal (the opponent's
@@ -369,6 +420,17 @@ export class Board {
     sprite.height = HEX_SIZE * 1.15;
     container.addChild(sprite);
 
+    if (unit.dead) {
+      // A corpse gets no HP bar - it would read as a live unit at 0 health - and is
+      // shrunk so a long column still fits beside the board. It stays interactive:
+      // the pointertap handler above still routes it to the sidebar for inspection.
+      sprite.width = HEX_SIZE * 0.7;
+      sprite.height = HEX_SIZE * 0.7;
+      container.alpha = 0.45;
+      this.placeInGraveyard(unit, container);
+      return;
+    }
+
     const barWidth = HEX_SIZE * 1.1;
     const barY = HEX_SIZE / 2 + 3;
     container.addChild(
@@ -383,7 +445,7 @@ export class Board {
     // Active-status display moved entirely into the sidebar effects list (see
     // Hud.renderUnitPanel) - the board itself no longer renders floating
     // status-flag text above units, just sprite + HP bar + strobe ring.
-    container.alpha = unit.dead ? 0.3 : 1;
+    container.alpha = 1;
 
     const pos = axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE);
     if (isNewUnit) {
@@ -474,17 +536,40 @@ export class Board {
       this.drawCastRange(state);
       const legal = state.prompt.legalTargets?.[state.selectedUnitId]?.[state.selectedAbilityId];
       if (!legal) return;
+
+      // A two-part ability highlights one stage at a time: the units that can be moved,
+      // then - once one is chosen - only that unit's own destinations. Showing every
+      // pair at once would light up most of the board and mean nothing.
+      if (legal.multi) {
+        if (state.multiPrimaryUnitId) {
+          for (const tile of legal.multi.destinationsByPrimary[state.multiPrimaryUnitId] ?? []) {
+            this.highlightTile(tile.q, tile.r);
+          }
+          this.ringUnit(state.multiPrimaryUnitId, SELECTED_RING_COLOR);
+        } else {
+          for (const unitId of legal.multi.primaryUnitIds) {
+            this.ringUnit(unitId, LEGAL_UNIT_RING_COLOR);
+          }
+        }
+        return;
+      }
+
       for (const tile of legal.tiles) {
         this.highlightTile(tile.q, tile.r);
       }
       for (const unitId of legal.unitIds) {
-        const sprite = this.unitSprites.get(unitId);
-        if (!sprite) continue;
-        const ring = new Graphics().circle(0, 0, HEX_SIZE * 0.75).stroke({ width: 3, color: LEGAL_UNIT_RING_COLOR });
-        ring.position.copyFrom(sprite.position);
-        this.uiLayer.addChild(ring);
+        this.ringUnit(unitId, LEGAL_UNIT_RING_COLOR);
       }
     }
+  }
+
+  /** Ring around a unit's sprite; a no-op if that unit isn't currently rendered. */
+  private ringUnit(unitId: string, color: number): void {
+    const sprite = this.unitSprites.get(unitId);
+    if (!sprite) return;
+    const ring = new Graphics().circle(0, 0, HEX_SIZE * 0.75).stroke({ width: 3, color });
+    ring.position.copyFrom(sprite.position);
+    this.uiLayer.addChild(ring);
   }
 
   /**

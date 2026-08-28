@@ -123,6 +123,21 @@ public abstract class Unit {
         abilities.add(ability);
     }
 
+    /**
+     * Unequips an ability without severing it from this unit - {@code owner} is
+     * deliberately left set, so the instance stays coherent for whoever is holding onto
+     * it (Joker's Mimic parks a replaced copy and keeps ticking its cooldown) and can be
+     * handed straight back to {@link #addAbility} later.
+     *
+     * <p>Re-adding it re-fires {@link Ability#onAttached}, which is harmless for
+     * everything copyable today - Eureka guards its own, and Gyroscope's permanent
+     * modifiers are only reachable on a passive, which is never copied. An ability whose
+     * onAttached is not idempotent must carry the {@code no_copy} tag in its JSON.
+     */
+    public void removeAbility(Ability ability) {
+        abilities.remove(ability);
+    }
+
     public List<Ability> getAbilities() {
         return Collections.unmodifiableList(abilities);
     }
@@ -226,6 +241,8 @@ public abstract class Unit {
             case INTELLIGENCE -> baseStats.intelligence();
             case MAX_HEALTH -> baseStats.maxHealth();
             case ATTACK_RANGE -> baseStats.attackRange();
+            // No per-unit base: a cast-range bonus only ever comes from a modifier.
+            case CAST_RANGE -> 0;
         };
 
         double flatTotal = 0;
@@ -253,6 +270,30 @@ public abstract class Unit {
         return (int) getEffective(stat);
     }
 
+    /**
+     * The attributes this unit can actually bring to an encounter - those whose effective
+     * value is above 0. A unit cannot choose an attribute it has none of, so a Branchling
+     * (0/0/0), or anything whose stats have been stripped by Cripple/Decay/Shrink Ray, can
+     * end up unable to defend itself at all.
+     *
+     * Single source of truth for the rule: every chooser (human prompt, weighted roll, the
+     * bot's solver) reads this rather than re-deriving "is this above zero".
+     */
+    public List<Attribute> getUsableAttributes() {
+        List<Attribute> usable = new ArrayList<>();
+        for (Attribute attribute : Attribute.values()) {
+            if (getAttributeValue(attribute) > 0) {
+                usable.add(attribute);
+            }
+        }
+        return usable;
+    }
+
+    /** False for a unit with every attribute at 0 - it cannot attack, and cannot defend. */
+    public boolean hasUsableAttribute() {
+        return !getUsableAttributes().isEmpty();
+    }
+
     private List<StatModifier> allModifiers() {
         List<StatModifier> all = new ArrayList<>(permanentModifiers);
         for (Effect effect : effects) {
@@ -266,6 +307,51 @@ public abstract class Unit {
     public boolean hasStatus(StatusFlag flag) {
         for (Effect effect : effects) {
             if (!effect.isExpired() && effect.getStatusFlags().contains(flag)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True if some active effect forbids this ONE ability right now, as opposed to
+     * {@link #isBlockedFrom} blanket-blocking a whole kind of action. Scanned live off
+     * the effect list for the same reason hasStatus is, so stacking and expiry need no
+     * bookkeeping. Joker's Superior Mastery is the only source today.
+     */
+    public boolean isAbilityRestricted(Ability ability) {
+        for (Effect effect : effects) {
+            if (!effect.isExpired() && effect.restrictsAbility(ability)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * False while some active effect seals this unit off from the battlefield - nothing
+     * may target it, from EITHER side. Checked once in Ability.canUse and once in
+     * Attack.canUse (which rolls its own checks), so it removes the unit from
+     * getLegalTargets and therefore from the client's highlighting and the bot's
+     * enumeration without either learning a new rule.
+     *
+     * Deliberately separate from damage immunity, which lives in takeDamage: an area
+     * ability that sweeps a radius rather than picking a target still reaches an
+     * invulnerable unit and is still zeroed there (and Sanity's Eclipse still punches
+     * through it). Targeting governs SELECTION; INVULNERABLE governs DAMAGE.
+     *
+     * UNTARGETABLE is listed too so the flag finally means something - it shipped
+     * declared and unread - and stays available to a future effect that wants to be
+     * unpickable without also being immune.
+     */
+    public boolean isTargetable() {
+        return !hasStatus(StatusFlag.INVULNERABLE) && !hasStatus(StatusFlag.UNTARGETABLE);
+    }
+
+    /** True while some active effect will pay for a cast in place of a move point. */
+    public boolean hasFreeCastCharge() {
+        for (Effect effect : effects) {
+            if (!effect.isExpired() && effect.freeCastCharges() > 0) {
                 return true;
             }
         }
@@ -301,6 +387,11 @@ public abstract class Unit {
         if (!hasStatus(StatusFlag.COOLDOWNS_PAUSED)) {
             for (Ability ability : abilities) {
                 ability.tick();
+                // Abilities parked off-roster (a copy Joker's Mimic is no longer
+                // wielding) keep cooling down while they wait - see getHeldAbilities.
+                for (Ability held : ability.getHeldAbilities()) {
+                    held.tick();
+                }
             }
         }
         removeExpiredEffects(state);

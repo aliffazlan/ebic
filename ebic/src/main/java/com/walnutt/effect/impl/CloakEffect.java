@@ -13,9 +13,9 @@ import com.walnutt.status.StatusFlag;
 import com.walnutt.unit.Unit;
 
 /**
- * Evayne's Cloak and Dagger: she effectively disappears from the game for the
- * duration - hidden AND invulnerable, occupying whatever tile she was cast on
- * (possibly stacked with whoever was already standing there; other units can also
+ * Evayne's Cloak and Dagger: she genuinely disappears from the game for the
+ * duration - hidden, untargetable, immune, and unable to act - occupying whatever tile
+ * she was cast on (possibly stacked with whoever was already standing there; other units can also
  * still walk onto that tile without knowing she's there, since Tile.isWalkable()
  * tolerates HIDDEN occupants). Any enemy that ends up on her exact tile - at cast
  * time or later - is automatically ambushed with a weighted-attribute attack at
@@ -33,13 +33,17 @@ public class CloakEffect extends Effect {
 
     public CloakEffect(int duration, double damagePenalty) {
         super("Cloak and Dagger",
-            "Evayne vanishes - hidden and invulnerable - occupying the tile she cast this on. Any enemy "
-                + "caught on that exact tile, now or later, is ambushed for reduced damage; she reappears "
-                + "on the nearest free tile once the effect ends.",
+            "Evayne vanishes into the shadows - untouchable, but unable to move, attack or cast while "
+                + "she is gone. Any enemy caught on the exact tile she cast this on, now or later, is "
+                + "ambushed for reduced damage; she reappears on the nearest free tile once it ends.",
             duration);
         this.damagePenalty = damagePenalty;
         this.flags.add(StatusFlag.HIDDEN);
         this.flags.add(StatusFlag.INVULNERABLE);
+        // She is out of the game, not merely hard to kill: STUNNED blocks all three action
+        // kinds through the existing Unit.isBlockedFrom machinery. The ambush is unaffected -
+        // it fires from onMove below, not through her action economy.
+        this.flags.add(StatusFlag.STUNNED);
         this.category = EffectCategory.BUFF;
     }
 

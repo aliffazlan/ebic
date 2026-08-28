@@ -7,6 +7,8 @@ export interface MatchActions {
   castAbility(targetKind: "unit" | "tile" | "none", target?: { unitId?: string; q?: number; r?: number }): void;
   endTurn(): void;
   sendAttribute(value: Attribute): void;
+  /** Answers a `choice` prompt (Eureka's gadget dialogue) with the chosen option's id. */
+  sendChoice(optionId: string): void;
   sendPick(definitionId: string): void;
   sendPlacementSwap(unitId: string, targetUnitId: string): void;
   sendPlacementMove(unitId: string, q: number, r: number): void;

@@ -3,6 +3,7 @@ import type {
   AbilityPreviewSnapshot,
   AbilitySnapshot,
   Attribute,
+  ChoiceOption,
   EffectSnapshot,
   PlacementUnitSnapshot,
   Team,
@@ -115,9 +116,70 @@ export class Hud {
       // Receiving a draft_round message doubles as the prompt to pick - see
       // API_CONTRACT.md, there's no separate "pick" prompt kind anymore.
       this.hudHost.appendChild(this.renderDraftModal(state));
+    } else if (state.prompt?.kind === "choice") {
+      this.hudHost.appendChild(this.renderChoiceModal(state.prompt));
     } else if (state.prompt?.kind === "attribute") {
       this.hudHost.appendChild(this.renderAttributeModal(state));
     }
+  }
+
+  /**
+   * The generic option dialogue (Maxwell's Eureka picking a gadget). Everything shown
+   * comes from the prompt itself - name, description, detail - so this stays a single
+   * renderer no matter which ability raised it, and a future ability needs no new UI.
+   */
+  private renderChoiceModal(prompt: { title: string; unitId: string; options: ChoiceOption[] }): HTMLElement {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+
+    const panel = document.createElement("div");
+    panel.className = "modal-panel choice-modal-panel";
+    backdrop.appendChild(panel);
+
+    const title = document.createElement("h2");
+    title.textContent = prompt.title;
+    panel.appendChild(title);
+
+    const caster = this.store.findUnit(prompt.unitId);
+    if (caster) {
+      const sub = document.createElement("div");
+      sub.className = "hint";
+      sub.textContent = caster.name;
+      panel.appendChild(sub);
+    }
+
+    const cards = document.createElement("div");
+    cards.className = "choice-cards";
+    for (const option of prompt.options) {
+      cards.appendChild(this.renderChoiceCard(option));
+    }
+    panel.appendChild(cards);
+
+    return backdrop;
+  }
+
+  private renderChoiceCard(option: ChoiceOption): HTMLElement {
+    const card = document.createElement("div");
+    card.className = "choice-card";
+
+    const name = document.createElement("h5");
+    name.textContent = option.name;
+    card.appendChild(name);
+
+    if (option.detail) {
+      const detail = document.createElement("div");
+      detail.className = "hint";
+      detail.textContent = option.detail;
+      card.appendChild(detail);
+    }
+
+    const description = document.createElement("div");
+    description.className = "choice-card-description";
+    description.textContent = option.description;
+    card.appendChild(description);
+
+    card.addEventListener("click", () => this.actions.sendChoice(option.id));
+    return card;
   }
 
   private renderTopBar(state: MatchUiState): HTMLElement {
@@ -235,7 +297,15 @@ export class Hud {
       const targetHint = document.createElement("div");
       targetHint.className = "hint";
       targetHint.style.marginTop = "8px";
-      targetHint.textContent = "Click a unit or tile on the board to target this ability.";
+      const multi =
+        state.prompt?.kind === "action"
+          ? state.prompt.legalTargets?.[state.selectedUnitId]?.[state.selectedAbilityId]?.multi
+          : undefined;
+      targetHint.textContent = !multi
+        ? "Click a unit or tile on the board to target this ability."
+        : state.multiPrimaryUnitId
+          ? "Now click where to put it, or click it again to pick someone else."
+          : "Click the unit you want to move.";
       // Self-casts fire the moment they are selected (see MatchScreen's
       // castImmediatelyIfSelfTargeted), so anything still showing this panel is
       // genuinely waiting on a target.
@@ -280,14 +350,14 @@ export class Hud {
   }
 
   /**
-   * Move/Attack/ability cost and blocked-by-status-flag rules mirror the
-   * engine exactly (see CLAUDE.md's Core game rules + Status flags sections):
-   * BASIC units move AND attack for free, everything else pays 1 per move or
-   * attack, and any other active ability costs 1 - no ability in the engine
-   * overrides that default. A unit can also only move/attack once per turn
-   * regardless of move points remaining (hasMovedThisTurn/hasAttackedThisTurn),
-   * independent of cooldown-based `ready`, so "free" means "costs no move
-   * point", not "unlimited".
+   * Blocked-by-status-flag rules mirror the engine (see CLAUDE.md's Status flags
+   * section). The action COST no longer does: it arrives as `ability.moveCost`,
+   * computed by Ability.getMoveCost, because the rule stopped being derivable
+   * from the snapshot alone once Maxwell's Capacitor Bank could pay for a cast.
+   * A unit can still only move/attack once per turn regardless of move points
+   * remaining (hasMovedThisTurn/hasAttackedThisTurn), independent of both
+   * cooldown-based `ready` and cost, so "free" means "costs no move point",
+   * not "unlimited".
    */
   private renderAbilityButton(
     unit: UnitSnapshot,
@@ -325,12 +395,18 @@ export class Hud {
       } else if (kind === "attack" && unit.hasAttackedThisTurn) {
         disabled = true;
         reason = "Already attacked this turn";
+      } else if (ability.usedThisTurn) {
+        // Server-decided, not re-derived here: the engine already refused it via
+        // Ability.canUse, so this only explains a button that would otherwise look
+        // castable (its cooldown can genuinely read 0).
+        disabled = true;
+        reason = "Already used this turn";
       } else {
-        const isFreeBasicAction =
-          unit.unitType === "BASIC" && (kind === "attack" || kind === "move");
-        const cost = isFreeBasicAction ? 0 : 1;
+        // Server-computed (Ability.getMoveCost), not re-derived here: it already accounts
+        // for a BASIC unit's free move/attack AND for a Maxwell charge paying the cost,
+        // neither of which this side could know on its own.
         const remainingMoves = state.snapshot?.remainingMoves ?? 0;
-        if (remainingMoves < cost) {
+        if (remainingMoves < ability.moveCost) {
           disabled = true;
           reason = "No moves remaining";
         }
@@ -728,7 +804,12 @@ export class Hud {
     // prompt.kind is narrowed to "attribute" by the caller (Hud.render); both
     // ids resolve against the last "state" message's units - no fog of war
     // once combat has started, see API_CONTRACT.md.
-    const prompt = state.prompt as { kind: "attribute"; unitId: string; opponentUnitId: string };
+    const prompt = state.prompt as {
+      kind: "attribute";
+      unitId: string;
+      opponentUnitId: string;
+      selectableAttributes?: Attribute[];
+    };
     const self = this.store.findUnit(prompt.unitId);
     const opponent = this.store.findUnit(prompt.opponentUnitId);
 
@@ -757,13 +838,33 @@ export class Hud {
       return backdrop;
     }
 
+    // The server decides which attributes are legal (a unit cannot fight with one it has
+    // none of) and ships the set; the client never re-derives the rule from the stat block.
+    // An older server that doesn't send the field leaves all three enabled.
+    const selectable = prompt.selectableAttributes;
     const row = document.createElement("div");
     row.className = "attribute-buttons";
     for (const attr of ATTRIBUTES) {
+      const usable = !selectable || selectable.includes(attr);
       const btn = document.createElement("button");
       btn.className = "primary";
       btn.textContent = attr;
-      btn.addEventListener("click", () => this.actions.sendAttribute(attr));
+      btn.disabled = !usable;
+      if (!usable) {
+        // Disabled alone reads as "broken"; say which stat is missing, using the same
+        // hover tooltip everything else in the HUD uses rather than a second mechanism.
+        this.attachTooltip(btn, (e) =>
+          this.showAbilityTooltip(
+            attr,
+            `${self?.name ?? "This unit"} has no ${attr.toLowerCase()} left, so it cannot fight with it.`,
+            false,
+            "",
+            e,
+          ),
+        );
+      } else {
+        btn.addEventListener("click", () => this.actions.sendAttribute(attr));
+      }
       row.appendChild(btn);
     }
     panel.appendChild(row);

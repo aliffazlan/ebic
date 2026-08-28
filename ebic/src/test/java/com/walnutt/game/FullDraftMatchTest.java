@@ -58,7 +58,7 @@ class FullDraftMatchTest {
         };
 
         // Fixed seed: the draft pool is now larger than what a single draft consumes
-        // (5 champions for 4 slots, 14 elites for 12), so WHICH heroes get offered
+        // (6 champions for 4 slots, 14 elites for 12), so WHICH heroes get offered
         // varies run to run. Without a seed this test's roster assertions silently
         // depend on that draw and only fail some of the time.
         GameState state = Game.newFullDraftMatch(alwaysFirst, silent, new Random(20260827L)).getState();
