@@ -26,14 +26,20 @@ import com.walnutt.web.match.MatchService;
 /**
  * Wires Javalin: HTTP routes (auth + match lobby) and the WS game bridge
  * (/ws/matches/{matchId}). See API_CONTRACT.md for the exact shapes. Run with
- * `java -cp ... com.walnutt.web.WebServer` or `java -cp ... com.walnutt.Main web`.
+ * `java -cp ... com.walnutt.web.WebServer` or `java -cp ... com.walnutt.Main
+ * web`.
  */
 public final class WebServer {
     private static final Logger LOG = System.getLogger(WebServer.class.getName());
     private static final String SESSION_COOKIE = "ebic_session";
     private static final int SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-    /** Vite's default dev port. Adjust here (single source of truth) if the frontend's dev port changes. */
-    private static final Set<String> ALLOWED_ORIGINS = Set.of("http://localhost:5173");
+    /**
+     * Vite's default dev port. Adjust here (single source of truth) if the
+     * frontend's dev port changes.
+     */
+    private static final Set<String> ALLOWED_ORIGINS = Set.of(
+            "http://localhost:5173",
+            "https://ebic.walnutt.net");
     /**
      * A real match can sit idle for a while (a player thinking through a turn, an
      * attribute encounter waiting on the other side, someone stepping away) with no
@@ -142,8 +148,10 @@ public final class WebServer {
     }
 
     /**
-     * A null/absent definitionId clears the favourite, which is what the client's "None"
-     * option sends. Validated against the same catalogue the info page serves, so a hero
+     * A null/absent definitionId clears the favourite, which is what the client's
+     * "None"
+     * option sends. Validated against the same catalogue the info page serves, so a
+     * hero
      * nobody can be dealt (Shawl, a summon prototype) can never be stored either.
      */
     private void handleSetFavouriteUnit(Context ctx) {
@@ -161,7 +169,10 @@ public final class WebServer {
         sendJson(ctx, 200, payload);
     }
 
-    /** The whole draftable roster as static design data - stats plus ability text, no match needed. */
+    /**
+     * The whole draftable roster as static design data - stats plus ability text,
+     * no match needed.
+     */
     private void handleUnits(Context ctx) {
         requireAuth(ctx);
         JsonObject payload = new JsonObject();
@@ -180,8 +191,10 @@ public final class WebServer {
     }
 
     /**
-     * Starts a match against the computer. The level is accepted and validated even though
-     * STANDARD is currently the only value, so introducing another difficulty later is a
+     * Starts a match against the computer. The level is accepted and validated even
+     * though
+     * STANDARD is currently the only value, so introducing another difficulty later
+     * is a
      * new enum constant rather than a change to this contract or to the client.
      */
     private void handleCreateBotMatch(Context ctx) {
@@ -233,7 +246,8 @@ public final class WebServer {
      * Registered via wsBeforeUpgrade (NOT a plain before() filter - confirmed
      * empirically that a plain before() on the WS path does not stop the handshake;
      * Javalin still returns 101 Switching Protocols and only closes the socket
-     * afterwards). wsBeforeUpgrade runs on the plain HTTP upgrade request itself, so
+     * afterwards). wsBeforeUpgrade runs on the plain HTTP upgrade request itself,
+     * so
      * an invalid session or non-participant is rejected with a real HTTP 401/403
      * *before* the WS handshake completes, per API_CONTRACT.md ("reject the upgrade
      * with HTTP 401"). Note: Javalin's WsContext does NOT reliably inherit
@@ -249,7 +263,7 @@ public final class WebServer {
         AuthService.AuthedUser user = requireAuth(ctx);
         String matchId = ctx.pathParam("matchId");
         MatchService.MatchParticipants participants = matches.getParticipants(matchId)
-            .orElseThrow(() -> new ApiException(401, "not a participant in this match"));
+                .orElseThrow(() -> new ApiException(401, "not a participant in this match"));
         if (user.userId() != participants.playerOneId() && user.userId() != participants.playerTwoId()) {
             throw new ApiException(401, "not a participant in this match");
         }
@@ -333,7 +347,8 @@ public final class WebServer {
     }
 
     private void setSessionCookie(Context ctx, String token) {
-        ctx.cookie(new Cookie(SESSION_COOKIE, token, "/", SESSION_MAX_AGE_SECONDS, false, 0, true, null, null, SameSite.LAX));
+        ctx.cookie(new Cookie(SESSION_COOKIE, token, "/", SESSION_MAX_AGE_SECONDS, false, 0, true, null, null,
+                SameSite.LAX));
     }
 
     private String clientIp(Context ctx) {
