@@ -22,8 +22,11 @@ class JsonDataLoaderTest {
         assertTrue(units.containsKey("valor"), "champion/valor.json");
         assertTrue(units.containsKey("dirge"), "elite/dirge.json");
         assertTrue(units.containsKey("zenith"), "champion/zenith.json - finished, no longer a blank placeholder");
-        assertTrue(units.containsKey("yuki_golem"), "elite/yuki_golem.json - a summon prototype, not draftable, but still a valid UnitDefinition");
-        assertTrue(units.containsKey("zenith_pylon"), "top-level zenith_pylon.json - also not draftable, still loaded");
+        assertTrue(units.containsKey("yuki_golem"), "units/other/yuki_golem.json - a summon prototype, not draftable, but still a valid UnitDefinition");
+        assertTrue(units.containsKey("zenith_pylon"), "units/other/zenith_pylon.json - also not draftable, still loaded");
+        assertTrue(units.containsKey("shawl"), "elite/shawl.json - draftable as of v0.3.0");
+        // The loader keys on filename and walks units/ recursively, so moving the summon
+        // prototypes into units/other/ changed none of the ids above.
 
         assertTrue(abilities.containsKey("soul_rip"));
         assertTrue(abilities.containsKey("backstab"));

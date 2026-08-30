@@ -132,18 +132,36 @@ class ConcurrentSetupFlowTest {
     }
 
     /**
-     * Shawl is real content in design_ideas/ but is in DraftService.EXCLUDED, so he must be
-     * ignored rather than injected - the same goes for any id that stops being draftable
-     * after someone has already stored it.
+     * A summon prototype is real content in design_ideas/ but sits in DraftService.EXCLUDED,
+     * so it must be ignored rather than injected - the same goes for any id that stops being
+     * draftable after a player has already stored it as their favourite.
+     *
+     * This used to be spelled with "shawl", who was a designed-but-unimplemented hero. He is
+     * draftable as of v0.3.0, so the case needs an id that is genuinely still excluded.
      */
     @Test
     @Timeout(10)
     void anUndraftableFavouriteIsIgnoredRatherThanBreakingTheDraft() {
         RecordingPickHandler handler = new RecordingPickHandler();
         Game game = Game.newConcurrentFullDraftMatch(handler, noOpInputHandler(), silentRenderer(),
+            Map.of(Team.PLAYER_ONE, "zenith_pylon"));
+
+        assertFalse(handler.allOffered(Team.PLAYER_ONE).contains("zenith_pylon"));
+        assertEquals(14, game.getState().getPlayers().get(0).getUnits().size());
+    }
+
+    /**
+     * Shawl's counterpart to the case above: now that he IS draftable, favouriting him has to
+     * actually work rather than silently doing nothing.
+     */
+    @Test
+    @Timeout(10)
+    void shawlIsDraftableAndCanBeFavourited() {
+        RecordingPickHandler handler = new RecordingPickHandler();
+        Game game = Game.newConcurrentFullDraftMatch(handler, noOpInputHandler(), silentRenderer(),
             Map.of(Team.PLAYER_ONE, "shawl"));
 
-        assertFalse(handler.allOffered(Team.PLAYER_ONE).contains("shawl"));
+        assertTrue(handler.allOffered(Team.PLAYER_ONE).contains("shawl"));
         assertEquals(14, game.getState().getPlayers().get(0).getUnits().size());
     }
 

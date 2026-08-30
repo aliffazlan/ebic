@@ -3,13 +3,26 @@
     "type": "active",
     "description": "Forms a link with a target within %cast_range% tiles, stealing %dmg_steal% damage from them at the start of every turn and granting a free attack at the end of it.",
     "details": [
-        "The link breaks if this unit does not end its turn adjacent to the target.",
+        "The link breaks if this unit does not end its turn within %link_range% tile of the target.",
         "The damage buff and debuff linger for %buff_linger_duration% turns after the link breaks."
     ],
     "stats": {
         "cooldown": 7,
         "cast_range": 1,
+        "link_range": 1,
         "dmg_steal": 5,
         "buff_linger_duration": 2
+    },
+    "upgrade": {
+        "summary": "Reaches and holds at %cast_range% tiles, and the free attack lands from any distance.",
+        "stats": {
+            "cast_range": 2,
+            "link_range": 2
+        },
+        "details": [
+            "The link breaks if this unit does not end its turn within %link_range% tiles of the target.",
+            "The free attack fires even when the target is beyond this unit's normal attack range.",
+            "The damage buff and debuff linger for %buff_linger_duration% turns after the link breaks."
+        ]
     }
 }

@@ -12,5 +12,17 @@
         "cast_range": 3,
         "branch_dmg": 10,
         "branch_heal": 8
+    },
+    "upgrade": {
+        "summary": "A slain Branchling leaves a Branchigga standing in its place.",
+        "stats": {
+            "branchigga_duration": 6
+        },
+        "details": [
+            "Tiles that are already occupied are skipped.",
+            "Overlapping Branchlings stack, so a unit beside two of them is hit or healed twice.",
+            "Killing a Branchling grows a Branchigga where it fell - a real unit that moves, attacks, and carries the same aura.",
+            "A Branchigga lasts %branchigga_duration% turns from the moment it sprouts. Branchlings that simply expire leave nothing behind, and Sprout's Branchling never grows one."
+        ]
     }
 }

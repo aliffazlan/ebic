@@ -1,5 +1,11 @@
 package com.walnutt.ability.impl;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import com.walnutt.ability.PassiveAbility;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.effect.Effect;
@@ -12,8 +18,10 @@ import com.walnutt.unit.Unit;
 
 /** Discharge - a random adjacent enemy is struck every turn and permanently grows more vulnerable; always also hits a Static Link target. */
 public class EyeOfTheStorm extends PassiveAbility {
-    private final int damage;
-    private final int bonusDamage;
+    private int damage;
+    private int bonusDamage;
+    /** Bolts released each turn. 1 until upgraded. */
+    private int count = 1;
 
     public EyeOfTheStorm(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -30,12 +38,27 @@ public class EyeOfTheStorm extends PassiveAbility {
             return;
         }
 
-        state.getMap().randomAdjacentUnit(owner.getPosition(), u -> u.getTeam() != owner.getTeam() && !u.isDead(),
-            state.getRandom()).ifPresent(target -> strike(state, target));
+        // Shuffled and taken from, rather than rolled `count` times: a unit cannot be struck
+        // more than once per turn, so several bolts need several separate enemies.
+        List<Unit> candidates = new ArrayList<>(state.getMap().getAdjacentUnits(owner.getPosition(),
+            u -> u.getTeam() != owner.getTeam() && !u.isDead()));
+        Collections.shuffle(candidates, state.getRandom());
 
+        Set<Unit> struck = new HashSet<>();
+        for (Unit candidate : candidates) {
+            if (struck.size() >= count) {
+                break;
+            }
+            if (struck.add(candidate)) {
+                strike(state, candidate);
+            }
+        }
+
+        // The linked target is always struck as well - on top of the bolts, not instead of one,
+        // but never twice if it was already among them.
         owner.getActiveEffect(StaticLinkEffect.class).ifPresent(link -> {
             Unit linked = link.getTarget();
-            if (linked != null && !linked.isDead()) {
+            if (linked != null && !linked.isDead() && struck.add(linked)) {
                 strike(state, linked);
             }
         });
@@ -57,5 +80,12 @@ public class EyeOfTheStorm extends PassiveAbility {
             target.addEffect(vulnerability);
         }
         vulnerability.addStack(bonusDamage);
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.damage = statInt("damage", damage);
+        this.bonusDamage = statInt("bonus_damage", bonusDamage);
+        this.count = statInt("count", count);
     }
 }

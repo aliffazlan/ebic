@@ -146,14 +146,20 @@ public class TerminalInputHandler implements InputHandler {
         System.out.println(unit.getName() + " - " + title + ":");
         for (int i = 0; i < options.size(); i++) {
             ChoiceOption option = options.get(i);
-            System.out.printf("  [%d] %s%s%n", i, option.name(),
-                option.detail() == null ? "" : " (" + option.detail() + ")");
+            System.out.printf("  [%d] %s%s%s%n", i, option.name(),
+                option.detail() == null ? "" : " (" + option.detail() + ")",
+                option.enabled() ? "" : " - unavailable");
             System.out.println("      " + option.description());
         }
+        System.out.println("  [c] Cancel");
         System.out.print("Your choice: ");
 
-        int index = parseIndex(scanner.nextLine().trim(), options.size());
-        if (index < 0) {
+        String answer = scanner.nextLine().trim();
+        if (answer.equalsIgnoreCase("c")) {
+            return null;
+        }
+        int index = parseIndex(answer, options.size());
+        if (index < 0 || !options.get(index).enabled()) {
             System.out.println("Invalid choice.");
             return chooseOption(state, unit, title, options);
         }

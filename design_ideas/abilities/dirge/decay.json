@@ -9,5 +9,17 @@
         "radius": 1,
         "health_steal": 5,
         "str_steal": 2
+    },
+    "upgrade": {
+        "summary": "A second, wider rot drains %aura_health_steal% more health from enemies within %aura_radius% tiles.",
+        "stats": {
+            "aura_radius": 2,
+            "aura_health_steal": 5
+        },
+        "details": [
+            "Allies are drained by the inner rot exactly as enemies are - it does not tell friend from foe.",
+            "The outer rot reaches %aura_radius% tiles but touches enemies only, taking %aura_health_steal% health and maximum health.",
+            "The two stack: an adjacent enemy sits in both, losing %health_steal% and %aura_health_steal% health along with %str_steal% strength."
+        ]
     }
 }

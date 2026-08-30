@@ -4,5 +4,14 @@
     "description": "Every tile between this unit and its target adds %dmg_increase:pct%% to its attack damage, rewarding shots taken from maximum range.",
     "stats": {
         "dmg_increase": 0.2
+    },
+    "upgrade": {
+        "summary": "Also grants %bonus_range% bonus attack range.",
+        "stats": {
+            "bonus_range": 2
+        },
+        "details": [
+            "Passively grants %bonus_range% bonus attack range, giving the damage bonus that much further to climb."
+        ]
     }
 }

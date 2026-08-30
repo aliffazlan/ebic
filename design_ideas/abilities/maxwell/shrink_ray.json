@@ -12,5 +12,12 @@
         "duration": 4,
         "stat_reduction": 0.2,
         "hp_reduction": 0.1
+    },
+    "upgrade": {
+        "summary": "Takes %stat_reduction:pct%% of every attribute and %hp_reduction:pct%% of health.",
+        "stats": {
+            "stat_reduction": 0.4,
+            "hp_reduction": 0.2
+        }
     }
 }

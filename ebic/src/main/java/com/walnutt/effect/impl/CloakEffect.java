@@ -4,6 +4,7 @@ import com.walnutt.combat.Encounter;
 import com.walnutt.combat.EncounterResolver;
 import com.walnutt.combat.WeightedEncounter;
 import com.walnutt.effect.Effect;
+import com.walnutt.effect.StatusEffect;
 import com.walnutt.event.DamageEvent;
 import com.walnutt.event.PostMoveEvent;
 import com.walnutt.game.GameState;
@@ -30,6 +31,8 @@ public class CloakEffect extends Effect {
     private static final EncounterResolver RESOLVER = new EncounterResolver();
 
     private final double damagePenalty;
+    /** Upgrade: turns of root + silence a LANDED ambush leaves behind. 0 until upgraded. */
+    private int ambushControlDuration;
 
     public CloakEffect(int duration, double damagePenalty) {
         super("Cloak and Dagger",
@@ -61,12 +64,22 @@ public class CloakEffect extends Effect {
         }
     }
 
+    public void setAmbushControlDuration(int turns) {
+        this.ambushControlDuration = turns;
+    }
+
     public void ambushAttack(GameState state, Unit target) {
         Encounter encounter = new WeightedEncounter(getOwner(), target);
         DamageEvent event = RESOLVER.resolve(state, encounter);
         event.setCauseLabel("Cloak and Dagger");
         event.multiplyDamage(1 - damagePenalty);
         target.takeDamage(state, event);
+
+        // Only an ambush that actually landed pins them; one the victim turned aside does not.
+        if (ambushControlDuration > 0 && event.getDamage() > 0 && !target.isDead()) {
+            target.addEffect(new StatusEffect("Ambushed", ambushControlDuration,
+                StatusFlag.ROOTED, StatusFlag.SILENCED));
+        }
     }
 
     @Override

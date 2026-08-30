@@ -10,10 +10,11 @@ import com.walnutt.unit.Unit;
 
 /** Thaddeus - shields an ally; if the barrier breaks, it clears their debuffs and blasts nearby enemies. */
 public class HolyShield extends Ability {
-    private final int duration;
-    private final int barrierHp;
-    private final int breakDamage;
-    private final int radius;
+    private int duration;
+    private int barrierHp;
+    private int breakDamage;
+    private int radius;
+    private int barrierRegen;
 
     public HolyShield(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -42,9 +43,19 @@ public class HolyShield extends Ability {
     @Override
     public void onUse(GameState state, Target target) {
         Unit ally = ((UnitTarget) target).getUnit();
-        ally.addEffect(new HolyShieldBarrierEffect(duration, barrierHp, breakDamage, radius));
+        ally.addEffect(new HolyShieldBarrierEffect(duration, barrierHp, breakDamage, radius,
+            barrierRegen, isUpgraded()));
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.barrierHp = statInt("barrier_hp", barrierHp);
+        this.breakDamage = statInt("damage", breakDamage);
+        this.radius = statInt("radius", radius);
+        this.barrierRegen = statInt("barrier_regen", 0);
     }
 }

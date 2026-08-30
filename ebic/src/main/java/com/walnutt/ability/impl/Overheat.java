@@ -25,9 +25,9 @@ import com.walnutt.unit.Unit;
  * damage that actually landed, not what a barrier absorbed.
  */
 public class Overheat extends PassiveAbility {
-    private final int threshold;
-    private final int radius;
-    private final int burnStacks;
+    private int threshold;
+    private int radius;
+    private int burnStacks;
 
     public Overheat(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -55,7 +55,7 @@ public class Overheat extends PassiveAbility {
         }
         OverheatTrackerEffect tracker = trackerFor(victim, ember);
         tracker.add(dealt);
-        if (tracker.consumeProc()) {
+        if (tracker.consumeProc(isUpgraded())) {
             igniteNeighbours(state, ember, victim);
         }
     }
@@ -79,7 +79,7 @@ public class Overheat extends PassiveAbility {
                     continue;
                 }
                 tracker.beginTurn();
-                if (tracker.consumeProc()) {
+                if (tracker.consumeProc(isUpgraded())) {
                     igniteNeighbours(state, ember, unit);
                 }
             }
@@ -113,5 +113,12 @@ public class Overheat extends PassiveAbility {
         OverheatTrackerEffect tracker = new OverheatTrackerEffect(ember, threshold);
         victim.addEffect(tracker);
         return tracker;
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.threshold = statInt("threshold", threshold);
+        this.radius = statInt("radius", radius);
+        this.burnStacks = statInt("burn_stacks", burnStacks);
     }
 }

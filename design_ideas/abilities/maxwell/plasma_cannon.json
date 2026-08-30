@@ -7,5 +7,11 @@
         "cast_range": 2,
         "damage": 60,
         "duration": 2
+    },
+    "upgrade": {
+        "summary": "The bolt hits for %damage%.",
+        "stats": {
+            "damage": 120
+        }
     }
 }

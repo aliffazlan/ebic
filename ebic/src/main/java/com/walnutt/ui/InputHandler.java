@@ -55,16 +55,36 @@ public interface InputHandler {
      * deterministic, always-legal answer - but it is NOT a real implementation, and any
      * handler fronting an actual decision-maker (a UI, the bot) must override it.
      *
+     * An option with {@code enabled == false} is shown but must never be returned - Shawl's
+     * dialogue lists an ally's already-unlocked abilities so the player can see why they are
+     * not choosable, and answering with one would upgrade something twice.
+     *
      * @param unit    whose ability raised the dialogue, so a UI can show who is choosing
      * @param title   what is being chosen, e.g. "Construct a gadget"
-     * @return one of {@code options}; never null unless {@code options} is empty
+     * @return one of the ENABLED {@code options}, or null if the player cancelled or there
+     *         was nothing choosable. Every caller must treat null as "do nothing and charge
+     *         nothing" - it is what makes cancelling a cast free.
      */
     default ChoiceOption chooseOption(GameState state, Unit unit, String title, List<ChoiceOption> options) {
-        return options.isEmpty() ? null : options.get(0);
+        return options.stream().filter(ChoiceOption::enabled).findFirst().orElse(null);
     }
 
     /** Draft phase: player picks one of the offered candidates. */
     UnitDefinition choosePick(GameState state, Player player, List<UnitDefinition> options);
+
+    /**
+     * Whether this seat would rather not be offered {@code definition} at all - asked by the
+     * draft BEFORE a pair is shown to anyone, so a refusal can be answered by quietly dealing
+     * a different pair rather than by the seat picking a hero it cannot play.
+     *
+     * False for a human: a person is offered the whole roster and decides for themselves.
+     * The computer refuses the handful of heroes it cannot play well (ai.HeroRatings.AVOIDED),
+     * which used to show up as the bot simply picking one anyway whenever a round happened to
+     * offer two of them.
+     */
+    default boolean refusesToDraft(Player player, UnitDefinition definition) {
+        return false;
+    }
 
     /** Placement phase: player picks a legal tile for the given unit. */
     Tile choosePlacementTile(GameState state, Player player, Unit unitToPlace, List<Tile> candidates);

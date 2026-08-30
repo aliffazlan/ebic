@@ -12,6 +12,10 @@ import org.junit.jupiter.api.Test;
 
 import com.google.gson.JsonObject;
 
+import com.walnutt.ability.Ability;
+import com.walnutt.ability.target.MultiTarget;
+import com.walnutt.data.AbilityFactory;
+import com.walnutt.data.JsonDataLoader;
 import com.walnutt.ability.Move;
 import com.walnutt.ability.target.TileTarget;
 import com.walnutt.combat.Attribute;
@@ -268,5 +272,62 @@ class WebInputHandlerTest {
             }
             Thread.sleep(10);
         }
+    }
+
+    /**
+     * The tile-then-tile half of the `multi` wire format, both ways.
+     *
+     * Worth its own test because the failure mode is silent: targetsToJson used to serialise
+     * only MultiTarget(unit, tile) and DROP anything else, so an upgraded Eruption's candidates
+     * vanished between the engine and the client with no error anywhere - the board simply
+     * highlighted nothing.
+     */
+    @Test
+    void chooseAction_offersAndResolvesATileThenTileCast() throws Exception {
+        ChannelHub hub = new ChannelHub();
+        RecordingChannel channel = new RecordingChannel();
+        hub.register(Team.PLAYER_ONE, channel);
+        UnitIdRegistry ids = new UnitIdRegistry();
+        WebInputHandler input = new WebInputHandler(hub, ids);
+
+        GameMap map = new GameMap(3);
+        Unit ember = new ChampionUnit("Ember", Team.PLAYER_ONE, new UnitStats(20, 20, 90, 970));
+        Ability eruption = AbilityFactory.create("eruption",
+            new JsonDataLoader(JsonDataLoader.locateDesignIdeasRoot()).loadAllAbilities().get("eruption"));
+        eruption.upgrade();
+        ember.addAbility(eruption);
+        map.moveUnit(ember, map.getTile(new Position(0, 0)));
+
+        Player player = new Player("P1", Team.PLAYER_ONE);
+        player.addUnit(ember);
+        String unitId = ids.idFor(ember);
+        GameState state = new GameState(map, List.of(player, new Player("P2", Team.PLAYER_TWO)), new Random(1));
+        state.setRemainingMoves(3);
+
+        CompletableFuture<ActionChoice> future = CompletableFuture.supplyAsync(() -> input.chooseAction(state, player));
+        waitUntil(() -> !channel.getSent().isEmpty());
+
+        String prompt = channel.getSent().get(0);
+        assertTrue(prompt.contains("\"primaryTiles\""), "the client needs tiles to offer for stage one");
+        assertTrue(prompt.contains("\"destinationsByPrimary\""));
+        // Keyed by "q,r" rather than by a unit id, and quoted as a JSON object key.
+        assertTrue(prompt.contains("\"0,1\":"), "a tile key the client can echo back verbatim");
+
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "action");
+        response.addProperty("kind", "ability");
+        response.addProperty("unitId", unitId);
+        response.addProperty("abilityId", "eruption");
+        response.addProperty("targetKind", "multi");
+        response.addProperty("primaryQ", 0);
+        response.addProperty("primaryR", 1);
+        response.addProperty("q", 0);
+        response.addProperty("r", 2);
+        input.offer(Team.PLAYER_ONE, response);
+
+        ActionChoice choice = future.get(2, TimeUnit.SECONDS);
+        MultiTarget target = (MultiTarget) choice.getTarget();
+        assertEquals(new Position(0, 1), ((TileTarget) target.primary()).getTile().getPosition());
+        assertEquals(new Position(0, 2), ((TileTarget) target.secondary()).getTile().getPosition());
     }
 }

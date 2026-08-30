@@ -1,0 +1,11 @@
+{
+    "name": "Recall",
+    "type": "active",
+    "description": "Pulls the unit that cast this shadow back to the tile the shadow is standing on, dispersing the shadow in the process.",
+    "tags": [
+        "no_upgrade"
+    ],
+    "stats": {
+        "cooldown": 0
+    }
+}

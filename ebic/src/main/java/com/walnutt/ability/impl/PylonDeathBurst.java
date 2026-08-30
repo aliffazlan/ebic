@@ -25,8 +25,20 @@ public class PylonDeathBurst extends PassiveAbility {
 
     @Override
     public void onDeath(GameState state, DeathEvent event) {
+        if (getOwner() == null || event.unit() != getOwner()) {
+            return;
+        }
+        detonate(state);
+    }
+
+    /**
+     * The burst itself, separated from the death that normally causes it: upgraded
+     * Dislocation draws power out of a pylon rather than consuming it, and the pylon still
+     * detonates even when it survives being drained.
+     */
+    public void detonate(GameState state) {
         Unit owner = getOwner();
-        if (owner == null || event.unit() != owner) {
+        if (owner == null) {
             return;
         }
         for (Unit enemy : state.getMap().getAdjacentUnits(owner.getPosition(),

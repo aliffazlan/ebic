@@ -16,5 +16,15 @@
         "duration": 10,
         "steal_window": 3,
         "max_abilities": 1
+    },
+    "upgrade": {
+        "summary": "Copies are kept for good, and arrive already upgraded.",
+        "description": "Copies the last ability an enemy within %cast_range% tiles was seen casting, wielding it as this unit's own for good - and in its upgraded form.",
+        "details": [
+            "This unit remembers what each enemy cast for %steal_window% turns after seeing it.",
+            "A copy never expires on its own. Only %max_abilities% can be held at a time, so taking a new one is the only way to give one up.",
+            "Every copy comes through upgraded, whether or not the unit it was taken from had upgraded it.",
+            "A discarded copy keeps cooling down in the background and returns with whatever cooldown it had left."
+        ]
     }
 }

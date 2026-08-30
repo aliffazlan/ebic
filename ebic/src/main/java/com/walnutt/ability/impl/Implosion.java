@@ -3,6 +3,8 @@ package com.walnutt.ability.impl;
 import com.walnutt.ability.Ability;
 import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.UnitTarget;
+import com.walnutt.combat.CombatEngine;
+import com.walnutt.combat.WeightedEncounter;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.event.DamageEvent;
 import com.walnutt.game.GameState;
@@ -10,8 +12,9 @@ import com.walnutt.unit.Unit;
 
 /** Wei - damages the target (and adjacent enemies) proportional to their summed active-ability cooldowns. */
 public class Implosion extends Ability {
-    private final int radius;
-    private final double damagePerCooldown;
+    private int radius;
+    private double damagePerCooldown;
+    private int freeAttacks;
 
     public Implosion(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -36,8 +39,26 @@ public class Implosion extends Ability {
     }
 
     @Override
+    protected void onUpgraded() {
+        this.radius = statInt("radius", radius);
+        this.damagePerCooldown = stat("dmg_per_cooldown", damagePerCooldown);
+        this.freeAttacks = statInt("free_attacks", 0);
+    }
+
+    @Override
     public void onUse(GameState state, Target target) {
         Unit primary = ((UnitTarget) target).getUnit();
+
+        // Upgrade: the free attacks come FIRST, so whatever cooldowns they drive up - Energy
+        // Break's above all - are counted by the implosion that follows.
+        for (int i = 0; i < freeAttacks && !primary.isDead() && !owner.isDead(); i++) {
+            CombatEngine.performAttack(state, new WeightedEncounter(owner, primary));
+        }
+        if (primary.isDead()) {
+            state.spendMoves(getMoveCost(state));
+            resetToMax();
+            return;
+        }
 
         strike(state, primary);
         for (Unit splash : state.getMap().getUnitsInRadius(primary.getPosition(), radius)) {

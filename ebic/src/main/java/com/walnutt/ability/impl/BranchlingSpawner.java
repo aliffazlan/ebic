@@ -5,6 +5,7 @@ import java.util.List;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.AbilityFactory;
 import com.walnutt.data.UnitDefinition;
+import com.walnutt.effect.impl.BranchiggaLifespanEffect;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Tile;
 import com.walnutt.unit.HealthPool;
@@ -27,8 +28,31 @@ import com.walnutt.unit.UnitType;
  */
 final class BranchlingSpawner {
     private static final int FALLBACK_MAX_HP = 50;
+    private static final String BRANCHIGGA_DEFINITION_ID = "branchigga";
 
     private BranchlingSpawner() {
+    }
+
+    /**
+     * The Branchigga upgraded Overgrowth grows where a Branchling was killed.
+     *
+     * Everything a Branchling is not: it gets Move and Attack, and it joins the player's ROSTER
+     * rather than the summon registry - it is a unit that acts, so it has to be selectable, and
+     * the roster is also the only place its own lifespan effect will tick (see
+     * SummonLifespanEffect). Its aura comes from branchigga.json, which lists the same one.
+     */
+    static Unit spawnBranchigga(GameState state, Unit summoner, Tile tile, int duration) {
+        UnitDefinition definition = state.getUnitDefinitions().get(BRANCHIGGA_DEFINITION_ID);
+        if (definition == null) {
+            return null;
+        }
+        Unit branchigga = UnitFactory.createFromDefinition(definition, summoner.getTeam(),
+            state.getAbilityDefinitions());
+        branchigga.addEffect(new BranchiggaLifespanEffect(duration));
+
+        state.getMap().moveUnit(branchigga, tile);
+        state.getPlayer(summoner.getTeam()).addUnit(branchigga);
+        return branchigga;
     }
 
     static Unit spawn(GameState state, Unit summoner, Tile tile) {

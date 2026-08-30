@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.walnutt.TriggerHandler;
+import com.walnutt.data.AbilityDefinition;
 import com.walnutt.ability.target.MultiTarget;
 import com.walnutt.ability.target.NoTarget;
 import com.walnutt.ability.target.Target;
@@ -27,8 +28,8 @@ public abstract class Ability extends TriggerHandler {
     public static final int UNLIMITED_RANGE = -1;
 
     private final String name;
-    private final String description;
-    private final boolean isPassive;
+    private String description;
+    private boolean isPassive;
     /**
      * The design_ideas/abilities/<unit>/<id>.json basename this ability was built from,
      * or null for one constructed directly in Java (Move, Attack, DroneAutoAttack, the
@@ -54,6 +55,19 @@ public abstract class Ability extends TriggerHandler {
      */
     private List<String> details = List.of();
     private Map<String, Double> stats = Map.of();
+    /**
+     * The whole definition this was built from, kept so {@link #upgrade()} can re-read it.
+     * Null for anything constructed directly in Java (Move, Attack, DroneAutoAttack, the
+     * Pylon's internal kit), which is exactly what makes those un-upgradeable with no list
+     * to maintain - the same trick getDefinitionId already plays for copyability.
+     */
+    private AbilityDefinition definition;
+    /**
+     * How many times this has been upgraded. A boolean everywhere except Hidden Potential,
+     * whose upgrade is repeatable and pays out per upgrade Shawl has granted - see
+     * AbilityDefinition.isUpgradeRepeatable.
+     */
+    private int upgradeCount;
     protected Unit owner;
     private int maxCooldown;
     private int currentCooldown;
@@ -87,9 +101,99 @@ public abstract class Ability extends TriggerHandler {
     }
 
     /** Called only by AbilityFactory, immediately after construction - see the field comment. */
-    public void setDefinitionText(List<String> details, Map<String, Double> stats) {
-        this.details = details == null ? List.of() : List.copyOf(details);
-        this.stats = stats == null ? Map.of() : Map.copyOf(stats);
+    public void setDefinition(AbilityDefinition definition) {
+        this.definition = definition;
+        this.details = definition == null ? List.of() : definition.formattedDetails();
+        this.stats = definition == null || definition.stats() == null
+            ? Map.of() : Map.copyOf(definition.stats());
+    }
+
+    public AbilityDefinition getDefinition() {
+        return this.definition;
+    }
+
+    public boolean isUpgraded() {
+        return upgradeCount > 0;
+    }
+
+    /** Only ever above 1 for Hidden Potential, whose upgrade is repeatable. */
+    public int getUpgradeCount() {
+        return upgradeCount;
+    }
+
+    /**
+     * Whether this instance may be upgraded right now: the design has an upgrade block, and
+     * either it has not been taken yet or it is the repeatable one.
+     *
+     * Deliberately NOT the same question as "should Hidden Potential offer this" - that also
+     * requires the behaviour to be implemented (AbilityFactory.isUpgradeImplemented), which
+     * is a property of the engine rather than of this instance.
+     */
+    public boolean canUpgrade() {
+        return definition != null && definition.isUpgradeable()
+            && (upgradeCount == 0 || definition.isUpgradeRepeatable());
+    }
+
+    /**
+     * Unlocks this ability's upgraded form, permanently. Final so no subclass can forget to
+     * re-apply the shared half; a subclass that caches its own tuning numbers overrides
+     * {@link #onUpgraded()} instead.
+     *
+     * Everything the base class already owns - text, stats, cooldown, range, passive-ness -
+     * is re-applied here, which is why an ability whose upgrade only moves its cooldown, its
+     * cast range, or its wording needs no code of its own at all.
+     */
+    public final void upgrade() {
+        if (!canUpgrade()) {
+            return;
+        }
+        upgradeCount++;
+        applyUpgradedDefinition();
+        onUpgraded();
+    }
+
+    /**
+     * Re-read whatever this ability cached from its definition at construction. Default
+     * no-op, correct for anything that reads its numbers straight off {@link #getStats()}.
+     *
+     * Called after the shared half has already been re-applied, so {@link #stat} inside an
+     * override already sees the upgraded values.
+     */
+    protected void onUpgraded() {
+    }
+
+    /** This ability's current tuning value for {@code key} - the upgraded one once upgraded. */
+    protected double stat(String key, double fallback) {
+        Double value = stats.get(key);
+        return value == null ? fallback : value;
+    }
+
+    /** Rounded {@link #stat}, for the many tuning numbers that are whole. */
+    protected int statInt(String key, int fallback) {
+        return (int) Math.round(stat(key, fallback));
+    }
+
+    private void applyUpgradedDefinition() {
+        this.stats = Map.copyOf(definition.mergedStats());
+        this.description = definition.upgradedDescription();
+        this.details = definition.upgradedDetails();
+        // An upgrade that flips active <-> passive (Dilation, Dispersion) also needs its own
+        // impl to stop refusing casts - PassiveAbility hard-codes that refusal - so this flag
+        // drives the snapshot and the UI, not the rules on its own.
+        this.isPassive = definition.isUpgradedPassive();
+        // Cooldown and range are only touched when the UPGRADE ITSELF names them. The base
+        // cannot know which key an impl read its range from (Backtrack uses "range", most use
+        // "cast_range", Sprout uses none and is unlimited), so guessing would quietly break
+        // the abilities that set a range unrelated to their stats.
+        Map<String, Double> overrides = definition.upgrade().statsOrEmpty();
+        if (overrides.containsKey("cooldown")) {
+            setMaxCooldown(statInt("cooldown", getMaxCooldown()));
+        }
+        if (overrides.containsKey("cast_range")) {
+            setRange(statInt("cast_range", getRange()));
+        } else if (overrides.containsKey("range")) {
+            setRange(statInt("range", getRange()));
+        }
     }
 
     public Unit getOwner() {

@@ -2,6 +2,12 @@
     "name": "Blizzard Fist",
     "type": "passive",
     "description": "A landed attack buries the target in a short Blizzard, rooting and damaging it for %duration% turn.",
+    "details": [
+        "The blizzard it raises follows its summoner's - if theirs disarms, so does this."
+    ],
+    "tags": [
+        "no_upgrade"
+    ],
     "stats": {
         "duration": 1
     }

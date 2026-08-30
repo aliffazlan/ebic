@@ -3,12 +3,16 @@ package com.walnutt.ability.impl;
 import com.walnutt.ability.PassiveAbility;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.event.DamageEvent;
+import com.walnutt.status.Stat;
+import com.walnutt.status.StatModifier;
 import com.walnutt.game.GameState;
 import com.walnutt.unit.Unit;
 
 /** Artemis - the further the shot, the harder it lands. */
 public class Longshot extends PassiveAbility {
-    private final double damageIncreasePerTile;
+    private double damageIncreasePerTile;
+    /** Applied once, on upgrade - see onUpgraded. */
+    private int bonusRange;
 
     public Longshot(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -30,5 +34,23 @@ public class Longshot extends PassiveAbility {
             return;
         }
         event.multiplyDamage(1 + (damageIncreasePerTile * distance));
+    }
+
+    /**
+     * Upgrade: a permanent bonus to the owner's attack range, which the damage bonus above
+     * then has that much further to climb.
+     *
+     * Granted as a modifier on the OWNER rather than handled inside this ability, the same
+     * shape Gyroscope uses - Attack reads Stat.ATTACK_RANGE directly, so nothing else has to
+     * learn that Artemis reaches further.
+     */
+    @Override
+    protected void onUpgraded() {
+        this.damageIncreasePerTile = stat("dmg_increase", damageIncreasePerTile);
+        int upgraded = statInt("bonus_range", 0);
+        if (owner != null && upgraded != bonusRange) {
+            owner.addPermanentModifier(StatModifier.flat(Stat.ATTACK_RANGE, upgraded - bonusRange, this));
+        }
+        this.bonusRange = upgraded;
     }
 }

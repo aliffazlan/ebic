@@ -15,8 +15,8 @@ import com.walnutt.unit.Unit;
  * no bookkeeping when it arrives.
  */
 public class Gyroscope extends PassiveAbility {
-    private final int attackRangeBoost;
-    private final int castRangeBoost;
+    private int attackRangeBoost;
+    private int castRangeBoost;
 
     public Gyroscope(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -33,5 +33,26 @@ public class Gyroscope extends PassiveAbility {
         if (castRangeBoost != 0) {
             newOwner.addPermanentModifier(StatModifier.flat(Stat.CAST_RANGE, castRangeBoost, this));
         }
+    }
+
+    /**
+     * Upgrade: both bonuses rise. Applied as a TOP-UP modifier for the difference rather
+     * than by replacing the original - modifiers are summed and there is no remove API, so
+     * adding the delta reaches the same effective range without one.
+     */
+    @Override
+    protected void onUpgraded() {
+        int newAttackBoost = statInt("attack_range_boost", attackRangeBoost);
+        int newCastBoost = statInt("cast_range_boost", castRangeBoost);
+        if (owner != null && newAttackBoost != attackRangeBoost) {
+            owner.addPermanentModifier(
+                StatModifier.flat(Stat.ATTACK_RANGE, newAttackBoost - attackRangeBoost, this));
+        }
+        if (owner != null && newCastBoost != castRangeBoost) {
+            owner.addPermanentModifier(
+                StatModifier.flat(Stat.CAST_RANGE, newCastBoost - castRangeBoost, this));
+        }
+        this.attackRangeBoost = newAttackBoost;
+        this.castRangeBoost = newCastBoost;
     }
 }

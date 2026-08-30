@@ -5,5 +5,19 @@
     "stats": {
         "radius": 1,
         "dmg_reflect": 0.25
+    },
+    "upgrade": {
+        "summary": "Gains an active that raises the dispersal to %active_reflect:pct%% for %duration% turns.",
+        "type": "active",
+        "description": "Disperses %dmg_reflect:pct%% of all damage this unit takes back onto enemies within %radius% tile. Activate to throw %active_reflect:pct%% back instead, for %duration% turns.",
+        "stats": {
+            "cooldown": 6,
+            "duration": 3,
+            "active_reflect": 1.5
+        },
+        "details": [
+            "The passive never switches off - activating it only raises what goes back out.",
+            "What this unit itself takes is unchanged either way. Only the share sent to its neighbours grows."
+        ]
     }
 }

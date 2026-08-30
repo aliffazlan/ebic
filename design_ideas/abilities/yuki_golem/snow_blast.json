@@ -2,6 +2,12 @@
     "name": "Snow Blast",
     "type": "passive",
     "description": "When this unit is destroyed it bursts apart, burying every enemy within %radius% tile in a Blizzard for %duration% turns.",
+    "details": [
+        "The blizzard it raises follows its summoner's - if theirs disarms, so does this."
+    ],
+    "tags": [
+        "no_upgrade"
+    ],
     "stats": {
         "duration": 4,
         "radius": 1

@@ -22,8 +22,10 @@ import com.walnutt.unit.Unit;
  * cast to refund it, and the first is ready again inside the same turn.
  */
 public class SuperiorMastery extends PassiveAbility {
-    private final int castRangeBonus;
-    private final int cooldownReduction;
+    private int castRangeBonus;
+    private int cooldownReduction;
+    /** Upgrade: abilities each turn that cost no action. 0 until upgraded. */
+    private int freeCasts;
 
     public SuperiorMastery(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -67,5 +69,28 @@ public class SuperiorMastery extends PassiveAbility {
                 }
             }
         }
+    }
+
+    /**
+     * Upgrade: the first ability each turn spends no action.
+     *
+     * Granted as free-cast charges on the owner - the same currency Maxwell's Capacitor Bank
+     * uses and Ability.getMoveCost already reads - rather than as new economy code. Topped back
+     * up at the start of each of Joker's turns.
+     */
+    @Override
+    protected void onUpgraded() {
+        this.castRangeBonus = statInt("cast_range_bonus", castRangeBonus);
+        this.cooldownReduction = statInt("cooldown_reduction", cooldownReduction);
+        this.freeCasts = statInt("free_casts", 0);
+        grantFreeCasts();
+    }
+
+    private void grantFreeCasts() {
+        if (freeCasts <= 0 || getOwner() == null) {
+            return;
+        }
+        getOwner().getActiveEffect(SuperiorMasteryEffect.class)
+            .ifPresent(effect -> effect.setFreeCasts(freeCasts));
     }
 }

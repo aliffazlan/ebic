@@ -10,5 +10,15 @@
         "cast_range": 2,
         "dmg_per_cooldown": 12,
         "radius": 1
+    },
+    "upgrade": {
+        "summary": "Takes %free_attacks% free attacks on the target before the damage lands.",
+        "stats": {
+            "free_attacks": 2
+        },
+        "details": [
+            "The same damage splashes onto enemies within %radius% tile.",
+            "The %free_attacks% attacks are made first, so whatever cooldowns they drive up - Energy Break's, above all - are counted by the implosion that follows."
+        ]
     }
 }

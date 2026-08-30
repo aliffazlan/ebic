@@ -1,0 +1,12 @@
+{
+    "name": "Mercurial Shadow",
+    "type": "basic",
+    "max_hp": 810,
+    "strength": 40,
+    "agility": 40,
+    "intelligence" : 30,
+    "attack_range": 1,
+    "abilities": [
+        "recall"
+    ]
+}

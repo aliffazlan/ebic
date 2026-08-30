@@ -11,5 +11,16 @@
         "self_range": 4,
         "ally_range": 3,
         "enemy_range": 2
+    },
+    "upgrade": {
+        "summary": "Reaches any unit on the map, and swaps two units if aimed at an occupied tile.",
+        "description": "Picks up any unit anywhere on the map and sets it down elsewhere - itself up to %self_range% tiles, an ally up to %ally_range%, an enemy up to %enemy_range%.",
+        "stats": {
+            "cast_range": -1
+        },
+        "details": [
+            "Only the throw is limited now, not the reach - distance to the unit being moved no longer matters at all.",
+            "The destination may be occupied, in which case the two units trade places."
+        ]
     }
 }

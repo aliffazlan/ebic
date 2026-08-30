@@ -8,5 +8,17 @@
     "stats": {
         "cooldown_increase": 1,
         "bonus_increase": 3
+    },
+    "upgrade": {
+        "summary": "Landed attacks also deal %bonus_damage_per_cooldown% damage and heal %heal_per_cooldown% per turn of cooldown on the target.",
+        "stats": {
+            "bonus_damage_per_cooldown": 2,
+            "heal_per_cooldown": 1
+        },
+        "details": [
+            "Cooldowns driven up this way can exceed their normal maximum.",
+            "A landed attack deals %bonus_damage_per_cooldown% extra damage and heals this unit %heal_per_cooldown% for every turn of cooldown the target is carrying.",
+            "Since the drain itself piles those cooldowns up, every exchange makes the next one worth more."
+        ]
     }
 }

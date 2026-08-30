@@ -24,10 +24,10 @@ import com.walnutt.unit.UnitType;
  * this hook.
  */
 public class Cripple extends PassiveAbility {
-    private final int statSteal;
-    private final int defendedBonus;
-    private final int hpSteal;
-    private final double nonBasicMultiplier;
+    private int statSteal;
+    private int defendedBonus;
+    private int hpSteal;
+    private double nonBasicMultiplier;
 
     public Cripple(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -62,7 +62,9 @@ public class Cripple extends PassiveAbility {
         // A "successful defense" is specifically the defender's attribute beating the
         // attacker's. A mirrored matchup can deal 0 damage without being a block, so this
         // reads the matchup rather than the damage number.
-        boolean defended = defendedAttribute.beats(attackerAttribute);
+        // Upgraded, a block is worth exactly as much as a hit - so the branch below, which
+        // shaves a single point and drains no health, simply stops applying.
+        boolean defended = defendedAttribute.beats(attackerAttribute) && !isUpgraded();
         if (defended) {
             transferStat(grivath, victim, toStat(defendedAttribute), scale(statSteal, multiplier));
             return;
@@ -113,5 +115,13 @@ public class Cripple extends PassiveAbility {
             case AGILITY -> Stat.AGILITY;
             case INTELLIGENCE -> Stat.INTELLIGENCE;
         };
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.statSteal = statInt("stat_steal", statSteal);
+        this.defendedBonus = statInt("defended_bonus", defendedBonus);
+        this.hpSteal = statInt("hp_steal", hpSteal);
+        this.nonBasicMultiplier = stat("non_basic_multiplier", nonBasicMultiplier);
     }
 }

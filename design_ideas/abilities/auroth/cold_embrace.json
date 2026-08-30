@@ -2,10 +2,20 @@
     "name": "Cold Embrace",
     "type": "active",
     "description": "Seals a unit within %cast_range% tiles in ice for %duration% turns, making it immune to attacks. Each turn the ice deals %dmg_heal% damage to an enemy, or heals an ally for the same amount.",
+    "details": [
+        "A sealed unit is fully disabled for the duration, unable to move or act."
+    ],
     "stats": {
         "cooldown": 6,
         "cast_range": 4,
         "duration": 3,
         "dmg_heal": 30
+    },
+    "upgrade": {
+        "summary": "A sealed ally can still walk, though it cannot attack or cast.",
+        "details": [
+            "A sealed enemy is fully disabled for the duration, unable to move or act.",
+            "A sealed ally keeps its movement, but is silenced and disarmed until the ice melts."
+        ]
     }
 }

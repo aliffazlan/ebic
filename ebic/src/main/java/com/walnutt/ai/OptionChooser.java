@@ -37,15 +37,23 @@ public final class OptionChooser {
     private OptionChooser() {
     }
 
+    /**
+     * Disabled options are skipped outright rather than ranked: they are shown to a human to
+     * explain an absence, and answering with one would be an illegal move. A dialogue with
+     * nothing enabled yields null, which every caller already treats as "cancel".
+     */
     public static ChoiceOption choose(List<ChoiceOption> options) {
         if (options == null || options.isEmpty()) {
             return null;
         }
-        ChoiceOption best = options.get(0);
-        int bestRank = rank(best);
+        ChoiceOption best = null;
+        int bestRank = Integer.MAX_VALUE;
         for (ChoiceOption option : options) {
+            if (!option.enabled()) {
+                continue;
+            }
             int optionRank = rank(option);
-            if (optionRank < bestRank) {
+            if (best == null || optionRank < bestRank) {
                 best = option;
                 bestRank = optionRank;
             }

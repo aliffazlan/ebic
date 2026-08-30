@@ -34,8 +34,8 @@ public class KillerDrone extends Ability {
     private static final String DRONE_DEFINITION_ID = "maxwell_drone";
     private static final int FALLBACK_MAX_HP = 100;
 
-    private final int duration;
-    private final int strikeRange;
+    private int duration;
+    private int strikeRange;
 
     public KillerDrone(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -64,7 +64,11 @@ public class KillerDrone extends Ability {
 
         state.getMap().moveUnit(drone, destination);
         state.getPlayer(owner.getTeam()).addUnit(drone);
-        drone.addEffect(new DroneLifespanEffect(duration));
+        // Upgraded, the drone has no power cell to run down at all - it stays until something
+        // shoots it down, so no lifespan effect is attached rather than one with a huge number.
+        if (!isUpgraded()) {
+            drone.addEffect(new DroneLifespanEffect(duration));
+        }
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
@@ -84,5 +88,11 @@ public class KillerDrone extends Ability {
         drone.addAbility(new Move());
         drone.addAbility(new DroneAutoAttack(strikeRange));
         return drone;
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.strikeRange = statInt("strike_range", strikeRange);
     }
 }

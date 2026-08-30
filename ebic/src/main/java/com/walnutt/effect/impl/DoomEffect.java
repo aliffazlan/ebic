@@ -17,9 +17,15 @@ import com.walnutt.unit.Unit;
 public class DoomEffect extends Effect {
     private final Unit source;
     private final int damageIncrease;
+    /** Upgrade: the share of each tick that spills onto enemies beside the host. 0 when not upgraded. */
+    private final double splashFraction;
     private int currentDamage;
 
     public DoomEffect(Unit source, int baseDamage, int damageIncrease) {
+        this(source, baseDamage, damageIncrease, 0);
+    }
+
+    public DoomEffect(Unit source, int baseDamage, int damageIncrease, double splashFraction) {
         super("Doom",
             "A curse that silences its target and deals " + baseDamage + " damage at the start of each "
                 + "of its turns, increasing by " + damageIncrease + " every turn. Lasts until the "
@@ -28,6 +34,7 @@ public class DoomEffect extends Effect {
         this.source = source;
         this.currentDamage = baseDamage;
         this.damageIncrease = damageIncrease;
+        this.splashFraction = splashFraction;
         this.flags.add(StatusFlag.SILENCED);
         this.category = EffectCategory.DEBUFF;
     }
@@ -50,6 +57,23 @@ public class DoomEffect extends Effect {
         DamageEvent damageEvent = new DamageEvent(source, owner, currentDamage);
         damageEvent.setCauseLabel("Doom");
         owner.takeDamage(state, damageEvent);
+
+        // Splashed from the tick's nominal damage rather than what actually landed, so a
+        // barrier on the cursed unit shields them without also shielding their neighbours.
+        int splash = (int) Math.round(currentDamage * splashFraction);
+        if (splash > 0) {
+            for (Unit neighbour : state.getMap().getUnitsInRadius(owner.getPosition(), 1)) {
+                // Enemies of the CASTER, not of the host. The host's own neighbours are exactly
+                // who this is meant to catch - comparing against the host's team would spare
+                // them and hit Lucifer's own side instead.
+                if (neighbour == owner || neighbour.isDead() || neighbour.getTeam() == source.getTeam()) {
+                    continue;
+                }
+                DamageEvent spill = new DamageEvent(source, neighbour, splash);
+                spill.setCauseLabel("Doom");
+                neighbour.takeDamage(state, spill);
+            }
+        }
         currentDamage += damageIncrease;
     }
 

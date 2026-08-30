@@ -11,7 +11,9 @@ import com.walnutt.unit.Unit;
 
 /** Lanaya - redirects incoming damage to a random adjacent unit, limited uses per turn. */
 public class Refraction extends PassiveAbility {
-    private final int maxCount;
+    private int maxCount;
+    /** Upgrade: the share of the blow the SECOND refraction of a turn passes on. 1.0 until upgraded. */
+    private double secondEfficiency = 1.0;
     private int usesRemainingThisTurn;
 
     public Refraction(AbilityDefinition definition) {
@@ -37,12 +39,34 @@ public class Refraction extends PassiveAbility {
             return;
         }
 
+        // The first refraction of a turn passes the whole blow on; the second passes only
+        // secondEfficiency of it, and Lanaya wears the rest.
+        boolean isFirst = usesRemainingThisTurn == maxCount;
+        double efficiency = isFirst ? 1.0 : secondEfficiency;
         usesRemainingThisTurn--;
+
         Unit newTarget = redirectTarget.get();
         int amount = event.getDamage();
-        event.cancel();
-        DamageEvent redirected = new DamageEvent(event.getSource(), newTarget, amount);
+        int passedOn = (int) Math.round(amount * efficiency);
+        if (passedOn >= amount) {
+            event.cancel();
+        } else {
+            event.modifyDamage(-passedOn);
+        }
+        if (passedOn <= 0) {
+            return;
+        }
+        DamageEvent redirected = new DamageEvent(event.getSource(), newTarget, passedOn);
         redirected.setCauseLabel("Refraction");
         newTarget.takeDamage(state, redirected);
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.maxCount = statInt("count", maxCount);
+        this.secondEfficiency = stat("second_efficiency", 1.0);
+        // Mid-turn upgrades are possible (Shawl casts on his own turn), so top the allowance up
+        // rather than leaving Lanaya on last turn's count until the next turn start.
+        this.usesRemainingThisTurn = Math.max(usesRemainingThisTurn, maxCount);
     }
 }

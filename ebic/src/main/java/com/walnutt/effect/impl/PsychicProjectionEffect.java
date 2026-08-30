@@ -18,15 +18,29 @@ public class PsychicProjectionEffect extends Effect {
     private final Player player;
 
     public PsychicProjectionEffect(Unit clone, Player player, int duration) {
+        this(clone, player, duration, true);
+    }
+
+    /**
+     * {@code stunsCaster} is false for the upgraded form: the projection stops costing Lanaya
+     * her own turn, which is the whole of what makes it worth unlocking. The effect still has to
+     * exist on her - it is what despawns the clone - so the flag is dropped rather than the
+     * effect.
+     */
+    public PsychicProjectionEffect(Unit clone, Player player, int duration, boolean stunsCaster) {
         super("Psychic Projection",
-            "Stuns Lanaya for the duration while her invulnerable psychic clone acts independently on "
-                + "the battlefield; when the effect ends, the clone is removed from the board and from "
-                + "her roster.",
+            (stunsCaster
+                ? "Stuns Lanaya for the duration while her "
+                : "Her ")
+                + "invulnerable psychic clone acts independently on the battlefield; when the effect "
+                + "ends, the clone is removed from the board and from her roster.",
             duration);
         this.clone = clone;
         this.player = player;
-        this.flags.add(StatusFlag.STUNNED);
-        this.category = EffectCategory.DEBUFF;
+        if (stunsCaster) {
+            this.flags.add(StatusFlag.STUNNED);
+        }
+        this.category = stunsCaster ? EffectCategory.DEBUFF : EffectCategory.BUFF;
     }
 
     @Override

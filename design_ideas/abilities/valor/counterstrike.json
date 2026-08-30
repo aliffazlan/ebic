@@ -5,5 +5,15 @@
     "stats": {
         "damage_reduction": 0.2,
         "lifesteal": 0.25
+    },
+    "upgrade": {
+        "summary": "The counter deals %damage_bonus:pct%% more damage rather than less.",
+        "description": "Being hit by an attack provokes an immediate counter-attack, dealing %damage_bonus:pct%% MORE damage and healing this unit for %lifesteal:pct%% of what it deals.",
+        "stats": {
+            "damage_bonus": 0.2
+        },
+        "details": [
+            "The penalty is not merely lifted but reversed - a counter now hits harder than the swing that provoked it."
+        ]
     }
 }

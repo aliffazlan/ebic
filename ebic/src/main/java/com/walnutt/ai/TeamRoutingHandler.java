@@ -103,6 +103,15 @@ public final class TeamRoutingHandler implements InputHandler, ConcurrentSetupHa
         return input.get(player.getTeam()).choosePick(state, player, options);
     }
 
+    /**
+     * Per seat, which is the whole point: in a bot match the computer refuses its handful of
+     * heroes while the human across the table is still offered every one of them.
+     */
+    @Override
+    public boolean refusesToDraft(Player player, UnitDefinition definition) {
+        return input.get(player.getTeam()).refusesToDraft(player, definition);
+    }
+
     @Override
     public Tile choosePlacementTile(GameState state, Player player, Unit unitToPlace, List<Tile> candidates) {
         return input.get(player.getTeam()).choosePlacementTile(state, player, unitToPlace, candidates);

@@ -1,9 +1,11 @@
 package com.walnutt.data;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 import com.walnutt.ability.Ability;
+import com.walnutt.ability.impl.AcidicBrew;
 import com.walnutt.ability.impl.Backstab;
 import com.walnutt.ability.impl.Backtrack;
 import com.walnutt.ability.impl.Blizzard;
@@ -29,6 +31,7 @@ import com.walnutt.ability.impl.Feast;
 import com.walnutt.ability.impl.Fireblast;
 import com.walnutt.ability.impl.Frostbite;
 import com.walnutt.ability.impl.Gyroscope;
+import com.walnutt.ability.impl.HiddenPotential;
 import com.walnutt.ability.impl.HolyShield;
 import com.walnutt.ability.impl.HomingMissile;
 import com.walnutt.ability.impl.Implosion;
@@ -51,6 +54,7 @@ import com.walnutt.ability.impl.PoisonSting;
 import com.walnutt.ability.impl.PsychicProjection;
 import com.walnutt.ability.impl.PylonAbility;
 import com.walnutt.ability.impl.PylonOrbitalBeam;
+import com.walnutt.ability.impl.Recall;
 import com.walnutt.ability.impl.Refraction;
 import com.walnutt.ability.impl.Reload;
 import com.walnutt.ability.impl.SanityEclipse;
@@ -139,7 +143,107 @@ public final class AbilityFactory {
         Map.entry("perplexing_shot", PerplexingShot::new),
         Map.entry("superior_mastery", SuperiorMastery::new),
         Map.entry("mimic", Mimic::new),
-        Map.entry("capacitor_bank", CapacitorBank::new)
+        Map.entry("capacitor_bank", CapacitorBank::new),
+        Map.entry("hidden_potential", HiddenPotential::new),
+        Map.entry("acidic_brew", AcidicBrew::new),
+        // Carried only by Mercurial's shadow, which upgraded Manifestation leaves behind.
+        Map.entry("recall", Recall::new)
+    );
+
+    /**
+     * Abilities whose UPGRADED behaviour is actually implemented, and so the only ones
+     * Shawl's Hidden Potential offers as a live choice. Everything else with an upgrade
+     * block designed in JSON is still listed in his dialogue, but disabled.
+     *
+     * This exists because most upgrades are not merely a bigger number: Static Link's
+     * raises cast_range, which Ability.upgrade applies on its own, but its link would still
+     * snap at one tile until StaticLink itself reads link_range. Offering that would sell a
+     * player an upgrade that half works, which reads as a bug rather than as a feature not
+     * finished yet.
+     *
+     * Membership is therefore a promise: an id here has been checked to change something
+     * observable when upgraded, and AbilityUpgradeTest fails the build if one does not.
+     *
+     * As of v0.3.0 it covers every upgradeable ability, so the disabled path in
+     * HiddenPotential.optionsFor is currently unreachable - deliberately kept rather than
+     * deleted, so a hero added later with a designed-but-unbuilt upgrade is withheld from
+     * Shawl's dialogue instead of being sold half-working. AbilityUpgradeTest asserts the
+     * coverage, so letting one slip is a build failure rather than a silent regression.
+     */
+    private static final Set<String> UPGRADE_IMPLEMENTED = Set.of(
+        // Nothing but numbers the ability already read - the base class re-applies these.
+        "sprout",           // cooldown
+        "pylon",            // cooldown
+        "fireblast",        // cooldown + cast_range
+        "plasma_cannon",    // damage
+        "perplexing_shot",  // bounces
+        "shrink_ray",       // stat_reduction + hp_reduction
+        "capacitor_bank",   // charge_per_turn + max_charges
+        "gyroscope",        // both range boosts, re-granted to the owner
+        // Shawl's own two. Both were written against their upgraded shape from the start -
+        // Acidic Brew is radius-aware with a base radius of 0, and Hidden Potential's payout
+        // is the one piece of behaviour it adds.
+        "acidic_brew",      // cast_range + radius
+        "hidden_potential", // repeatable; pays out per unlock granted
+
+        // Numbers the ability already read, or one extra clause bolted onto it.
+        "longshot",             // permanent attack-range bonus
+        "frostbite",            // longer, plus a higher shatter bar for basics
+        "soul_rip",             // strength crosses with the soul
+        "decay",                // a second, wider, enemies-only rot
+        "oblivion_confinement", // a second helping of intelligence on the way out
+        "doom",                 // the tick spills onto neighbours
+        "infernal_blade",       // striking a branded unit burns and stuns
+        "selfless",             // takes more of the blow, and less of it lands
+        "counterstrike",        // the penalty reverses into a bonus
+        "energy_break",         // landed attacks feed on the cooldowns they pile up
+        "eureka",               // casting anything pays Inspiration back
+        "poison_sting",         // the poison softens as well as kills
+        "orbital_beam",         // one extra global beam per pylon
+        "holy_shield",          // mends itself, and always erupts
+        "energy_shield",        // a second, self-repairing barrier
+
+        // Rules hung off the combat hooks.
+        "backstab",             // a defended attack keeps a share of the bonus
+        "cripple",              // the full toll even from an attack that fails
+        "cloak_and_dagger",     // a landed ambush roots and silences
+        "timeless_strike",      // the first chain gets another roll
+        "duel",                 // mutual vulnerability, and a refresh on a win
+        "implosion",            // free attacks before the damage is priced
+        "overwhelming_odds",    // a board-wide passive on Valor's own swings
+        "refraction",           // a second, weaker refraction each turn
+        "overheat",             // banks the excess instead of burning it off
+        "blizzard",             // the snow disarms, golems included
+        "backtrack",            // arriving strikes everything beside it
+
+        // Rules flipped on or off.
+        "killer_drone",         // no power cell to run down
+        "reload",               // casting no longer interrupts it
+        "nanobots",             // the bots stay dormant for one more cleanse
+        "poison_bloom",         // a host that dies spreads the bloom itself
+        "cold_embrace",         // an embraced ally keeps its feet
+        "eye_of_the_storm",     // several bolts a turn
+        "static_link",          // the link stretches
+        "sanity_eclipse",       // the orb falls twice
+        "objurgation",          // a killing blow burns every point
+        "dislocation",          // the pylon survives, hurt
+
+        // Reshapes: the ability is a different thing afterwards.
+        "steady_focus",         // a toggle rather than a timer
+        "feast",                // the hunger never lifts
+        "translocation",        // reaches anywhere, and swaps
+        "psychic_projection",   // indefinite, and no longer stunning
+        "mimic",                // copies kept for good, and upgraded
+        "superior_mastery",     // one free cast a turn
+        "dilation",             // becomes a field he simply carries
+        "dispersion",           // gains an active half
+
+        // The last five, each of which needed machinery built for it.
+        "eruption",             // two tiles at once
+        "snow_golem",           // two golems, on two tiles
+        "manifestation",        // leaves a shadow that can call him back
+        "overgrowth",           // a slain Branchling grows a Branchigga
+        "homing_missile"        // a stunning missile ahead of the warhead
     );
 
     private AbilityFactory() {
@@ -147,6 +251,16 @@ public final class AbilityFactory {
 
     public static boolean isImplemented(String id) {
         return REGISTRY.containsKey(id);
+    }
+
+    /** Whether upgrading {@code id} would actually do everything its JSON advertises. */
+    public static boolean isUpgradeImplemented(String id) {
+        return UPGRADE_IMPLEMENTED.contains(id);
+    }
+
+    /** The ids in {@link #UPGRADE_IMPLEMENTED}, for the build guard over that promise. */
+    public static Set<String> implementedUpgradeIds() {
+        return UPGRADE_IMPLEMENTED;
     }
 
     public static Ability create(String id, AbilityDefinition definition) {
@@ -160,7 +274,7 @@ public final class AbilityFactory {
         // directly in Java (Move, Attack, a summon's internal kit) keeps a null id,
         // which is exactly what makes it uncopyable - see Ability.getDefinitionId.
         ability.setDefinitionId(id);
-        ability.setDefinitionText(definition.formattedDetails(), definition.stats());
+        ability.setDefinition(definition);
         return ability;
     }
 }

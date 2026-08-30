@@ -14,6 +14,10 @@ public class BlizzardEffect extends Effect {
     private final int damagePerTurn;
 
     public BlizzardEffect(Unit source, int duration, int damagePerTurn) {
+        this(source, duration, damagePerTurn, false);
+    }
+
+    public BlizzardEffect(Unit source, int duration, int damagePerTurn, boolean disarms) {
         super("Blizzard",
             "Roots the target in place and deals " + damagePerTurn + " damage at the start of each of "
                 + "its turns; casting Blizzard again while it's already active extends the duration "
@@ -22,6 +26,10 @@ public class BlizzardEffect extends Effect {
         this.source = source;
         this.damagePerTurn = damagePerTurn;
         this.flags.add(StatusFlag.ROOTED);
+        // Upgraded, they cannot swing their way out of it either.
+        if (disarms) {
+            this.flags.add(StatusFlag.DISARMED);
+        }
         this.category = EffectCategory.DEBUFF;
     }
 
@@ -40,8 +48,13 @@ public class BlizzardEffect extends Effect {
 
     /** "If the target is already affected by blizzard, the duration is increased." */
     public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn) {
+        applyOrExtend(target, source, duration, damagePerTurn, false);
+    }
+
+    public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn,
+                                      boolean disarms) {
         target.getActiveEffect(BlizzardEffect.class).ifPresentOrElse(
             existing -> existing.extendDuration(duration),
-            () -> target.addEffect(new BlizzardEffect(source, duration, damagePerTurn)));
+            () -> target.addEffect(new BlizzardEffect(source, duration, damagePerTurn, disarms)));
     }
 }

@@ -2,8 +2,6 @@
 
 A 2-player turn-based tactics game: hex-grid movement, rock-paper-scissors combat (Strength beats Intelligence beats Agility beats Strength), a drafted roster of 15 named heroes, and 39 abilities. Java 21 engine + web server, browser client.
 
-This doc is the "get it running" guide. For architecture/design details, see [`CLAUDE.md`](CLAUDE.md); for the exact HTTP/WebSocket wire format, see [`API_CONTRACT.md`](API_CONTRACT.md).
-
 ## Prerequisites
 
 - **Java 21** and **Maven** (`java -version`, `mvn -version`)

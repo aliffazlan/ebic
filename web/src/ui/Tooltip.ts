@@ -13,6 +13,8 @@ export interface AbilityTooltipContent {
   details: string[];
   stats: Record<string, number>;
   passive: boolean;
+  // Only in-match abilities can be upgraded - a preview is a definition, not an instance.
+  upgraded?: boolean;
   // Precomputed by the caller: the two snapshot shapes name the cooldown field
   // differently (`cooldown` vs `maxCooldown`) and only one carries live state.
   cooldownLabel: string;
@@ -28,6 +30,7 @@ export function abilityTooltip(ability: AbilitySnapshot): AbilityTooltipContent 
     details: ability.details ?? [],
     stats: ability.stats ?? {},
     passive: ability.passive,
+    upgraded: ability.upgraded,
     cooldownLabel: cooldownLabel(ability.maxCooldown),
   };
 }
@@ -133,9 +136,15 @@ export class Tooltip {
     this.el.innerHTML = "";
     this.el.classList.toggle("expanded", expanded);
 
+    this.el.classList.toggle("upgraded", content.upgraded === true);
+
     this.el.appendChild(line("hover-tooltip-title", content.name));
     this.el.appendChild(line("", content.description));
-    this.el.appendChild(line("hover-tooltip-meta", content.passive ? "Passive" : content.cooldownLabel));
+    const meta = content.passive ? "Passive" : content.cooldownLabel;
+    // The description above is already the upgraded text, so this says why it reads
+    // differently from the same ability on anyone else.
+    this.el.appendChild(line("hover-tooltip-meta",
+      content.upgraded ? `${meta} \u00b7 Upgraded` : meta));
 
     const hasMore = content.details.length > 0 || Object.keys(content.stats).length > 0;
     if (expanded && hasMore) {

@@ -9,5 +9,11 @@
         "cooldown": 6,
         "delay": 1,
         "barrier": 20
+    },
+    "upgrade": {
+        "summary": "Cooldown cut to %cooldown% turn, so a seed is almost always in the ground.",
+        "stats": {
+            "cooldown": 1
+        }
     }
 }

@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Predicate;
 
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.ui.InputHandler;
@@ -24,6 +25,8 @@ import com.walnutt.unit.UnitFactory;
 public class DraftFlow {
     private static final int ELITE_ROUNDS = 3;
     private static final int BASIC_COUNT = 10;
+    /** See ConcurrentSetupFlow.REROLL_ATTEMPTS. */
+    private static final int REROLL_ATTEMPTS = 8;
 
     public void run(GameState state, InputHandler input, Renderer renderer) {
         Map<String, UnitDefinition> unitDefs = state.getUnitDefinitions();
@@ -48,8 +51,10 @@ public class DraftFlow {
 
     private void runRound(GameState state, InputHandler input, Renderer renderer, String roundLabel,
                            Player p1, Player p2, List<UnitDefinition> pool) {
-        List<UnitDefinition> p1Options = drawTwo(pool);
-        List<UnitDefinition> p2Options = drawTwo(pool);
+        // Dealt before renderDraftRound below, so a seat that refuses both halves (the bot -
+        // see InputHandler.refusesToDraft) gets a different pair before anyone has seen one.
+        List<UnitDefinition> p1Options = drawTwoFor(pool, refusalFor(input, p1), state.getRandom());
+        List<UnitDefinition> p2Options = drawTwoFor(pool, refusalFor(input, p2), state.getRandom());
 
         renderer.renderDraftRound(roundLabel, p1, p1Options, p2, p2Options);
 
@@ -65,6 +70,38 @@ public class DraftFlow {
             throw new IllegalStateException("Not enough units left in the pool to offer a pick");
         }
         return List.of(pool.remove(0), pool.remove(0));
+    }
+
+    private static Predicate<UnitDefinition> refusalFor(InputHandler input, Player player) {
+        return definition -> input.refusesToDraft(player, definition);
+    }
+
+    /**
+     * As ConcurrentSetupFlow.drawTwoFor, and bounded for the same reason - self-play runs two
+     * refusing seats against a pool that can hold three refused heroes. Kept here rather than
+     * shared because the two flows deal from their pools at different moments (this one round
+     * by round, that one all up front) and neither owns the other.
+     */
+    private List<UnitDefinition> drawTwoFor(List<UnitDefinition> pool, Predicate<UnitDefinition> refused,
+                                             Random random) {
+        for (int attempt = 0; attempt < REROLL_ATTEMPTS; attempt++) {
+            List<UnitDefinition> pair = drawTwo(pool);
+            if (pair.stream().anyMatch(definition -> !refused.test(definition))) {
+                return pair;
+            }
+            pool.addAll(pair);
+            Collections.shuffle(pool, random);
+        }
+        List<UnitDefinition> pair = new ArrayList<>(drawTwo(pool));
+        for (int i = 0; i < pool.size(); i++) {
+            if (!refused.test(pool.get(i))) {
+                pool.add(pair.remove(1));
+                pair.add(pool.remove(i));
+                Collections.shuffle(pair, random);
+                break;
+            }
+        }
+        return List.copyOf(pair);
     }
 
     private List<UnitDefinition> shuffled(List<String> ids, Map<String, UnitDefinition> unitDefs, Random random) {

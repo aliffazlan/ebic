@@ -12,5 +12,13 @@
         "defended_bonus": 3,
         "hp_steal": 5,
         "non_basic_multiplier": 2
+    },
+    "upgrade": {
+        "summary": "Takes the full toll even from an attack that fails.",
+        "details": [
+            "A further %defended_bonus% points are taken from whichever attribute the target defended with.",
+            "Against anything tougher than a basic unit every amount is multiplied by %non_basic_multiplier%.",
+            "An attack that is successfully defended drains exactly as much as one that lands - every attribute, the defended bonus, and the health alike."
+        ]
     }
 }

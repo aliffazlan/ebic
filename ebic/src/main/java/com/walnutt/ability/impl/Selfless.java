@@ -8,8 +8,10 @@ import com.walnutt.unit.Unit;
 
 /** Thaddeus - adjacent allies have a portion of their incoming damage redirected to him instead. */
 public class Selfless extends PassiveAbility {
-    private final int radius;
-    private final double redirectPercent;
+    private int radius;
+    private double redirectPercent;
+    /** Upgrade: the fraction of redirected damage this unit actually takes. 1.0 until upgraded. */
+    private double selfDamageTaken = 1.0;
 
     public Selfless(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -35,9 +37,22 @@ public class Selfless extends PassiveAbility {
         if (redirected <= 0) {
             return;
         }
+        // The ally is spared the whole redirected share either way; the upgrade only changes
+        // how much of it survives the trip, so the pair together take strictly less.
         event.modifyDamage(-redirected);
-        DamageEvent redirectedDamage = new DamageEvent(event.getSource(), owner, redirected);
+        int borne = (int) Math.round(redirected * selfDamageTaken);
+        if (borne <= 0) {
+            return;
+        }
+        DamageEvent redirectedDamage = new DamageEvent(event.getSource(), owner, borne);
         redirectedDamage.setCauseLabel("Selfless");
         owner.takeDamage(state, redirectedDamage);
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.radius = statInt("radius", radius);
+        this.redirectPercent = stat("redirect_dmg", redirectPercent);
+        this.selfDamageTaken = stat("self_damage_taken", selfDamageTaken);
     }
 }

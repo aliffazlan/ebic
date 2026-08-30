@@ -6,5 +6,14 @@
         "cooldown": 3,
         "range": 3,
         "backtrack_period": 1
+    },
+    "upgrade": {
+        "summary": "Reaches %range% tiles, and the landing strikes everything beside it.",
+        "stats": {
+            "range": 4
+        },
+        "details": [
+            "On arrival this unit makes a free attack against every enemy adjacent to its landing tile."
+        ]
     }
 }

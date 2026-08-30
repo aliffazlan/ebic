@@ -12,5 +12,16 @@
         "duration": 2,
         "dmg_penalty": 0.4,
         "backstab_bonus": 1
+    },
+    "upgrade": {
+        "summary": "A landed ambush roots and silences its victim for %cc_duration% turn.",
+        "stats": {
+            "cc_duration": 1
+        },
+        "details": [
+            "Ambushes deal %dmg_penalty:pct%% less base damage, though Backstab contributes %backstab_bonus:pct%% more.",
+            "An ambush that lands roots and silences the victim for %cc_duration% turn. One that is defended does neither.",
+            "When the cloak ends this unit reappears on the nearest completely free tile."
+        ]
     }
 }

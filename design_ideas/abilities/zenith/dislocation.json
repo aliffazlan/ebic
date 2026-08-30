@@ -6,8 +6,20 @@
         "A pylon sharing its tile with another unit cannot be used."
     ],
     "stats": {
-        "cooldown": 1,
+        "cooldown": 2,
         "barrier_hp": 50,
         "barrier_duration": 2
+    },
+    "upgrade": {
+        "summary": "The pylon survives, taking %pylon_damage% damage instead of being consumed.",
+        "description": "Teleports to one of this unit's own pylons and draws %pylon_damage% damage out of it, cutting every ability cooldown by 1 turn and granting a %barrier_hp% health barrier for %barrier_duration% turns.",
+        "stats": {
+            "pylon_damage": 50
+        },
+        "details": [
+            "A pylon sharing its tile with another unit cannot be used.",
+            "The pylon detonates as though it had died - stunning and damaging adjacent enemies - even when the %pylon_damage% leaves it standing.",
+            "A pylon that was already hurt can still be spent outright, dying to the draw as it always did."
+        ]
     }
 }

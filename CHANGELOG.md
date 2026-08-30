@@ -7,7 +7,95 @@ Every version lives in this one file, newest first — the project is small enou
 scrollable history beats hunting through per-version files. Entries are written for players
 rather than for the diff: what changed about playing the game, not which classes moved.
 
-## [Unreleased] — 0.2.1
+## [Unreleased] — 0.3.0
+
+An alchemist who does not fight so much as *improve* — and, behind him, the machinery for an
+ability to have a second, better form.
+
+### New unit
+
+**Shawl** — a brewer of impossible tonics, who wins by making everyone else better than they were.
+
+- *Hidden Potential* — every blow Shawl lands earns him a point of **Insight**. At 10 Insight,
+  pour it into any ally within 4 tiles — Shawl included — and pick one of their abilities to
+  **permanently unlock**. There is no cap: one hero can be handed upgrade after upgrade if you
+  are willing to spend the match feeding them.
+- *Acidic Brew* — a pool of acid on a tile 2 away for 3 turns. Enemies standing in it take 10
+  extra damage from **every** source, and 5 more if they end their turn there.
+- Hidden Potential can of course be poured into itself, and it is the one ability that accepts
+  the treatment twice. Each time, Shawl gains **+20 to every attribute and +100 health for every
+  ability he has ever unlocked**, counted backwards over the whole match.
+
+### Upgraded abilities
+
+- **An unlocked ability is gold**, and reads differently for both players — its description,
+  its numbers and its rules are all the upgraded ones from the moment Shawl pours the brew.
+  There is nothing to hover on an ability you have not unlocked: what it *would* become is
+  shown only inside Shawl's own dialogue, when you are choosing.
+- **Every one of the 59 designed upgrades works**, and they are not all bigger numbers. Some are:
+  Plasma Cannon hits for 120, Perplexing Shot ricochets ten times, Shrink Ray takes twice as
+  much. Others change what the ability *is* — **Dilation** stops being a spell and becomes a
+  field Chronos simply carries, **Dispersion** gains an active that throws 150% of a blow back,
+  **Steady Focus** becomes a toggle Artemis holds as long as she likes, **Feast** makes the
+  lifesteal and the root permanent so the cast is nothing but the bite, and **Counterstrike**
+  stops countering for 20% *less* damage and starts countering for 20% *more*.
+- **A few of the best ones pay off through another ability.** Upgraded Implosion swings twice
+  before pricing its damage, so Wei's own Energy Break has already piled the cooldowns up that
+  the implosion then charges for. Upgraded Mimic hands Joker copies that never expire *and*
+  arrive already unlocked. Upgraded Hidden Potential pays Shawl for every unlock he has ever
+  granted, counted backwards.
+- **Five of them change what a cast even looks like.** **Eruption** sets *two* tiles alight and
+  **Snow Golem** raises a pair on two chosen tiles — both are the first casts in the game to ask
+  for two tiles, so the board now walks you through it a click at a time. **Manifestation** leaves
+  a shadow of Mercurial standing where he vanished from, carrying his health and a single ability
+  — *Recall*, which pulls him back to wherever it is standing. Kill the shadow and there is
+  nothing to come back to; shove it with a Translocation and you have moved his escape route.
+  **Overgrowth** grows a Branchigga wherever one of its Branchlings is killed — a real unit that
+  moves and attacks, on its own six-turn clock, so it outlives the grove that seeded it. And
+  **Homing Missile** fires two: a light one that arrives a turn early and stuns everything it
+  catches, with the warhead a turn behind.
+- Summons' own kits — a Branchling's aura, a Snow Golem's fists, a Pylon's beam — can never be
+  unlocked at all.
+- **Cancelling costs nothing.** Open the dialogue, look at what an ally has, and back out: the
+  Insight and the cooldown are only spent once you actually choose.
+
+### Playing against the computer
+
+- **The computer never drafts Shawl**, joining Maxwell and Joker on the short list of heroes it
+  declines — all three win by investing now for a payoff several turns away, which it cannot yet
+  plan for.
+- **A draft round that would have offered the computer two heroes it declines is now redealt**
+  before either player sees it. That was already possible with Maxwell and Joker, and used to
+  end with the computer picking one of them anyway.
+
+### Balance
+
+Several abilities were re-tuned in their **base** form so their unlocked form has somewhere to go:
+
+- **Backstab** now adds 0.8 damage per point of agility, up from 0.4.
+- **Fireblast** is shorter-ranged (2 tiles), applies 2 stacks of Burn, and comes back in 3 turns.
+- **Eruption** can be cast onto ground that is already alight, refreshing how long it burns
+  instead of being refused.
+- **Overheat** now empties its counter when it procs — damage past the threshold no longer
+  carries toward the next one.
+- **Oblivion Confinement** steals 25% intelligence on the way in, and no longer steals again on
+  the way out.
+- **Objurgation** has been rebuilt. Rather than cheating death once, it now throws up a 4-turn
+  barrier out of 20% of Harbinger's intelligence whenever he is struck below half health.
+- **Psychic Projection** no longer costs an action to cast.
+- **Snow Golems** are proper basic units that move and attack on their own.
+- **Zenith**: Orbital Beam hits for 60, Pylon comes back in 3 turns, Dislocation in 2.
+- **A defended Backstab no longer lands the backstab bonus at all.** It used to carry the whole
+  thing, which quietly made a failed swing one of Evayne's better outcomes.
+- **Overheat now empties its gauge when it procs.** Banking whatever was past the threshold is
+  the upgrade.
+- **Oblivion Confinement takes its whole toll on the way in.** Taking a second helping when the
+  target returns is the upgrade, not the baseline.
+- **Eruption can be cast onto burning ground, and refreshes it.** It used to be refused outright.
+  Re-lighting tops the fire back up rather than laying a second one, so a tile never burns its
+  occupant twice a round.
+
+## [0.2.1] — 2026-08-29
 
 A place to read the roster outside a match, a hero you can promise yourself in every draft,
 shorter ability text with the fine print one key away, and two delayed spells that finally

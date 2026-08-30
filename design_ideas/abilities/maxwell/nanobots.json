@@ -10,5 +10,13 @@
         "cast_range": 1,
         "heal": 40,
         "duration": 2
+    },
+    "upgrade": {
+        "summary": "The bots stay dormant afterwards to strip one more debuff.",
+        "details": [
+            "Only debuffs that can be cleansed are stripped.",
+            "When the %duration% turns of healing are up the bots stay in the body rather than dissolving, waiting.",
+            "The next cleansable debuff the host receives is stripped on arrival, and the bots burn out doing it. They heal nothing while they wait."
+        ]
     }
 }

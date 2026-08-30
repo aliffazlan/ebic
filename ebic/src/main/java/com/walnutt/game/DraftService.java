@@ -19,17 +19,20 @@ public class DraftService {
     /**
      * Not draftable heroes: yuki_golem/zenith_pylon are summon prototypes loaded as
      * UnitDefinitions purely so their kits can be constructed the same way a
-     * drafted unit's is, not actual pickable champions/elites. "vex" is kept here
+     * drafted unit's is, not actual pickable champions/elites. They live under
+     * units/other/ now, but the loader keys on filename, so this list is unaffected. "vex" is kept here
      * defensively in case an unfinished vex.json (a past duplicate of valor.json)
      * ever reappears - it doesn't exist in design_ideas/ right now.
      *
-     * "shawl" is a designed-but-unimplemented hero: shawl.json is real content sitting
-     * in units/elite/, so without this line he'd be draftable as a Move+Attack shell
-     * (and DraftPoolCoverageTest would fail). Delete the entry the moment his kit is
-     * wired into AbilityFactory. Summon prototypes like maxwell_drone/branchling need
-     * no entry - they're type "basic", which both pool queries already filter out.
+     * Shawl used to sit here as a designed-but-unimplemented hero; his kit is wired into
+     * AbilityFactory as of v0.3.0, so he is draftable like anyone else. The computer still
+     * declines him, but that is a bot preference (ai.HeroRatings.AVOIDED), not a pool rule.
+     *
+     * Summon prototypes beyond the two named need no entry - branchling, branchigga,
+     * maxwell_drone, mercurial_shadow and yuki_golem_upgrade are all type "basic", which
+     * both pool queries already filter out, wherever under units/ they happen to live.
      */
-    private static final Set<String> EXCLUDED = Set.of("vex", "yuki_golem", "zenith_pylon", "shawl");
+    private static final Set<String> EXCLUDED = Set.of("vex", "yuki_golem", "zenith_pylon");
 
     public List<String> getAvailableChampions(Map<String, UnitDefinition> unitDefs) {
         return unitDefs.entrySet().stream()

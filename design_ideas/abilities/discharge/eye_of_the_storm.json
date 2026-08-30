@@ -4,12 +4,27 @@
     "description": "At the start of each of this unit's turns, %count% random enemy within %range% tile is struck by lightning for %damage% damage.",
     "details": [
         "A struck enemy is left with a permanent, stacking vulnerability adding %bonus_damage% damage to everything that hits it afterwards.",
-        "A unit held by Static Link is always struck as well."
+        "A unit held by Static Link is always struck as well.",
+        "A unit cannot be struck more than once per turn."
     ],
     "stats": {
         "count": 1,
         "range": 1,
         "damage": 2,
         "bonus_damage": 2
+    },
+    "upgrade": {
+        "summary": "%count% bolts fall each turn, and vulnerability rises to %bonus_damage%.",
+        "description": "At the start of each of this unit's turns, %count% random enemies within %range% tile are struck by lightning for %damage% damage each.",
+        "stats": {
+            "count": 3,
+            "bonus_damage": 4
+        },
+        "details": [
+            "A struck enemy is left with a permanent, stacking vulnerability adding %bonus_damage% damage to everything that hits it afterwards.",
+            "Stacks already on the board keep the value they were laid down at - only new ones are worth %bonus_damage%.",
+            "A unit held by Static Link is always struck as well.",
+            "A unit cannot be struck more than once per turn, so %count% bolts need %count% separate enemies."
+        ]
     }
 }

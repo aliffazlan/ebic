@@ -10,6 +10,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import com.walnutt.ability.Ability;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.effect.Effect;
 import com.walnutt.effect.impl.BurnEffect;
@@ -33,10 +34,19 @@ class OverheatTest {
     private Unit ally;
     private GameState state;
 
+    /**
+     * Unlocks the Overheat already on the board, which is the form that banks heat past the
+     * threshold rather than burning it off.
+     */
+    private void unlockOverheat() {
+        ember.getAbilities().stream().filter(Overheat.class::isInstance).forEach(Ability::upgrade);
+    }
+
     private GameState setUpBoard() {
         ember = new BasicUnit("Ember", Team.PLAYER_ONE, new UnitStats(10, 10, 90, 970));
-        ember.addAbility(new Overheat(new AbilityDefinition("Overheat", "passive", "desc",
-            Map.of("threshold", 50.0, "radius", 1.0, "burn_stacks", 1.0))));
+        // The real definition rather than a hand-written stat map, so its upgrade block is
+        // present and the numbers below are the shipped ones (threshold 50, radius 1, 1 stack).
+        ember.addAbility(UpgradeFixture.ability("overheat"));
         victim = new BasicUnit("Victim", Team.PLAYER_TWO, new UnitStats(10, 10, 10, 100_000));
         neighbour = new BasicUnit("Neighbour", Team.PLAYER_TWO, new UnitStats(10, 10, 10, 100_000));
         ally = new BasicUnit("Ally", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100_000));
@@ -84,24 +94,53 @@ class OverheatTest {
 
     /** The brief's first example: 60 damage procs once and leaves 10 banked. */
     @Test
-    void crossingTheThresholdProcsOnceAndCarriesTheRemainderOver() {
+    void crossingTheThresholdProcsOnceAndBurnsOffTheRemainder() {
         setUpBoard();
         hit(60);
 
-        assertEquals(10, heat(), "60 - 50 threshold = 10 carried toward the next proc");
+        // The base form empties the gauge. Banking the extra 10 toward the next proc is the
+        // upgrade - see the test below, and overheat.json.
+        assertEquals(0, heat(), "the gauge is emptied, not decremented");
         assertEquals(1, burnStacks(neighbour), "the adjacent enemy catches fire");
     }
 
-    /** The brief's second example: 130 damage banks 80, which fires again next turn. */
     @Test
-    void oneBigHitProcsOnlyOnce_theBankedRemainderFiresOnALaterTurn() {
+    void upgradedItKeepsWhateverWasPastTheThreshold() {
+        setUpBoard();
+        unlockOverheat();
+
+        hit(60);
+
+        assertEquals(10, heat(), "60 - 50 threshold = 10 banked toward the next proc");
+        assertEquals(1, burnStacks(neighbour));
+    }
+
+    /** One huge hit is worth exactly one proc either way; what differs is what survives it. */
+    @Test
+    void oneBigHitProcsOnlyOnce_andTheBaseFormKeepsNoneOfIt() {
         setUpBoard();
         hit(130);
 
+        assertEquals(0, heat(), "one threshold fires and the other 80 is lost");
+        assertEquals(1, burnStacks(neighbour));
+
+        // New turn: the latch clears, but there is no banked heat left to cash in.
+        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_TWO));
+
+        assertEquals(0, heat());
+        assertEquals(1, burnStacks(neighbour), "nothing more to give");
+    }
+
+    /** Upgraded, the same hit banks 80, which fires again on a later turn with no fresh damage. */
+    @Test
+    void upgradedTheBankedRemainderFiresOnALaterTurn() {
+        setUpBoard();
+        unlockOverheat();
+
+        hit(130);
         assertEquals(80, heat(), "only one threshold is consumed per turn");
         assertEquals(1, burnStacks(neighbour));
 
-        // New turn: the latch clears and the banked heat cashes in without any fresh damage.
         state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_TWO));
 
         assertEquals(30, heat(), "80 - 50 = 30");

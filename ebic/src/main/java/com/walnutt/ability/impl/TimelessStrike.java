@@ -27,8 +27,10 @@ import com.walnutt.unit.Unit;
 public class TimelessStrike extends PassiveAbility {
     private static final int MAX_CHAIN_DEPTH = 8;
 
-    private final int stunDurationPerHit;
-    private final double chainedDamageMultiplier;
+    private int stunDurationPerHit;
+    private double chainedDamageMultiplier;
+    /** Upgrade: extra rolls the FIRST link of a chain gets if it comes up empty. */
+    private int rerolls;
     private int depth;
 
     public TimelessStrike(AbilityDefinition definition) {
@@ -69,9 +71,27 @@ public class TimelessStrike extends PassiveAbility {
         try {
             // chained=true: this is a follow-up within one cast, not a fresh attack, so
             // once-per-cast passives (Energy Break, Counterstrike) skip it.
-            CombatEngine.performAttack(state, new WeightedEncounter(getOwner(), defender), true);
+            DamageEvent chained =
+                CombatEngine.performAttack(state, new WeightedEncounter(getOwner(), defender), true);
+
+            // Upgrade: a chain that dies on its very first swing gets another roll. Only the
+            // first - depth 0 is the opening attack, so depth 1 is the link being rolled here,
+            // and later links are left to their luck.
+            int rollsLeft = depth == 1 ? rerolls : 0;
+            while (rollsLeft > 0 && !defender.isDead() && !getOwner().isDead()
+                && (chained == null || chained.getDamage() <= 0)) {
+                rollsLeft--;
+                chained = CombatEngine.performAttack(state, new WeightedEncounter(getOwner(), defender), true);
+            }
         } finally {
             depth--;
         }
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.stunDurationPerHit = statInt("duration", stunDurationPerHit);
+        this.chainedDamageMultiplier = stat("damage_multiplier", chainedDamageMultiplier);
+        this.rerolls = statInt("rerolls", 0);
     }
 }

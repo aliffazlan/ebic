@@ -9,5 +9,12 @@
     "stats": {
         "charge_per_turn": 1,
         "max_charges": 3
+    },
+    "upgrade": {
+        "summary": "Banks %charge_per_turn% charges a turn, up to %max_charges%.",
+        "stats": {
+            "charge_per_turn": 2,
+            "max_charges": 6
+        }
     }
 }

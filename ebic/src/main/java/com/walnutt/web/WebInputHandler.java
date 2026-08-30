@@ -211,6 +211,7 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             entry.addProperty("name", option.name());
             entry.addProperty("description", option.description());
             entry.addProperty("detail", option.detail());
+            entry.addProperty("enabled", option.enabled());
             optionArray.add(entry);
         }
         prompt.add("options", optionArray);
@@ -221,14 +222,35 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             if (msg == null) {
                 continue;
             }
+            // Cancelling is always available, whatever is on offer. Without it a player who
+            // opened a dialogue by mistake - or found nothing in it worth taking - would be
+            // stuck here with the match waiting on them.
+            if (msg.has("cancel") && msg.get("cancel").getAsBoolean()) {
+                hub.clearPrompt(team);
+                return null;
+            }
             String optionId = JsonSupport.optString(msg, "optionId");
+            ChoiceOption match = null;
             for (ChoiceOption option : options) {
                 if (option.id().equals(optionId)) {
-                    hub.clearPrompt(team);
-                    return option;
+                    match = option;
+                    break;
                 }
             }
-            hub.sendTo(team, JsonSupport.messageEnvelope("That isn't one of the options offered."));
+            if (match == null) {
+                hub.sendTo(team, JsonSupport.messageEnvelope("That isn't one of the options offered."));
+                continue;
+            }
+            // A disabled option is rendered greyed out and carries its reason, so a client
+            // answering with one is either out of date or lying; either way it is not a legal
+            // answer and must not upgrade anything.
+            if (!match.enabled()) {
+                hub.sendTo(team, JsonSupport.messageEnvelope(
+                    match.name() + " isn't available: " + match.detail() + "."));
+                continue;
+            }
+            hub.clearPrompt(team);
+            return match;
         }
     }
 
@@ -516,10 +538,16 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
         boolean noTarget = false;
         JsonArray unitIds = new JsonArray();
         JsonArray tiles = new JsonArray();
-        // Two-part candidates are grouped by their subject, so the client can highlight
-        // the pickable units first and then only that unit's own legal destinations.
+        // Two-part candidates are grouped by their FIRST half, so the client can highlight what
+        // can be picked first and then only that choice's own second halves. The key is a unit
+        // id (Translocation picks a unit, then a tile) or a "q,r" tile key (Eruption and Snow
+        // Golem pick two tiles); the client reads it back verbatim and never parses it.
         // LinkedHashMap keeps the enumeration order stable between pushes.
         Map<String, JsonArray> destinationsByPrimary = new LinkedHashMap<>();
+        // Which of those keys are units and which are tiles - the client needs to know what to
+        // accept a click on for stage one, and a tile key has to carry its own coordinates back.
+        List<String> primaryUnitKeys = new ArrayList<>();
+        Map<String, JsonObject> primaryTileKeys = new LinkedHashMap<>();
 
         for (Target target : targets) {
             if (target instanceof NoTarget) {
@@ -529,11 +557,22 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             } else if (target instanceof TileTarget tileTarget) {
                 tiles.add(tileJson(tileTarget));
             } else if (target instanceof MultiTarget multi
-                && multi.primary() instanceof UnitTarget primary
                 && multi.secondary() instanceof TileTarget destination) {
-                destinationsByPrimary
-                    .computeIfAbsent(ids.idFor(primary.getUnit()), key -> new JsonArray())
-                    .add(tileJson(destination));
+                String key = null;
+                if (multi.primary() instanceof UnitTarget primary) {
+                    key = ids.idFor(primary.getUnit());
+                    if (!primaryUnitKeys.contains(key)) {
+                        primaryUnitKeys.add(key);
+                    }
+                } else if (multi.primary() instanceof TileTarget primary) {
+                    key = tileKey(primary);
+                    primaryTileKeys.putIfAbsent(key, tileJson(primary));
+                }
+                if (key != null) {
+                    destinationsByPrimary
+                        .computeIfAbsent(key, unused -> new JsonArray())
+                        .add(tileJson(destination));
+                }
             }
         }
 
@@ -543,16 +582,27 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
         if (!destinationsByPrimary.isEmpty()) {
             JsonObject multi = new JsonObject();
             JsonArray primaryUnitIds = new JsonArray();
+            primaryUnitKeys.forEach(primaryUnitIds::add);
+            JsonArray primaryTiles = new JsonArray();
+            primaryTileKeys.values().forEach(primaryTiles::add);
             JsonObject destinations = new JsonObject();
-            destinationsByPrimary.forEach((unitId, tileArray) -> {
-                primaryUnitIds.add(unitId);
-                destinations.add(unitId, tileArray);
-            });
+            destinationsByPrimary.forEach(destinations::add);
+
             multi.add("primaryUnitIds", primaryUnitIds);
+            multi.add("primaryTiles", primaryTiles);
             multi.add("destinationsByPrimary", destinations);
             obj.add("multi", multi);
         }
         return obj;
+    }
+
+    /**
+     * The key a tile takes when it is the FIRST half of a two-part cast. Opaque to the client,
+     * which only ever echoes it back - but it has to be stable and collision-free against a unit
+     * id, which is a UUID and so never contains a comma.
+     */
+    private static String tileKey(TileTarget tile) {
+        return tile.getTile().getPosition().getQ() + "," + tile.getTile().getPosition().getR();
     }
 
     private static JsonObject tileJson(TileTarget tileTarget) {
@@ -612,23 +662,35 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
                 Tile tile = resolveTile(state, msg);
                 yield tile == null ? null : new TileTarget(tile);
             }
-            // A two-part cast (Translocation): a unit AND a destination tile, carried in
-            // the same message rather than over two round trips - the client has both by
-            // the time it submits, having picked them from the prompt's own `multi` block.
+            // A two-part cast, carried in one message rather than over two round trips - the
+            // client has both halves by the time it submits, having picked them from the
+            // prompt's own `multi` block. The first half is a unit (Translocation) or a tile
+            // (Eruption, Snow Golem); the second is always a tile.
             case "multi" -> {
+                Tile destination = resolveTile(state, msg);
+                if (destination == null) {
+                    yield null;
+                }
                 Unit subject = ids.resolve(JsonSupport.optString(msg, "targetUnitId"));
-                Tile tile = resolveTile(state, msg);
-                yield subject == null || tile == null
+                if (subject != null) {
+                    yield new MultiTarget(new UnitTarget(subject), new TileTarget(destination));
+                }
+                Tile primary = resolveTile(state, msg, "primaryQ", "primaryR");
+                yield primary == null
                     ? null
-                    : new MultiTarget(new UnitTarget(subject), new TileTarget(tile));
+                    : new MultiTarget(new TileTarget(primary), new TileTarget(destination));
             }
             default -> null;
         };
     }
 
     private Tile resolveTile(GameState state, JsonObject msg) {
-        Integer q = JsonSupport.optInt(msg, "q");
-        Integer r = JsonSupport.optInt(msg, "r");
+        return resolveTile(state, msg, "q", "r");
+    }
+
+    private Tile resolveTile(GameState state, JsonObject msg, String qField, String rField) {
+        Integer q = JsonSupport.optInt(msg, qField);
+        Integer r = JsonSupport.optInt(msg, rField);
         if (q == null || r == null) {
             return null;
         }

@@ -6,5 +6,16 @@
         "cooldown": 5,
         "dmg_reduction": 0.5,
         "duration": 2
+    },
+    "upgrade": {
+        "summary": "Leaves a shadow behind for %shadow_duration% turns, which can call this unit back.",
+        "stats": {
+            "shadow_duration": 2
+        },
+        "details": [
+            "A shadow is left standing on the tile this unit vanished from, with its statline and the health it left with.",
+            "The shadow cannot move, and lasts %shadow_duration% turns. Its Recall pulls this unit back to wherever the shadow is standing, and the shadow with it.",
+            "Anything that shifts the shadow shifts where the recall lands - a translocated shadow is a translocated escape route."
+        ]
     }
 }

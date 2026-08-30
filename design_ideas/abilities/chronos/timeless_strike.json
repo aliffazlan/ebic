@@ -9,5 +9,16 @@
     "stats": {
         "duration": 1,
         "damage_multiplier": 0.5
+    },
+    "upgrade": {
+        "summary": "The first chained attack is rolled a second time if it misses.",
+        "stats": {
+            "rerolls": 1
+        },
+        "details": [
+            "Chained attacks deal %damage_multiplier:pct%% of their normal damage.",
+            "Each chained hit adds %duration% turn to a single stun on the target.",
+            "A chain that dies on its first swing gets %rerolls% more roll to keep itself going. Later links in the chain do not."
+        ]
     }
 }

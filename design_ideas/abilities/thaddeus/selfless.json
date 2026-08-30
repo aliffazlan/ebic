@@ -5,5 +5,16 @@
     "stats": {
         "radius": 1,
         "redirect_dmg": 0.25
+    },
+    "upgrade": {
+        "summary": "Takes %redirect_dmg:pct%% of an ally's damage, and only %self_damage_taken:pct%% of it lands.",
+        "stats": {
+            "redirect_dmg": 0.4,
+            "self_damage_taken": 0.5
+        },
+        "details": [
+            "Of everything redirected onto it, this unit actually takes %self_damage_taken:pct%%. The rest is simply borne away.",
+            "A shielded ally in the aura is therefore losing far less than %redirect_dmg:pct%% of the blow to the pair of them."
+        ]
     }
 }

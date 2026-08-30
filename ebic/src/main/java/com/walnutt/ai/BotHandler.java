@@ -153,6 +153,12 @@ public final class BotHandler implements InputHandler, ConcurrentSetupHandler {
         return pickBest(options);
     }
 
+    /** The heroes the computer cannot play well - see HeroRatings.AVOIDED for each one's reason. */
+    @Override
+    public boolean refusesToDraft(Player player, UnitDefinition definition) {
+        return HeroRatings.isAvoided(definition);
+    }
+
     /**
      * The champion takes the tile deepest in its own territory; everything else takes the
      * most forward tile still free.

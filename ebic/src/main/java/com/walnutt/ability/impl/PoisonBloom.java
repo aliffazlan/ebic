@@ -21,10 +21,10 @@ public class PoisonBloom extends Ability {
     /** Net stacks the bloom adds to the poison each turn it is active. */
     private static final int GROWTH_PER_TURN = 1;
 
-    private final int initialPoison;
-    private final int growthDuration;
-    private final int durationIncrease;
-    private final int infectRadius;
+    private int initialPoison;
+    private int growthDuration;
+    private int durationIncrease;
+    private int infectRadius;
 
     public PoisonBloom(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -61,9 +61,17 @@ public class PoisonBloom extends Ability {
         // Two separate effects: the Poison does the damage, the Bloom feeds it and bursts.
         PoisonEffect.applyOrExtend(other, owner, initialPoison, damagePerTurn);
         other.addEffect(new PoisonBloomEffect(owner, growthDuration, GROWTH_PER_TURN, durationIncrease,
-            infectRadius));
+            infectRadius, isUpgraded(), false));
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.initialPoison = statInt("initial_poison", initialPoison);
+        this.growthDuration = statInt("duration", growthDuration);
+        this.durationIncrease = statInt("duration_increase", durationIncrease);
+        this.infectRadius = statInt("infect_radius", infectRadius);
     }
 }

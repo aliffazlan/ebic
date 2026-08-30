@@ -10,8 +10,9 @@ import com.walnutt.unit.Unit;
 
 /** Harbinger - imprisons (stun + invulnerable) an enemy, stealing intelligence on cast and on escape. */
 public class OblivionConfinement extends Ability {
-    private final int duration;
-    private final double intStealPercent;
+    private int duration;
+    private double intStealPercent;
+    private boolean stealOnEscape;
 
     public OblivionConfinement(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -39,11 +40,18 @@ public class OblivionConfinement extends Ability {
     public void onUse(GameState state, Target target) {
         Unit other = ((UnitTarget) target).getUnit();
 
-        ImprisonmentEffect effect = new ImprisonmentEffect(owner, duration, intStealPercent);
+        ImprisonmentEffect effect = new ImprisonmentEffect(owner, duration, intStealPercent, stealOnEscape);
         other.addEffect(effect);
         effect.stealIntelligence();
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.intStealPercent = stat("int_steal", intStealPercent);
+        this.stealOnEscape = true;
     }
 }

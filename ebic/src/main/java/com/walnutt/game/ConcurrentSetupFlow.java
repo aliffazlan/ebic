@@ -7,10 +7,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import java.util.function.Predicate;
+
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.ui.ConcurrentSetupHandler;
+import com.walnutt.ui.InputHandler;
 import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitFactory;
 
@@ -36,6 +39,13 @@ public final class ConcurrentSetupFlow {
     private static final int ELITE_ROUNDS = 3;
     private static final int BASIC_COUNT = 10;
     private static final List<String> ROUND_LABELS = List.of("Champion", "Elite 1/3", "Elite 2/3", "Elite 3/3");
+    /**
+     * How many times a pair of two refused heroes is redealt before falling back to a
+     * deterministic swap. Bounded because a self-play match has TWO refusing seats and the
+     * pool can hold three refused heroes at once, so a pool that is mostly refused near the
+     * end of the draft would otherwise spin forever reshuffling the same two cards.
+     */
+    private static final int REROLL_ATTEMPTS = 8;
 
     private ConcurrentSetupFlow() {
     }
@@ -125,14 +135,18 @@ public final class ConcurrentSetupFlow {
                 ? 1 + random.nextInt(ELITE_ROUNDS)
                 : -1;
 
+            // Asked once per seat, before a single pair is dealt: a human refuses nothing, so
+            // this is identity for them and the draft is untouched.
+            Predicate<UnitDefinition> refused = refusalFor(state, player);
+
             List<List<UnitDefinition>> rounds = new ArrayList<>();
             rounds.add(favouriteIsChampion
                 ? pairWithFavourite(favouriteDef, championPool, random)
-                : drawTwo(championPool));
+                : drawTwoFor(championPool, refused, random));
             for (int i = 1; i <= ELITE_ROUNDS; i++) {
                 rounds.add(i == favouriteEliteRound
                     ? pairWithFavourite(favouriteDef, elitePool, random)
-                    : drawTwo(elitePool));
+                    : drawTwoFor(elitePool, refused, random));
             }
             allocation.put(player.getTeam(), rounds);
         }
@@ -176,6 +190,53 @@ public final class ConcurrentSetupFlow {
             seen.add(id);
         }
         return contested;
+    }
+
+    /**
+     * What this seat refuses to be dealt. Read off the state's own InputHandler rather than
+     * threaded in as a parameter, because it is exactly the seat that will be answering
+     * choosePick a moment later - Game sets the handler before calling run, and a test
+     * driving this flow directly may not have set one at all, hence the null.
+     */
+    private static Predicate<UnitDefinition> refusalFor(GameState state, Player player) {
+        InputHandler handler = state.getInputHandler();
+        return handler == null ? definition -> false : definition -> handler.refusesToDraft(player, definition);
+    }
+
+    /**
+     * A pair this seat can actually play. Ordinary {@link #drawTwo} unless BOTH halves are
+     * refused, in which case they go back and the pool is redealt - invisibly, since the
+     * whole allocation happens before either player's thread starts and nothing has been
+     * rendered yet.
+     *
+     * Rerolling rather than letting the seat pick one anyway is the point: declining a hero
+     * only helps if something else is on offer, and with three refused heroes in the pool a
+     * round of two of them was reachable well before Shawl joined the list.
+     */
+    private static List<UnitDefinition> drawTwoFor(List<UnitDefinition> pool,
+                                                    Predicate<UnitDefinition> refused, Random random) {
+        for (int attempt = 0; attempt < REROLL_ATTEMPTS; attempt++) {
+            List<UnitDefinition> pair = drawTwo(pool);
+            if (pair.stream().anyMatch(definition -> !refused.test(definition))) {
+                return pair;
+            }
+            pool.addAll(pair);
+            Collections.shuffle(pool, random);
+        }
+        // Every reroll came back refused. Rather than keep shuffling, take a pair and trade
+        // one half for the first playable hero left in the pool - which terminates, and is
+        // what the rerolling was trying to stumble into anyway. If the pool holds nothing
+        // playable at all, the pair stands: the draft must still hand back two heroes.
+        List<UnitDefinition> pair = new ArrayList<>(drawTwo(pool));
+        for (int i = 0; i < pool.size(); i++) {
+            if (!refused.test(pool.get(i))) {
+                pool.add(pair.remove(1));
+                pair.add(pool.remove(i));
+                Collections.shuffle(pair, random);
+                break;
+            }
+        }
+        return List.copyOf(pair);
     }
 
     /** The guaranteed hero plus one ordinary draw, shuffled so the favourite isn't always listed first. */

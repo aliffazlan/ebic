@@ -1,0 +1,12 @@
+{
+    "name": "Branchigga",
+    "type": "basic",
+    "max_hp": 400,
+    "strength": 45,
+    "agility": 25,
+    "intelligence": 25,
+    "attack_range": 1,
+    "abilities": [
+        "branchling_aura"
+    ]
+}

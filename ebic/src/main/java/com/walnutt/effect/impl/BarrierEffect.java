@@ -35,6 +35,18 @@ public class BarrierEffect extends Effect {
         setRemainingTurns(duration);
     }
 
+    /**
+     * Tops the pool back up toward {@code max} without touching the duration, for a barrier
+     * that mends itself over time (upgraded Holy Shield, upgraded Energy Shield's passive).
+     * Distinct from {@link #refresh}, which is a whole new barrier and resets the clock.
+     */
+    public void restore(int amount, int max) {
+        if (amount <= 0 || remainingBarrierHp >= max) {
+            return;
+        }
+        remainingBarrierHp = Math.min(max, remainingBarrierHp + amount);
+    }
+
     @Override
     public String getExtraInfo() {
         return "Barrier: " + remainingBarrierHp + " HP remaining";

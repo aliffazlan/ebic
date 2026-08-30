@@ -10,9 +10,10 @@ import com.walnutt.map.Tile;
 
 /** Harbinger - launches a delayed orb that explodes for intelligence-difference damage in an area. */
 public class SanityEclipse extends Ability {
-    private final int delay;
-    private final int radius;
-    private final double intDiffMultiplier;
+    private int delay;
+    private int radius;
+    private double intDiffMultiplier;
+    private int recasts;
 
     public SanityEclipse(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -37,9 +38,18 @@ public class SanityEclipse extends Ability {
     @Override
     public void onUse(GameState state, Target target) {
         Tile tile = ((TileTarget) target).getTile();
-        owner.addEffect(new OrbEffect(owner, tile.getPosition(), delay, radius, intDiffMultiplier));
+        owner.addEffect(new OrbEffect(owner, tile.getPosition(), delay, radius, intDiffMultiplier,
+            recasts));
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.delay = statInt("delay", delay);
+        this.radius = statInt("radius", radius);
+        this.intDiffMultiplier = stat("int_diff_dmg", intDiffMultiplier);
+        this.recasts = statInt("recasts", 0);
     }
 }

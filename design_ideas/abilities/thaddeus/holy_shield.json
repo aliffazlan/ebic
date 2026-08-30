@@ -12,5 +12,16 @@
         "barrier_hp": 50,
         "damage": 50,
         "radius": 1
+    },
+    "upgrade": {
+        "summary": "A %barrier_hp% barrier that mends %barrier_regen% a turn and always erupts.",
+        "stats": {
+            "barrier_hp": 100,
+            "barrier_regen": 20
+        },
+        "details": [
+            "The barrier regains %barrier_regen% at the start of each turn, up to its full %barrier_hp%, for as long as it has not been broken.",
+            "It erupts whether it is broken or simply fades, clearing the ally's debuffs and dealing %damage% damage to enemies within %radius% tile either way."
+        ]
     }
 }

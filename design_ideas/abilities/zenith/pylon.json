@@ -7,8 +7,14 @@
         "A destroyed pylon detonates for %death_damage% damage to adjacent enemies, stunning them for %death_duration% turn."
     ],
     "stats": {
-        "cooldown": 4,
+        "cooldown": 3,
         "death_damage": 50,
         "death_duration": 1
+    },
+    "upgrade": {
+        "summary": "Cooldown cut to %cooldown% turn - a pylon almost every turn.",
+        "stats": {
+            "cooldown": 1
+        }
     }
 }

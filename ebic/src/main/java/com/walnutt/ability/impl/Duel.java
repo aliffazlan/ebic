@@ -11,10 +11,11 @@ import com.walnutt.unit.Unit;
 
 /** Valor - taunts an enemy into forced mutual combat; the survivor gains permanent stats + heals. */
 public class Duel extends Ability {
-    private final int duration;
-    private final double duelBonus;
-    private final double duelHealPercent;
-    private final double winMultiplier;
+    private int duration;
+    private double duelBonus;
+    private double duelHealPercent;
+    private double winMultiplier;
+    private double duelVulnerability;
 
     public Duel(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -52,11 +53,23 @@ public class Duel extends Ability {
         DuelEffect theirs = new DuelEffect(owner, duration, duelBonus, duelHealPercent, winMultiplier);
         mine.linkPartner(theirs);
         theirs.linkPartner(mine);
+        // The vulnerability is mutual; only Valor's own half refreshes this ability on a win.
+        mine.upgradeWith(duelVulnerability, isUpgraded() ? this : null);
+        theirs.upgradeWith(duelVulnerability, null);
 
         owner.addEffect(mine);
         other.addEffect(theirs);
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.duelBonus = stat("duel_bonus", duelBonus);
+        this.duelHealPercent = stat("duel_heal", duelHealPercent);
+        this.winMultiplier = stat("win_multiplier", winMultiplier);
+        this.duelVulnerability = stat("duel_vulnerability", 0);
     }
 }

@@ -7,5 +7,13 @@
         "duration": 4,
         "range": 1,
         "time_modifier": 0.5
+    },
+    "upgrade": {
+        "summary": "Becomes a passive - the field never switches off.",
+        "type": "passive",
+        "description": "Warps time permanently within %range% tile. Enemies caught in the field have their ability cooldowns frozen, their buffs tick away twice as fast, and their debuffs linger twice as long.",
+        "details": [
+            "There is nothing to cast and nothing to time - the field simply follows this unit."
+        ]
     }
 }

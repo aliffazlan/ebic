@@ -4,6 +4,7 @@ import com.walnutt.ability.Ability;
 import com.walnutt.ability.target.NoTarget;
 import com.walnutt.ability.target.Target;
 import com.walnutt.data.AbilityDefinition;
+import com.walnutt.effect.Effect;
 import com.walnutt.effect.impl.FeastEffect;
 import com.walnutt.game.GameState;
 
@@ -13,10 +14,10 @@ import com.walnutt.game.GameState;
  * whoever gets bitten.
  */
 public class Feast extends Ability {
-    private final int duration;
-    private final int attacks;
-    private final double lifesteal;
-    private final int rootDuration;
+    private int duration;
+    private int attacks;
+    private double lifesteal;
+    private int rootDuration;
 
     public Feast(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -33,8 +34,28 @@ public class Feast extends Ability {
     }
 
     @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.attacks = statInt("attacks", attacks);
+        this.lifesteal = stat("lifesteal", lifesteal);
+        this.rootDuration = statInt("root_duration", rootDuration);
+        // The frenzy stops being a window and becomes what he simply is. Granted once, here,
+        // rather than on every cast - so the cast below has only the free attack left to do.
+        if (owner != null && owner.getActiveEffect(FeastEffect.class).isEmpty()) {
+            owner.addEffect(new FeastEffect(Effect.PERMANENT, 0, lifesteal, rootDuration));
+        }
+    }
+
+    @Override
     public void onUse(GameState state, Target target) {
-        owner.addEffect(new FeastEffect(duration, attacks, lifesteal, rootDuration));
+        if (isUpgraded()) {
+            // Everything the frenzy used to grant is already permanent, so a cast is now purely
+            // the free attacks - which is what makes it still worth a cooldown.
+            owner.getActiveEffect(FeastEffect.class)
+                .ifPresent(feast -> feast.strike(state, attacks));
+        } else {
+            owner.addEffect(new FeastEffect(duration, attacks, lifesteal, rootDuration));
+        }
         state.spendMoves(getMoveCost(state));
         resetToMax();
     }

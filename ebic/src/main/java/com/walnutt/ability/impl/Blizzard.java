@@ -10,8 +10,8 @@ import com.walnutt.unit.Unit;
 
 /** Yuki - roots and damages a unit over time; reapplying stacks the duration instead of refreshing it. */
 public class Blizzard extends Ability {
-    private final int duration;
-    private final int damage;
+    private int duration;
+    private int damage;
 
     public Blizzard(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -36,9 +36,24 @@ public class Blizzard extends Ability {
     @Override
     public void onUse(GameState state, Target target) {
         Unit other = ((UnitTarget) target).getUnit();
-        BlizzardEffect.applyOrExtend(other, owner, duration, damage);
+        BlizzardEffect.applyOrExtend(other, owner, duration, damage, isUpgraded());
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.damage = statInt("damage", damage);
+    }
+
+    /**
+     * Whether this Yuki's snow disarms. Read by her golem's Blizzard Fist and Snow Blast, which
+     * raise the same storm and are tagged no_upgrade precisely because they follow hers rather
+     * than being unlocked in their own right.
+     */
+    public boolean disarms() {
+        return isUpgraded();
     }
 }

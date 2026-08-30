@@ -2,8 +2,25 @@
     "name": "Snow Golem",
     "type": "active",
     "description": "Summons a snow golem on an empty tile within %cast_range% tile, armed with Blizzard Fist and Snow Blast. Summoning a second golem destroys the first.",
+    "details": [
+        "The golem is a basic unit - it moves and attacks on its own, spending none of this unit's actions."
+    ],
     "stats": {
         "cooldown": 16,
         "cast_range": 1
+    },
+    "upgrade": {
+        "summary": "Raises %golems% golems at once, onto %targets% chosen tiles.",
+        "description": "Summons %golems% snow golems onto %targets% empty tiles within %cast_range% tile, each armed with Blizzard Fist and Snow Blast. Summoning again destroys whatever is still standing.",
+        "stats": {
+            "targets": 2,
+            "golems": 2
+        },
+        "details": [
+            "The golems are basic units - they move and attack on their own, spending none of this unit's actions.",
+            "The pair are a little weaker apiece than the single golem they replace.",
+            "Resummoning clears the board of every golem still standing, whether that is one or %golems%.",
+            "Unlocking this refreshes the cooldown at once, so the pair can be raised immediately."
+        ]
     }
 }

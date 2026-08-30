@@ -2,6 +2,9 @@
     "name": "Pylon Orbital Beam",
     "type": "passive",
     "description": "Whenever this pylon's summoner casts Orbital Beam, this pylon fires one too, at a random enemy within %radius% tile.",
+    "tags": [
+        "no_upgrade"
+    ],
     "stats": {
         "radius": 1
     }

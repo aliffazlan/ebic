@@ -8,10 +8,11 @@ import com.walnutt.unit.Unit;
  * Ember's hidden heat gauge, one per (victim, Ember) pair. Records how much damage that
  * Ember has dealt to this unit and reports when a threshold's worth has built up.
  *
- * Crossing the threshold consumes exactly one threshold and leaves the remainder banked
- * toward the next one - 130 damage at a threshold of 50 fires once and keeps 80 - and a
- * unit can only overheat once per turn, so a large hit doesn't cash in several at once.
- * That cap is what keeps the burn-feeds-heat-feeds-burn loop linear instead of runaway.
+ * Crossing the threshold empties the gauge - 130 damage at a threshold of 50 fires once and
+ * the other 80 is lost - unless Ember's Overheat has been upgraded, in which case exactly one
+ * threshold is taken and the remainder banks toward the next. Either way a unit can only
+ * overheat once per turn, so a large hit never cashes in several at once. That cap is what
+ * keeps the burn-feeds-heat-feeds-burn loop linear instead of runaway.
  *
  * NEUTRAL and non-dispellable so a cleanse can't wipe the gauge.
  */
@@ -46,12 +47,15 @@ public class OverheatTrackerEffect extends Effect {
         }
     }
 
-    /** True at most once per turn, consuming one threshold's worth of heat when it fires. */
-    public boolean consumeProc() {
+    /**
+     * True at most once per turn. {@code preserveExcess} is upgraded Overheat: take exactly one
+     * threshold and bank the rest, rather than emptying the gauge outright.
+     */
+    public boolean consumeProc(boolean preserveExcess) {
         if (proccedThisTurn || accumulated < threshold) {
             return false;
         }
-        accumulated -= threshold;
+        accumulated = preserveExcess ? accumulated - threshold : 0;
         proccedThisTurn = true;
         return true;
     }

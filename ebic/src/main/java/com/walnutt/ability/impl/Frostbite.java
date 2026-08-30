@@ -11,8 +11,9 @@ import com.walnutt.unit.Unit;
 
 /** Auroth - dealing damage frostbites the target: no healing, instant death below the HP threshold. */
 public class Frostbite extends PassiveAbility {
-    private final int duration;
-    private final double killThreshold;
+    private int duration;
+    private double killThreshold;
+    private double basicKillThreshold;
 
     public Frostbite(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -30,7 +31,14 @@ public class Frostbite extends PassiveAbility {
         if (existing.isPresent()) {
             existing.get().setRemainingTurns(duration);
         } else {
-            target.addEffect(new FrostbiteEffect(getOwner(), duration, killThreshold));
+            target.addEffect(new FrostbiteEffect(getOwner(), duration, killThreshold, basicKillThreshold));
         }
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.killThreshold = stat("kill_threshold", killThreshold);
+        this.basicKillThreshold = stat("basic_kill_threshold", 0);
     }
 }

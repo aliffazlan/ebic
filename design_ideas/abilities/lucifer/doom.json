@@ -10,5 +10,15 @@
         "cast_range": 1,
         "base_dmg": 20,
         "dmg_increase": 20
+    },
+    "upgrade": {
+        "summary": "Enemies beside the cursed unit take %splash_damage:pct%% of the damage as well.",
+        "stats": {
+            "splash_damage": 0.5
+        },
+        "details": [
+            "The curse has no duration - it lifts only once the cursed unit claims a kill of its own.",
+            "Every tick spills %splash_damage:pct%% onto each enemy adjacent to the cursed unit, so the longer it runs the worse standing near them gets."
+        ]
     }
 }

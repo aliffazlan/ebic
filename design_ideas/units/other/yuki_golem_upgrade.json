@@ -1,0 +1,12 @@
+{
+    "name": "Snow Golem",
+    "type": "basic",
+    "max_hp": 800,
+    "strength": 50,
+    "agility": 30,
+    "intelligence" : 12,
+    "attack_range": 1,
+    "abilities": [
+        "blizzard_fist", "snow_blast"
+    ]
+}

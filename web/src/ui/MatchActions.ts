@@ -9,6 +9,8 @@ export interface MatchActions {
   sendAttribute(value: Attribute): void;
   /** Answers a `choice` prompt (Eureka's gadget dialogue) with the chosen option's id. */
   sendChoice(optionId: string): void;
+  /** Closes a `choice` prompt without picking. The cast is abandoned and costs nothing. */
+  cancelChoice(): void;
   sendPick(definitionId: string): void;
   sendPlacementSwap(unitId: string, targetUnitId: string): void;
   sendPlacementMove(unitId: string, q: number, r: number): void;

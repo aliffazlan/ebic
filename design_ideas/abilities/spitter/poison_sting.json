@@ -8,5 +8,15 @@
     "stats": {
         "duration": 2,
         "dmg_per_duration": 5
+    },
+    "upgrade": {
+        "summary": "Each turn of poison left also adds %vulnerability_per_stack% to the damage the victim takes.",
+        "stats": {
+            "vulnerability_per_stack": 2
+        },
+        "details": [
+            "Attacking an already-poisoned target extends the poison instead of restacking it.",
+            "Every turn still on the poison adds %vulnerability_per_stack% damage to everything that hits the victim, so the same stacks that are killing them are also softening them up."
+        ]
     }
 }

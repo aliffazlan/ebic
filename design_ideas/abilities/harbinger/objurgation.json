@@ -1,13 +1,27 @@
 {
     "name": "Objurgation",
     "type": "passive",
-    "description": "Cheats death: on taking a fatal blow this unit burns %int_consumed:pct%% of its intelligence and survives on the %int_to_hp% health each point becomes.",
+    "description": "Below %hp_threshold:pct%% health, any blow this unit takes is met first with a barrier, burning %int_consumed:pct%% of its intelligence into %int_to_hp% health of shielding per point.",
     "details": [
-        "Can only save this unit once every %cooldown% turns."
+        "The barrier goes up just before the damage lands, and lasts %barrier_duration% turns.",
+        "Can only trigger once every %cooldown% turns."
     ],
     "stats": {
         "cooldown": 4,
         "int_to_hp": 1,
-        "int_consumed": 0.5
+        "int_consumed": 0.2,
+        "hp_threshold": 0.5,
+        "barrier_duration": 4
+    },
+    "upgrade": {
+        "summary": "A killing blow instead burns every point of intelligence into health.",
+        "stats": {
+            "fatal_int_consumed": 1
+        },
+        "details": [
+            "The barrier goes up just before the damage lands, and lasts %barrier_duration% turns.",
+            "A blow that would actually kill this unit is answered differently: it burns %fatal_int_consumed:pct%% of its intelligence and heals %int_to_hp% health per point, cheating death outright.",
+            "Can only trigger once every %cooldown% turns, whichever of the two fires."
+        ]
     }
 }

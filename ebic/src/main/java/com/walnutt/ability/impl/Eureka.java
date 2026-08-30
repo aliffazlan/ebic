@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Set;
 
 import com.walnutt.ability.Ability;
+import com.walnutt.ability.Attack;
+import com.walnutt.ability.Move;
 import com.walnutt.ability.target.NoTarget;
 import com.walnutt.ability.target.Target;
 import com.walnutt.data.AbilityDefinition;
@@ -51,10 +53,12 @@ public class Eureka extends Ability {
         "capacitor_bank"
     );
 
-    private final int passiveInspiration;
-    private final int bonusInspiration;
-    private final int baseCost;
-    private final int costIncrease;
+    private int passiveInspiration;
+    private int bonusInspiration;
+    private int baseCost;
+    private int costIncrease;
+    /** Upgrade: Inspiration returned by each ability cast. 0 until upgraded. */
+    private int inspirationPerAbility;
     /**
      * Ids already constructed. Tracked directly rather than by scanning owner.getAbilities()
      * and normalizing names back into ids - that round-trip is not reliable (Harbinger's
@@ -181,9 +185,31 @@ public class Eureka extends Ability {
      */
     @Override
     public void onAbilityUsed(GameState state, AbilityCastEvent event) {
-        if (event.phase() == AbilityCastEvent.Phase.POST && event.user() == getOwner()) {
-            actedThisTurn = true;
+        if (event.phase() != AbilityCastEvent.Phase.POST || event.user() != getOwner()) {
+            return;
         }
+        actedThisTurn = true;
+
+        // Upgrade: a real ability only. TurnManager publishes this same event around Move and
+        // Attack too, which is exactly what makes the flag above cover all three - so the
+        // refund has to exclude them explicitly rather than rely on the hook.
+        if (inspirationPerAbility <= 0 || event.ability() instanceof Move || event.ability() instanceof Attack) {
+            return;
+        }
+        InspirationEffect pool = pool();
+        if (pool != null) {
+            pool.add(inspirationPerAbility);
+            pool.setNextThreshold(currentCost());
+        }
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.passiveInspiration = statInt("passive_inspiration", passiveInspiration);
+        this.bonusInspiration = statInt("bonus_inspiration", bonusInspiration);
+        this.baseCost = statInt("cost", baseCost);
+        this.costIncrease = statInt("cost_increase", costIncrease);
+        this.inspirationPerAbility = statInt("inspiration_per_ability", 0);
     }
 
     @Override

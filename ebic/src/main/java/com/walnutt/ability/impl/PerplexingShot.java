@@ -23,9 +23,9 @@ import com.walnutt.unit.Unit;
  * and a liability anywhere else.
  */
 public class PerplexingShot extends Ability {
-    private final int damage;
-    private final int bonusDamage;
-    private final int bounces;
+    private int damage;
+    private int bonusDamage;
+    private int bounces;
 
     public PerplexingShot(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -101,5 +101,13 @@ public class PerplexingShot extends Ability {
         DamageEvent event = new DamageEvent(owner, target, amount);
         event.setCauseLabel(getName());
         target.takeDamage(state, event);
+    }
+
+    /** Upgrade: ricochets up to `bounces` times rather than twice. */
+    @Override
+    protected void onUpgraded() {
+        this.damage = statInt("damage", damage);
+        this.bonusDamage = statInt("bonus_damage", bonusDamage);
+        this.bounces = statInt("bounces", bounces);
     }
 }

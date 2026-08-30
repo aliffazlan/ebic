@@ -10,8 +10,9 @@ import com.walnutt.unit.Unit;
 
 /** Lucifer - curses an enemy with silence and escalating damage until it lands a kill. */
 public class Doom extends Ability {
-    private final int baseDamage;
-    private final int damageIncrease;
+    private int baseDamage;
+    private int damageIncrease;
+    private double splashDamage;
 
     public Doom(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -39,9 +40,16 @@ public class Doom extends Ability {
     @Override
     public void onUse(GameState state, Target target) {
         Unit other = ((UnitTarget) target).getUnit();
-        other.addEffect(new DoomEffect(owner, baseDamage, damageIncrease));
+        other.addEffect(new DoomEffect(owner, baseDamage, damageIncrease, splashDamage));
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.baseDamage = statInt("base_dmg", baseDamage);
+        this.damageIncrease = statInt("dmg_increase", damageIncrease);
+        this.splashDamage = stat("splash_damage", 0);
     }
 }

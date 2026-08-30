@@ -10,9 +10,9 @@ import com.walnutt.unit.Unit;
 
 /** Maxwell gadget - shrinks an enemy's attributes and health for a few turns. */
 public class ShrinkRay extends Ability {
-    private final int duration;
-    private final double statReduction;
-    private final double hpReduction;
+    private int duration;
+    private double statReduction;
+    private double hpReduction;
 
     public ShrinkRay(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -39,5 +39,13 @@ public class ShrinkRay extends Ability {
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    /** Upgrade: takes a bigger bite out of both the attributes and the health. */
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.statReduction = stat("stat_reduction", statReduction);
+        this.hpReduction = stat("hp_reduction", hpReduction);
     }
 }

@@ -10,5 +10,18 @@
         "radius": 3,
         "diff_dmg": 16,
         "diff_heal": 16
+    },
+    "upgrade": {
+        "summary": "Gains a passive: every attack this unit makes scales with who has the numbers, board-wide.",
+        "stats": {
+            "passive_damage": 10,
+            "passive_heal": 5
+        },
+        "details": [
+            "Being outnumbered instead heals every ally in the area %diff_heal% for each unit of the deficit.",
+            "The passive counts the whole board, not the area: with more allies alive than enemies, each of this unit's attacks deals %passive_damage% more damage per unit of the advantage.",
+            "Outnumbered, each of its attacks instead heals it %passive_heal% per unit of the deficit, without hitting any harder.",
+            "Both apply to this unit alone, and both fire on a Counterstrike - untouched by its damage reduction."
+        ]
     }
 }

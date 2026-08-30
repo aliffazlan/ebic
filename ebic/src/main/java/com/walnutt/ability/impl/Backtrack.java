@@ -3,11 +3,16 @@ package com.walnutt.ability.impl;
 import com.walnutt.ability.Ability;
 import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.TileTarget;
+import java.util.List;
+
+import com.walnutt.combat.CombatEngine;
+import com.walnutt.combat.WeightedEncounter;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.event.PostDamageEvent;
 import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Tile;
+import com.walnutt.unit.Unit;
 
 /**
  * Chronos - dashes to an empty tile and heals for damage taken during the
@@ -17,6 +22,8 @@ import com.walnutt.map.Tile;
  * ever specified) - "the previous turn", not a longer rolling window.
  */
 public class Backtrack extends Ability {
+    /** Upgrade: whether arriving swings at every adjacent enemy. */
+    private boolean strikesOnArrival;
     private int damageTakenLastTurn;
     private int damageTakenThisTurn;
 
@@ -61,8 +68,25 @@ public class Backtrack extends Ability {
         if (damageTakenLastTurn > 0) {
             owner.heal(state, damageTakenLastTurn);
         }
+        // Upgrade: the landing itself is an attack, on everything beside the tile arrived at.
+        // Snapshotted first because a strike can kill, which would otherwise mutate the tile's
+        // neighbours mid-iteration.
+        if (strikesOnArrival) {
+            for (Unit enemy : List.copyOf(
+                    state.getMap().getUnitsInRadius(destination.getPosition(), 1))) {
+                if (enemy != owner && enemy.getTeam() != owner.getTeam() && !enemy.isDead()
+                    && !owner.isDead()) {
+                    CombatEngine.performAttack(state, new WeightedEncounter(owner, enemy));
+                }
+            }
+        }
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.strikesOnArrival = true;
     }
 }

@@ -9,8 +9,9 @@ import com.walnutt.unit.Unit;
 
 /** Spitter - applies a stacking-duration poison on attack. */
 public class PoisonSting extends PassiveAbility {
-    private final int duration;
-    private final int damagePerTurnRemaining;
+    private int duration;
+    private int damagePerTurnRemaining;
+    private int vulnerabilityPerStack;
 
     public PoisonSting(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -31,6 +32,13 @@ public class PoisonSting extends PassiveAbility {
         if (defender.isDead()) {
             return;
         }
-        PoisonEffect.applyOrExtend(defender, getOwner(), duration, damagePerTurnRemaining);
+        PoisonEffect.applyOrExtend(defender, getOwner(), duration, damagePerTurnRemaining, vulnerabilityPerStack);
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.damagePerTurnRemaining = statInt("dmg_per_duration", damagePerTurnRemaining);
+        this.vulnerabilityPerStack = statInt("vulnerability_per_stack", 0);
     }
 }

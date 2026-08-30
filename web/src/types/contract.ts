@@ -77,6 +77,11 @@ export interface AbilitySnapshot {
   details: string[];
   stats: Record<string, number>;
   passive: boolean;
+  // True once Shawl's Hidden Potential has unlocked this ability. `description`, `details`
+  // and `stats` above are already the UPGRADED values by then, so this only says to render
+  // them as special. Deliberately no companion field describing what an un-upgraded ability
+  // WOULD become - that text exists only inside Shawl's own dialogue.
+  upgraded: boolean;
   ready: boolean;
   // True when this one ability is locked for the rest of the turn by an effect
   // (Joker's Superior Mastery lets each of his abilities be cast only once per
@@ -174,10 +179,11 @@ export interface GameStateSnapshot {
 export interface TileEffectSnapshot {
   q: number;
   r: number;
-  // "burning" is Ember's ground fire; "eclipse" and "missile" are warnings about something
-  // that has not landed yet (a pending Sanity's Eclipse blast, a homing missile's current
-  // impact tile). Open-ended: an unrecognised kind draws a generic overlay.
-  kind: "burning" | "eclipse" | "missile" | string;
+  // "burning" is Ember's ground fire and "acid" is Shawl's brew; "eclipse" and "missile"
+  // are warnings about something that has not landed yet (a pending Sanity's Eclipse blast,
+  // a homing missile's current impact tile). Open-ended: an unrecognised kind draws a
+  // generic overlay.
+  kind: "burning" | "acid" | "eclipse" | "missile" | string;
   name: string;
   remainingTurns: number;
 }
@@ -232,7 +238,12 @@ export interface LegalTargets {
   // enumerates both stages up front, so the client still computes no legality -
   // it only decides which of the two sets to highlight right now.
   multi?: {
+    // What can be picked FIRST. A cast picks a unit then a tile (Translocation) or two tiles
+    // (Eruption, Snow Golem), so exactly one of these two is populated.
     primaryUnitIds: string[];
+    primaryTiles: { q: number; r: number }[];
+    // Keyed by the first half: a unit id, or a "q,r" tile key. The key is opaque - echo it
+    // back rather than parsing it; the client only ever needs to look a choice up by it.
     destinationsByPrimary: Record<string, { q: number; r: number }[]>;
   };
 }
@@ -253,8 +264,13 @@ export interface ChoiceOption {
   id: string;
   name: string;
   description: string;
-  // Secondary line, e.g. "Cooldown: 4 turns" or "Passive". May be null.
+  // Secondary line, e.g. "Cooldown: 4 turns" or "Passive". May be null. For a disabled
+  // option this is the reason it cannot be taken ("Already upgraded").
   detail: string | null;
+  // False for an option shown but not choosable. Render it greyed out WITH its reason
+  // rather than hiding it - Shawl's dialogue lists an ally's already-unlocked abilities so
+  // the player can see why they are missing. The server refuses a disabled id.
+  enabled: boolean;
 }
 
 export type PromptPayload =
@@ -321,11 +337,17 @@ export type ClientMessage =
       // (who moves) and q/r (where to) - since the client has already picked both from
       // the prompt's own `multi` block by the time it submits.
       targetKind: "unit" | "tile" | "none" | "multi";
+      // The first half of a "multi" cast: a unit, or - for a two-tile cast - a coordinate pair.
+      // q/r are always the SECOND half.
       targetUnitId?: string;
+      primaryQ?: number;
+      primaryR?: number;
       q?: number;
       r?: number;
     }
   | { type: "attribute"; value: Attribute }
-  | { type: "choice"; optionId: string }
+  // `cancel` closes a choice dialogue without picking anything, at no cost - always
+  // available, including when every option is disabled.
+  | { type: "choice"; optionId?: string; cancel?: boolean }
   | { type: "pick"; definitionId: string }
   | ({ type: "placement_edit" } & PlacementEdit);

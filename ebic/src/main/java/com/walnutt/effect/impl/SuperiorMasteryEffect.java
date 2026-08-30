@@ -31,6 +31,9 @@ import com.walnutt.status.EffectCategory;
  */
 public class SuperiorMasteryEffect extends Effect {
     private final Set<Ability> usedThisTurn = new LinkedHashSet<>();
+    /** Upgrade: abilities each turn that cost no action. 0 until Superior Mastery is unlocked. */
+    private int freeCastsPerTurn;
+    private int freeCastsRemaining;
 
     public SuperiorMasteryEffect(String name) {
         super(name, "Each of this unit's abilities can only be cast once per turn.", Effect.PERMANENT);
@@ -44,6 +47,27 @@ public class SuperiorMasteryEffect extends Effect {
      */
     public static boolean isRealAbility(Ability ability) {
         return ability != null && !ability.isPassive() && !(ability instanceof Move) && !(ability instanceof Attack);
+    }
+
+    /**
+     * Granted by upgraded Superior Mastery. Takes effect immediately as well as from the next
+     * turn, since the unlock can land part way through one.
+     */
+    public void setFreeCasts(int perTurn) {
+        this.freeCastsPerTurn = Math.max(0, perTurn);
+        this.freeCastsRemaining = Math.max(this.freeCastsRemaining, this.freeCastsPerTurn);
+    }
+
+    /**
+     * The same currency Maxwell's Capacitor Bank spends - Ability.getMoveCost already reads it
+     * through Unit.hasFreeCastCharge, so the upgrade needs no economy code of its own.
+     *
+     * Joker can never hold both this and a Capacitor Bank (it is passive, and Mimic only copies
+     * actives), so there is no question of one cast spending two different charges.
+     */
+    @Override
+    public int freeCastCharges() {
+        return freeCastsRemaining;
     }
 
     @Override
@@ -60,6 +84,9 @@ public class SuperiorMasteryEffect extends Effect {
         }
         if (isRealAbility(event.ability())) {
             usedThisTurn.add(event.ability());
+            if (freeCastsRemaining > 0) {
+                freeCastsRemaining--;
+            }
         }
     }
 
@@ -67,13 +94,14 @@ public class SuperiorMasteryEffect extends Effect {
     public void onTurnStart(GameState state, TurnStartEvent event) {
         if (getOwner() != null && event.team() == getOwner().getTeam()) {
             usedThisTurn.clear();
+            freeCastsRemaining = freeCastsPerTurn;
         }
     }
 
     @Override
     public String getExtraInfo() {
         if (usedThisTurn.isEmpty()) {
-            return null;
+            return freeCastsRemaining > 0 ? "Free casts left: " + freeCastsRemaining : null;
         }
         List<String> names = new ArrayList<>();
         for (Ability ability : usedThisTurn) {

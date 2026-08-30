@@ -15,8 +15,10 @@ import com.walnutt.status.StatModifier;
  * intelligence lost.
  */
 public class Objurgation extends PassiveAbility {
-    private final double intelligenceToHealth;
-    private final double intelligenceConsumed;
+    private double intelligenceToHealth;
+    private double intelligenceConsumed;
+    /** Upgrade: the share burned by a blow that would actually kill. 0 until upgraded. */
+    private double fatalIntelligenceConsumed;
 
     public Objurgation(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -30,12 +32,22 @@ public class Objurgation extends PassiveAbility {
         if (event.getTarget() != getOwner() || !isReady()) {
             return;
         }
+        // Upgraded, a blow that would genuinely kill him is answered with everything he has
+        // rather than the ordinary share - which is the difference between surviving it and not.
+        double share = fatalIntelligenceConsumed > 0 ? fatalIntelligenceConsumed : intelligenceConsumed;
         int intelligence = getOwner().getAttributeValue(Attribute.INTELLIGENCE);
-        double consumed = intelligenceConsumed * intelligence;
+        double consumed = share * intelligence;
         int hpGained = (int) Math.round(intelligenceToHealth * consumed);
 
-        getOwner().addPermanentModifier(StatModifier.percent(Stat.INTELLIGENCE, -intelligenceConsumed, this));
+        getOwner().addPermanentModifier(StatModifier.percent(Stat.INTELLIGENCE, -share, this));
         event.preventDeath(hpGained);
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.intelligenceToHealth = stat("int_to_hp", intelligenceToHealth);
+        this.intelligenceConsumed = stat("int_consumed", intelligenceConsumed);
+        this.fatalIntelligenceConsumed = stat("fatal_int_consumed", 0);
     }
 }

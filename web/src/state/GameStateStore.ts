@@ -45,6 +45,8 @@ export interface MatchUiState {
   // while the board waits for a destination click. Null at every other moment,
   // including for ordinary single-click abilities.
   multiPrimaryUnitId: string | null;
+  /** The first tile of a two-tile cast, once picked. Mutually exclusive with the above. */
+  multiPrimaryTile: { q: number; r: number } | null;
 }
 
 const MAX_MESSAGES = 50;
@@ -83,6 +85,7 @@ export class GameStateStore extends Store<MatchUiState> {
       selectedUnitId: null,
       selectedAbilityId: null,
       multiPrimaryUnitId: null,
+      multiPrimaryTile: null,
     });
   }
 

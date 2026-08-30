@@ -3,6 +3,7 @@
     "type": "active",
     "description": "Projects an invulnerable copy of this unit onto a tile within %cast_range% tiles for %duration% turns.",
     "details": [
+        "Projecting costs no action - it is as free as a step.",
         "The copy moves and attacks freely and takes no damage.",
         "This unit is stunned for as long as the copy exists."
     ],
@@ -13,5 +14,15 @@
         "cooldown": 6,
         "cast_range": 4,
         "duration": 3
+    },
+    "upgrade": {
+        "summary": "The copy stays indefinitely, and this unit is no longer stunned holding it.",
+        "description": "Projects an invulnerable copy of this unit onto a tile within %cast_range% tiles, and leaves it standing for as long as it is wanted.",
+        "details": [
+            "Projecting costs no action - it is as free as a step.",
+            "The copy moves and attacks freely and takes no damage.",
+            "This unit acts as normal the whole time the copy is out.",
+            "Casting it again relocates the copy rather than raising a second one."
+        ]
     }
 }

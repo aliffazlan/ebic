@@ -14,5 +14,18 @@
         "duel_bonus": 20,
         "duel_heal": 0.5,
         "win_multiplier": 2.5
+    },
+    "upgrade": {
+        "summary": "Duellists take %duel_vulnerability:pct%% more damage from each other, and a win refreshes the cooldown.",
+        "stats": {
+            "duel_vulnerability": 1
+        },
+        "details": [
+            "While the duel runs, each combatant takes %duel_vulnerability:pct%% more damage from the other - the exchange is settled roughly twice as fast.",
+            "The survivor permanently gains %duel_bonus% to every attribute and heals %duel_heal:pct%% of its maximum health.",
+            "That reward is multiplied by %win_multiplier% if the loser was more than a basic unit.",
+            "Winning also refreshes this ability outright, so a duel won is a duel that can be started again at once.",
+            "Separating the duellists ends it early, with no reward and no refresh for either."
+        ]
     }
 }

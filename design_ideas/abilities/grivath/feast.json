@@ -12,5 +12,13 @@
         "attacks": 1,
         "lifesteal": 0.25,
         "root_duration": 1
+    },
+    "upgrade": {
+        "summary": "The hunger never lifts - every attack heals and roots, frenzy or not.",
+        "description": "The frenzy is permanent: every attack this unit makes heals it for %lifesteal:pct%% of the damage dealt and roots the victim for %root_duration% turn. Casting this takes %attacks% free attack on an adjacent enemy.",
+        "details": [
+            "There is no duration to run out and nothing to keep up - the lifesteal and the root are simply always on.",
+            "The cast is now only the free attack, which is why it is still worth the cooldown."
+        ]
     }
 }

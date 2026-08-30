@@ -7,5 +7,12 @@
         "cast_range": 3,
         "duration": 2,
         "damage": 25
+    },
+    "upgrade": {
+        "summary": "The snow disarms as well as roots.",
+        "details": [
+            "A buried unit is disarmed for the whole duration on top of being rooted - it cannot swing its way out either.",
+            "A Snow Golem's Blizzard Fist and Snow Blast bury their victims the same way, disarm included."
+        ]
     }
 }

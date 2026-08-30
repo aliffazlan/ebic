@@ -48,7 +48,7 @@ public class Mimic extends Ability {
         }
     }
 
-    private final int duration;
+    private int duration;
     private final int stealWindow;
 
     /** Most recent copyable cast per enemy unit. Only the last one counts, by design. */
@@ -181,7 +181,13 @@ public class Mimic extends Ability {
             id -> AbilityFactory.create(id, definition));
         owner.addAbility(copy);
         equipped = copy;
-        owner.addEffect(new MimicEffect(getName(), this, copy, duration));
+        // Upgraded, a copy never expires on its own - only being replaced gives one up - and it
+        // arrives already unlocked, whether or not the unit it was taken from had unlocked it.
+        if (isUpgraded()) {
+            copy.upgrade();
+        }
+        owner.addEffect(new MimicEffect(getName(), this, copy,
+            isUpgraded() ? Effect.PERMANENT : duration));
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
@@ -210,5 +216,10 @@ public class Mimic extends Ability {
         }
         // The instance stays in `retained` - it becomes a held ability, still ticking.
         equipped = null;
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
     }
 }

@@ -3,6 +3,16 @@
     "type": "passive",
     "description": "Every point of agility this unit has adds %dmg_bonus% damage to its attacks.",
     "stats": {
-        "dmg_bonus": 0.4
+        "dmg_bonus": 0.8
+    },
+    "upgrade": {
+        "summary": "An attack that fails still lands %fail_multiplier:pct%% of the backstab damage.",
+        "stats": {
+            "fail_multiplier": 0.5
+        },
+        "details": [
+            "An attack that is defended outright still delivers %fail_multiplier:pct%% of the backstab bonus.",
+            "The base form delivers none of it, so this is purely a gain - a failed swing stops being wasted."
+        ]
     }
 }

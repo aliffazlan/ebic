@@ -3,9 +3,11 @@ package com.walnutt.effect.impl;
 import java.util.List;
 
 import com.walnutt.effect.Effect;
+import com.walnutt.effect.StatusEffect;
 import com.walnutt.event.DamageEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.status.EffectCategory;
+import com.walnutt.status.StatusFlag;
 import com.walnutt.unit.Unit;
 
 /**
@@ -29,16 +31,31 @@ public class HomingMissileEffect extends Effect {
     private final Unit source;
     private final int impactDamage;
     private final int splashDamage;
+    /** Upgrade's lighter missile: turns of stun on everyone caught. 0 for the warhead. */
+    private final int stunDuration;
 
     public HomingMissileEffect(Unit source, int delay, int impactDamage, int splashDamage) {
-        super("Missile Lock",
+        this(source, delay, impactDamage, splashDamage, 0);
+    }
+
+    /**
+     * {@code stunDuration} above 0 is the upgrade's second missile: a lighter warhead that
+     * arrives a turn ahead of the real one and stuns everything it catches. Its damage is the
+     * same for the locked target as for their neighbours - it plays no favourites - which the
+     * caller expresses by passing the same number twice.
+     */
+    public HomingMissileEffect(Unit source, int delay, int impactDamage, int splashDamage,
+                                int stunDuration) {
+        super(stunDuration > 0 ? "Missile Lock (stunning)" : "Missile Lock",
             "A homing missile is tracking this unit. On impact it deals " + impactDamage
-                + " damage to it and " + splashDamage + " to enemies beside it. Cleansing the lock "
-                + "shoots the missile down.",
+                + " damage to it and " + splashDamage + " to enemies beside it"
+                + (stunDuration > 0 ? ", stunning them all for " + stunDuration + " turn" : "")
+                + ". Cleansing the lock shoots the missile down.",
             delay);
         this.source = source;
         this.impactDamage = impactDamage;
         this.splashDamage = splashDamage;
+        this.stunDuration = stunDuration;
         this.category = EffectCategory.DEBUFF;
     }
 
@@ -67,6 +84,7 @@ public class HomingMissileEffect extends Effect {
         DamageEvent impact = new DamageEvent(source, victim, impactDamage);
         impact.setCauseLabel("Homing Missile");
         victim.takeDamage(state, impact);
+        stun(victim);
 
         if (splashDamage <= 0) {
             return;
@@ -78,6 +96,13 @@ public class HomingMissileEffect extends Effect {
             DamageEvent splash = new DamageEvent(source, nearby, splashDamage);
             splash.setCauseLabel("Homing Missile");
             nearby.takeDamage(state, splash);
+            stun(nearby);
+        }
+    }
+
+    private void stun(Unit caught) {
+        if (stunDuration > 0 && !caught.isDead()) {
+            caught.addEffect(new StatusEffect("Missile Stun", stunDuration, StatusFlag.STUNNED));
         }
     }
 }

@@ -18,6 +18,8 @@ import com.walnutt.unit.Unit;
 public class PoisonEffect extends Effect {
     private final Unit source;
     private final int damagePerTurnRemaining;
+    /** Upgrade: extra damage the victim takes from EVERYTHING, per turn still on the poison. */
+    private int vulnerabilityPerTurn;
 
     public PoisonEffect(Unit source, int duration, int damagePerTurnRemaining) {
         super("Poison",
@@ -33,6 +35,15 @@ public class PoisonEffect extends Effect {
 
     public Unit getSource() {
         return source;
+    }
+
+    public int getVulnerabilityPerTurn() {
+        return vulnerabilityPerTurn;
+    }
+
+    /** Raised, never lowered: a weaker re-application must not undo a stronger one. */
+    public void raiseVulnerability(int perTurn) {
+        this.vulnerabilityPerTurn = Math.max(this.vulnerabilityPerTurn, perTurn);
     }
 
     public int getDamagePerTurn() {
@@ -56,7 +67,30 @@ public class PoisonEffect extends Effect {
     @Override
     public String getExtraInfo() {
         int nextTick = damagePerTurnRemaining * getRemainingTurns();
-        return "Next tick: " + nextTick + " damage";
+        String info = "Next tick: " + nextTick + " damage";
+        if (vulnerabilityPerTurn > 0) {
+            info += ", +" + (vulnerabilityPerTurn * getRemainingTurns()) + " damage taken";
+        }
+        return info;
+    }
+
+    /**
+     * Upgraded Poison Sting: the same stacks that are killing the victim are also softening
+     * them up. Scaled by turns remaining like the tick itself, so it decays in step with it.
+     *
+     * Applied here rather than as a separate DamageTakenModifierEffect so it cannot be
+     * cleansed apart from the poison it belongs to, and so it disappears the moment the
+     * poison does.
+     */
+    @Override
+    public void onIncomingDamage(GameState state, DamageEvent event) {
+        if (getOwner() == null || isExpired() || event.getTarget() != getOwner()) {
+            return;
+        }
+        int bonus = vulnerabilityPerTurn * getRemainingTurns();
+        if (bonus > 0 && event.getDamage() > 0) {
+            event.modifyDamage(bonus);
+        }
     }
 
     @Override
@@ -80,11 +114,19 @@ public class PoisonEffect extends Effect {
 
     /** If the target is already poisoned, stack duration onto the existing instance instead of refreshing it. */
     public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn) {
+        applyOrExtend(target, source, duration, damagePerTurn, 0);
+    }
+
+    public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn,
+                                      int vulnerabilityPerTurn) {
         PoisonEffect existing = on(target);
         if (existing != null) {
             existing.extendDuration(duration);
+            existing.raiseVulnerability(vulnerabilityPerTurn);
         } else {
-            target.addEffect(new PoisonEffect(source, duration, damagePerTurn));
+            PoisonEffect poison = new PoisonEffect(source, duration, damagePerTurn);
+            poison.raiseVulnerability(vulnerabilityPerTurn);
+            target.addEffect(poison);
         }
     }
 }

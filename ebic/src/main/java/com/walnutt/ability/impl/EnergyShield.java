@@ -5,13 +5,14 @@ import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.effect.impl.EnergyShieldEffect;
+import com.walnutt.effect.impl.EnergyShieldPassiveEffect;
 import com.walnutt.game.GameState;
 import com.walnutt.unit.Unit;
 
 /** Maxwell gadget - a plain damage-absorbing barrier on itself or a nearby ally. */
 public class EnergyShield extends Ability {
-    private final int barrierHp;
-    private final int duration;
+    private int barrierHp;
+    private int duration;
 
     public EnergyShield(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -43,5 +44,22 @@ public class EnergyShield extends Ability {
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    /**
+     * Upgrade: Maxwell gains a second barrier of his own, permanently. Granted here rather
+     * than on the next cast so it starts mending immediately, and guarded so a repeat call
+     * could never leave him wearing two of them.
+     */
+    @Override
+    protected void onUpgraded() {
+        this.barrierHp = statInt("barrier", barrierHp);
+        this.duration = statInt("duration", duration);
+        int regen = statInt("passive_regen", 0);
+        int max = statInt("passive_barrier_max", 0);
+        if (owner != null && regen > 0 && max > 0
+            && owner.getActiveEffect(EnergyShieldPassiveEffect.class).isEmpty()) {
+            owner.addEffect(new EnergyShieldPassiveEffect(regen, max));
+        }
     }
 }

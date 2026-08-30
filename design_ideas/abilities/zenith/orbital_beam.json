@@ -4,7 +4,18 @@
     "description": "Calls down a beam from orbit on a unit or empty tile within %cast_range% tiles, dealing %damage% damage.",
     "stats": {
         "cooldown": 2,
-        "damage": 40,
+        "damage": 60,
         "cast_range": 5
+    },
+    "upgrade": {
+        "summary": "Deals %damage%, and every pylon calls down another beam anywhere on the map.",
+        "stats": {
+            "damage": 100
+        },
+        "details": [
+            "Each pylon standing adds one more beam, aimed at a random enemy anywhere on the map rather than beside the pylon.",
+            "Those beams are aimed independently, so one unlucky enemy can be struck by several of them at once.",
+            "They come on top of the volley the pylons already fire at whatever is next to them."
+        ]
     }
 }

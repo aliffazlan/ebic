@@ -5,14 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.combat.Attribute;
-import com.walnutt.data.AbilityDefinition;
+import com.walnutt.data.AbilityFactory;
+import com.walnutt.data.JsonDataLoader;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
@@ -25,14 +25,17 @@ import com.walnutt.unit.UnitStats;
 
 class OblivionConfinementTest {
 
-    @Test
-    void imprisonsAndStealsIntelligenceOnCastAndOnEscape() {
+    private record Fixture(GameState state, OblivionConfinement ability, Unit caster, Unit victim) {
+    }
+
+    /** Built from the real JSON so the upgrade block is present and the numbers are the shipped ones. */
+    private static Fixture fixture() {
         Unit caster = new BasicUnit("Harbinger", Team.PLAYER_ONE, new UnitStats(0, 0, 0, 100));
-        OblivionConfinement ability = new OblivionConfinement(new AbilityDefinition(
-            "Oblivion Confinement", "active", "desc",
-            Map.of("cooldown", 3.0, "cast_range", 2.0, "duration", 1.0, "int_steal", 0.2)));
+        OblivionConfinement ability = (OblivionConfinement) AbilityFactory.create("oblivion_confinement",
+            new JsonDataLoader(JsonDataLoader.locateDesignIdeasRoot())
+                .loadAllAbilities().get("oblivion_confinement"));
         caster.addAbility(ability);
-        Unit victim = new BasicUnit("Victim", Team.PLAYER_TWO, new UnitStats(0, 0, 50, 100));
+        Unit victim = new BasicUnit("Victim", Team.PLAYER_TWO, new UnitStats(0, 0, 100, 100));
 
         Player p1 = new Player("P1", Team.PLAYER_ONE);
         Player p2 = new Player("P2", Team.PLAYER_TWO);
@@ -43,22 +46,60 @@ class OblivionConfinementTest {
         state.setRemainingMoves(3);
         map.moveUnit(caster, map.getTile(new Position(0, 0)));
         map.moveUnit(victim, map.getTile(new Position(0, 2)));
+        return new Fixture(state, ability, caster, victim);
+    }
 
-        UnitTarget target = new UnitTarget(victim);
-        assertTrue(ability.canUse(state, target));
-        ability.onUse(state, target);
+    /** Ends and restarts the victim's turn, which is how the imprisonment expires - the "escape". */
+    private static void letThemEscape(Fixture f) {
+        f.victim.endTurn(f.state);
+        f.victim.startTurn(f.state);
+    }
 
-        assertTrue(victim.hasStatus(StatusFlag.STUNNED));
-        assertTrue(victim.hasStatus(StatusFlag.INVULNERABLE));
-        assertEquals(40, victim.getAttributeValue(Attribute.INTELLIGENCE)); // 50 - 20% = 40
-        assertEquals(10, caster.getAttributeValue(Attribute.INTELLIGENCE)); // stole 10
+    @Test
+    void imprisonsAndStealsIntelligenceOnCastOnly() {
+        Fixture f = fixture();
+        UnitTarget target = new UnitTarget(f.victim);
+        assertTrue(f.ability.canUse(f.state, target));
+        f.ability.onUse(f.state, target);
 
-        // Duration was 1 turn - end/start the victim's controller's turn to expire it ("escape").
-        victim.endTurn(state);
-        victim.startTurn(state);
+        assertTrue(f.victim.hasStatus(StatusFlag.STUNNED));
+        assertTrue(f.victim.hasStatus(StatusFlag.INVULNERABLE));
+        assertEquals(75, f.victim.getAttributeValue(Attribute.INTELLIGENCE), "100 less 25%");
+        assertEquals(25, f.caster.getAttributeValue(Attribute.INTELLIGENCE));
 
-        assertFalse(victim.hasStatus(StatusFlag.STUNNED));
-        assertEquals(32, victim.getAttributeValue(Attribute.INTELLIGENCE)); // 40 - 20% of 40 = 32
-        assertEquals(18, caster.getAttributeValue(Attribute.INTELLIGENCE)); // 10 + 8
+        letThemEscape(f);
+
+        assertFalse(f.victim.hasStatus(StatusFlag.STUNNED));
+        // The whole toll is taken on the way in now. Taking a second helping on the way out is
+        // the upgrade, not the baseline - see oblivion_confinement.json.
+        assertEquals(75, f.victim.getAttributeValue(Attribute.INTELLIGENCE));
+        assertEquals(25, f.caster.getAttributeValue(Attribute.INTELLIGENCE));
+    }
+
+    @Test
+    void upgradedItTakesASecondHelpingWhenTheTargetReturns() {
+        Fixture f = fixture();
+        f.ability.upgrade();
+
+        f.ability.onUse(f.state, new UnitTarget(f.victim));
+        assertEquals(75, f.victim.getAttributeValue(Attribute.INTELLIGENCE));
+
+        letThemEscape(f);
+
+        // Reckoned from what is left, not from the original: 25% of 75 rounds to 19.
+        assertEquals(56, f.victim.getAttributeValue(Attribute.INTELLIGENCE));
+        assertEquals(44, f.caster.getAttributeValue(Attribute.INTELLIGENCE));
+    }
+
+    /** A cast made before the upgrade keeps the terms it was made under. */
+    @Test
+    void anImprisonmentAlreadyRunningIsNotRetroactivelyUpgraded() {
+        Fixture f = fixture();
+        f.ability.onUse(f.state, new UnitTarget(f.victim));
+        f.ability.upgrade();
+
+        letThemEscape(f);
+
+        assertEquals(75, f.victim.getAttributeValue(Attribute.INTELLIGENCE));
     }
 }

@@ -16,8 +16,9 @@ import com.walnutt.unit.Unit;
  * someone's already there) and ambushes every enemy caught on it.
  */
 public class CloakAndDagger extends Ability {
-    private final int duration;
-    private final double damagePenalty;
+    private int duration;
+    private double damagePenalty;
+    private int ambushControlDuration;
 
     public CloakAndDagger(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -44,6 +45,7 @@ public class CloakAndDagger extends Ability {
         state.getMap().moveUnit(owner, destination); // forced stack if occupied - bypasses isWalkable() on purpose
 
         CloakEffect cloak = new CloakEffect(duration, damagePenalty);
+        cloak.setAmbushControlDuration(ambushControlDuration);
         owner.addEffect(cloak);
 
         // Snapshot occupants first - ambushAttack can kill/remove units mid-iteration.
@@ -55,5 +57,12 @@ public class CloakAndDagger extends Ability {
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.duration = statInt("duration", duration);
+        this.damagePenalty = stat("dmg_penalty", damagePenalty);
+        this.ambushControlDuration = statInt("cc_duration", 0);
     }
 }

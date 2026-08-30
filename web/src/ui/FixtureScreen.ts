@@ -124,6 +124,10 @@ export class FixtureScreen implements Screen, MatchActions {
   sendAttribute(_value: Attribute): void {
     this.store.pushMessage("(fixture preview - no server to send this to)");
   }
+  cancelChoice(): void {
+    // Fixtures render a static snapshot; nothing is listening for an answer.
+  }
+
   sendChoice(_optionId: string): void {
     this.store.pushMessage("(fixture preview - no server to send this to)");
   }

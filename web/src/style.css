@@ -257,6 +257,24 @@ input {
 .ability-btn.selected {
   outline: 2px solid #facc15;
 }
+/*
+ * Unlocked by Shawl's Hidden Potential. Gold, and deliberately visible to BOTH players -
+ * an upgraded ability is public information, and its tooltip already reads differently, so
+ * hiding which one changed would only be confusing.
+ */
+.ability-btn.upgraded {
+  border-color: #d4a72c;
+  background: linear-gradient(180deg, #2a2110 0%, #1e293b 100%);
+}
+.ability-btn.upgraded > span:first-child {
+  color: #fcd34d;
+}
+.hover-tooltip.upgraded {
+  border-color: #d4a72c;
+}
+.hover-tooltip.upgraded .hover-tooltip-title {
+  color: #fcd34d;
+}
 .ability-cd {
   font-size: 11px;
   color: #fbbf24;
@@ -583,6 +601,23 @@ input {
 
 .choice-card:hover {
   border-color: #60a5fa;
+}
+
+/*
+ * Listed but not takeable - an ability already unlocked, or one whose upgrade is not built
+ * yet. Kept on screen rather than filtered out so its reason (the .hint line) is visible;
+ * an option that silently vanished would just look like a bug.
+ */
+.choice-card-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.choice-card-disabled:hover {
+  border-color: #334155;
+}
+
+.choice-cancel {
+  margin-top: 16px;
 }
 
 .choice-card h5 {

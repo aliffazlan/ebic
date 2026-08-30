@@ -13,8 +13,8 @@ import com.walnutt.unit.Unit;
 
 /** Maxwell gadget - direct damage plus a disarm. */
 public class PlasmaCannon extends Ability {
-    private final int damage;
-    private final int duration;
+    private int damage;
+    private int duration;
 
     public PlasmaCannon(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -49,5 +49,12 @@ public class PlasmaCannon extends Ability {
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    /** Upgrade: the bolt hits for `damage` rather than 60. */
+    @Override
+    protected void onUpgraded() {
+        this.damage = statInt("damage", damage);
+        this.duration = statInt("duration", duration);
     }
 }

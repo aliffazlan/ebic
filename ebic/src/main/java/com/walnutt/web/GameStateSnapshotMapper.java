@@ -2,12 +2,14 @@ package com.walnutt.web;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 
 import com.walnutt.ability.Ability;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.effect.Effect;
+import com.walnutt.effect.impl.AcidPoolEffect;
 import com.walnutt.effect.impl.BurningGroundEffect;
 import com.walnutt.effect.impl.HomingMissileEffect;
 import com.walnutt.effect.impl.OrbEffect;
@@ -87,9 +89,24 @@ public final class GameStateSnapshotMapper {
                     orb.getRemainingTurns()));
             }
         }
+        for (AcidPoolEffect acid : AcidPoolEffect.activePools(state)) {
+            // Same reason as the eclipse below: the board is row-trimmed, so the tiles a
+            // radius actually covers have to be asked of the map rather than derived.
+            for (Tile tile : state.getMap().getTilesInRadius(acid.getCentre(), acid.getRadius())) {
+                tileEffects.add(new TileEffectSnapshot(
+                    tile.getPosition().getQ(),
+                    tile.getPosition().getR(),
+                    "acid",
+                    acid.getName(),
+                    acid.getRemainingTurns()));
+            }
+        }
+        // Deduped by impact tile: upgraded Homing Missile puts TWO locks on one victim, and two
+        // identical reticles stacked on the same hex just render as one slightly darker one.
+        Set<Position> markedImpacts = new java.util.HashSet<>();
         for (HomingMissileEffect missile : HomingMissileEffect.activeLocks(state)) {
             Position impact = missile.getOwner() == null ? null : missile.getOwner().getPosition();
-            if (impact == null) {
+            if (impact == null || !markedImpacts.add(impact)) {
                 continue;
             }
             tileEffects.add(new TileEffectSnapshot(
@@ -169,6 +186,7 @@ public final class GameStateSnapshotMapper {
             ability.getDetails(),
             ability.getStats(),
             ability.isPassive(),
+            ability.isUpgraded(),
             ability.isReady(),
             // Read off the ability's own owner rather than a passed-in unit: an ability
             // always knows who holds it, and this keeps the public single-argument

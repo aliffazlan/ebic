@@ -136,12 +136,25 @@ export class Hud {
     }
     panel.appendChild(cards);
 
+    // Always offered, whatever is on the table - a dialogue with nothing takeable in it
+    // (an ally with no unlockable abilities) would otherwise be a dead end with the match
+    // waiting on this player. Cancelling costs nothing: the server spends neither the
+    // resource nor the cooldown until a real choice comes back.
+    const cancel = document.createElement("button");
+    cancel.className = "choice-cancel";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => this.actions.cancelChoice());
+    panel.appendChild(cancel);
+
     return backdrop;
   }
 
   private renderChoiceCard(option: ChoiceOption): HTMLElement {
     const card = document.createElement("div");
     card.className = "choice-card";
+    // Shown but not takeable - the card stays so the reason below is visible, which is the
+    // entire point of listing an ally's already-unlocked abilities rather than omitting them.
+    if (!option.enabled) card.classList.add("choice-card-disabled");
 
     const name = document.createElement("h5");
     name.textContent = option.name;
@@ -159,7 +172,9 @@ export class Hud {
     description.textContent = option.description;
     card.appendChild(description);
 
-    card.addEventListener("click", () => this.actions.sendChoice(option.id));
+    if (option.enabled) {
+      card.addEventListener("click", () => this.actions.sendChoice(option.id));
+    }
     return card;
   }
 
@@ -282,11 +297,18 @@ export class Hud {
         state.prompt?.kind === "action"
           ? state.prompt.legalTargets?.[state.selectedUnitId]?.[state.selectedAbilityId]?.multi
           : undefined;
+      // A two-part cast says which half is being asked for, and how to back out. Without it
+      // the first of two clicks looks like a cast that did nothing.
+      const picksTiles = !!multi && (multi.primaryTiles ?? []).length > 0;
       targetHint.textContent = !multi
         ? "Click a unit or tile on the board to target this ability."
-        : state.multiPrimaryUnitId
-          ? "Now click where to put it, or click it again to pick someone else."
-          : "Click the unit you want to move.";
+        : picksTiles
+          ? state.multiPrimaryTile
+            ? "Now click the second tile, or click the first again to change it."
+            : "Click the first of two tiles."
+          : state.multiPrimaryUnitId
+            ? "Now click where to put it, or click it again to pick someone else."
+            : "Click the unit you want to move.";
       // Self-casts fire the moment they are selected (see MatchScreen's
       // castImmediatelyIfSelfTargeted), so anything still showing this panel is
       // genuinely waiting on a target.
@@ -349,6 +371,7 @@ export class Hud {
     const btn = document.createElement("button");
     btn.className = "ability-btn";
     if (state.selectedAbilityId === ability.id) btn.classList.add("selected");
+    if (ability.upgraded) btn.classList.add("upgraded");
 
     const label = document.createElement("span");
     label.textContent = `${ability.name}${ability.passive ? " (passive)" : ""}`;

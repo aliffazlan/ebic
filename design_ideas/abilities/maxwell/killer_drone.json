@@ -11,5 +11,14 @@
         "cast_range": 5,
         "duration": 8,
         "strike_range": 1
+    },
+    "upgrade": {
+        "summary": "Drones never run out of fuel - they stay until something shoots them down.",
+        "description": "Deploys a drone onto any tile up to %cast_range% tiles away, where it stays indefinitely. It has no attack you can order, but strikes a random enemy within %strike_range% tile at the end of every turn.",
+        "details": [
+            "Drones never block movement, and nothing standing in the way blocks them either - they fly over units and deploy onto occupied tiles.",
+            "An enemy sharing the drone's own tile counts as being in reach.",
+            "With no duration to run down, every drone deployed is a drone that is still out there."
+        ]
     }
 }

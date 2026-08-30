@@ -10,8 +10,8 @@ import com.walnutt.unit.Unit;
 
 /** Maxwell gadget - cleanses and heals an ally now, and again at the start of their turns. */
 public class Nanobots extends Ability {
-    private final int heal;
-    private final int duration;
+    private int heal;
+    private int duration;
 
     public Nanobots(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -34,7 +34,7 @@ public class Nanobots extends Ability {
     public void onUse(GameState state, Target target) {
         Unit ally = ((UnitTarget) target).getUnit();
 
-        NanobotsEffect effect = new NanobotsEffect(duration, heal);
+        NanobotsEffect effect = new NanobotsEffect(duration, heal, isUpgraded());
         ally.addEffect(effect);
         // The first pulse lands immediately rather than waiting a turn - otherwise the
         // ability does literally nothing on the turn it is cast.
@@ -42,5 +42,11 @@ public class Nanobots extends Ability {
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.heal = statInt("heal", heal);
+        this.duration = statInt("duration", duration);
     }
 }

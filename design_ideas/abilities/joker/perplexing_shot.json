@@ -12,5 +12,11 @@
         "damage": 30,
         "bonus_damage": 20,
         "bounces": 2
+    },
+    "upgrade": {
+        "summary": "Ricochets up to %bounces% times, if the board can carry it that far.",
+        "stats": {
+            "bounces": 10
+        }
     }
 }

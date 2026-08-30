@@ -23,9 +23,11 @@ import com.walnutt.unit.Unit;
  * repositioning yourself reaches further than shoving an enemy.
  */
 public class Translocation extends Ability {
-    private final int selfRange;
-    private final int allyRange;
-    private final int enemyRange;
+    private int selfRange;
+    private int allyRange;
+    private int enemyRange;
+    /** Upgrade: an occupied destination swaps the two units instead of being refused. */
+    private boolean swaps;
 
     public Translocation(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -64,7 +66,9 @@ public class Translocation extends Ability {
         if (!isInRange(state, subject.getPosition())) {
             return false;
         }
-        if (!destination.isWalkable()) {
+        // Upgraded, an occupied tile is a swap rather than a refusal - but genuinely blocked
+        // terrain is still blocked.
+        if (!destination.isWalkable() && !(swaps && swapPartner(destination, subject) != null)) {
             return false;
         }
         int displacement = state.getMap().getDistance(subject.getPosition(), destination.getPosition());
@@ -106,11 +110,49 @@ public class Translocation extends Ability {
         Unit subject = ((UnitTarget) multi.primary()).getUnit();
         Tile destination = ((TileTarget) multi.secondary()).getTile();
 
+        // Upgraded, landing on someone trades the two of them. Read BEFORE the first move, or
+        // the subject would be standing on the destination and count as its own partner.
+        Unit partner = swaps ? swapPartner(destination, subject) : null;
+        Tile vacated = state.getMap().getTile(subject.getPosition());
+
         // A forced relocation, not the subject's own move: no markMoved, and no
         // Pre/PostMoveEvent - matching Manifestation, Dislocation and Cloak and Dagger.
         state.getMap().moveUnit(subject, destination);
+        if (partner != null && vacated != null) {
+            state.getMap().moveUnit(partner, vacated);
+        }
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.selfRange = statInt("self_range", selfRange);
+        this.allyRange = statInt("ally_range", allyRange);
+        this.enemyRange = statInt("enemy_range", enemyRange);
+        this.swaps = true;
+    }
+
+    /**
+     * The single unit standing on {@code destination} that {@code subject} would trade places
+     * with, or null if the tile is empty, blocked, or crowded. Deliberately refuses a stacked
+     * tile: a swap is a trade between two units, and there is no sensible answer for three.
+     */
+    private Unit swapPartner(Tile destination, Unit subject) {
+        if (destination.getType() == com.walnutt.map.TileType.BLOCKED) {
+            return null;
+        }
+        Unit partner = null;
+        for (Unit occupant : destination.getOccupants()) {
+            if (occupant == subject || !occupant.occupiesTile()) {
+                continue;
+            }
+            if (partner != null) {
+                return null;
+            }
+            partner = occupant;
+        }
+        return partner;
     }
 }

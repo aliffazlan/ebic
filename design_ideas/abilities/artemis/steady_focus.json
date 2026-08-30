@@ -7,5 +7,16 @@
         "duration": 2,
         "bonus_range": 3,
         "min_range": 3
+    },
+    "upgrade": {
+        "summary": "Becomes a toggle, holding the aim for as long as this unit wants it.",
+        "description": "Takes aim indefinitely, gaining %bonus_range% bonus attack range but becoming rooted in place. While focused, this unit cannot attack anything closer than %min_range% tiles.",
+        "stats": {
+            "cooldown": 2
+        },
+        "details": [
+            "Casting it a second time lowers the aim.",
+            "Taking or lowering the aim puts it on cooldown, so a stance is locked in for %cooldown% turns either way."
+        ]
     }
 }

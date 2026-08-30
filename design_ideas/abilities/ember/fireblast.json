@@ -3,9 +3,16 @@
     "type": "active",
     "description": "Hurls a fireball at a target within %cast_range% tiles, dealing %damage% damage and applying %burn_stacks% stacks of Burn.",
     "stats": {
-        "cooldown": 2,
-        "cast_range": 3,
+        "cooldown": 3,
+        "cast_range": 2,
         "damage": 24,
-        "burn_stacks": 3
+        "burn_stacks": 2
+    },
+    "upgrade": {
+        "summary": "Thrown %cast_range% tiles, and comes back up in %cooldown% turns.",
+        "stats": {
+            "cooldown": 2,
+            "cast_range": 3
+        }
     }
 }

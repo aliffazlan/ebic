@@ -55,6 +55,9 @@ const TILE_EFFECT_STYLES: Record<string, {
   reticle?: boolean; aboveUnits?: boolean;
 }> = {
   burning: { fill: 0xff5722, fillAlpha: 0.28, stroke: 0xff8a50, strokeAlpha: 0.85, inset: 2 },
+  // Shawl's Acidic Brew. Sickly green, and a touch fainter than burning ground: it does
+  // no damage on contact, it only softens whoever is standing in it.
+  acid: { fill: 0x84cc16, fillAlpha: 0.24, stroke: 0xa3e635, strokeAlpha: 0.8, inset: 2 },
   eclipse: { fill: 0x93c5fd, fillAlpha: 0.16, stroke: 0xbfdbfe, strokeAlpha: 0.45, inset: 2 },
   missile: { fill: 0xfb923c, fillAlpha: 0.18, stroke: 0xf97316, strokeAlpha: 0.9, inset: 5, reticle: true, aboveUnits: true },
   unknown: { fill: 0x94a3b8, fillAlpha: 0.2, stroke: 0xcbd5e1, strokeAlpha: 0.6, inset: 2 },
@@ -577,14 +580,27 @@ export class Board {
       // then - once one is chosen - only that unit's own destinations. Showing every
       // pair at once would light up most of the board and mean nothing.
       if (legal.multi) {
-        if (state.multiPrimaryUnitId) {
-          for (const tile of legal.multi.destinationsByPrimary[state.multiPrimaryUnitId] ?? []) {
+        // The key the server grouped the second halves under: a unit id, or a "q,r" tile key.
+        // Built here rather than parsed - see the contract, it is meant to be opaque.
+        const primaryKey =
+          state.multiPrimaryUnitId ??
+          (state.multiPrimaryTile ? `${state.multiPrimaryTile.q},${state.multiPrimaryTile.r}` : null);
+
+        if (primaryKey) {
+          for (const tile of legal.multi.destinationsByPrimary[primaryKey] ?? []) {
             this.highlightTile(tile.q, tile.r);
           }
-          this.ringUnit(state.multiPrimaryUnitId, SELECTED_RING_COLOR);
+          if (state.multiPrimaryUnitId) {
+            this.ringUnit(state.multiPrimaryUnitId, SELECTED_RING_COLOR);
+          } else if (state.multiPrimaryTile) {
+            this.highlightTile(state.multiPrimaryTile.q, state.multiPrimaryTile.r, SELECTED_RING_COLOR);
+          }
         } else {
           for (const unitId of legal.multi.primaryUnitIds) {
             this.ringUnit(unitId, LEGAL_UNIT_RING_COLOR);
+          }
+          for (const tile of legal.multi.primaryTiles ?? []) {
+            this.highlightTile(tile.q, tile.r);
           }
         }
         return;
@@ -641,13 +657,15 @@ export class Board {
     }
   }
 
-  private highlightTile(q: number, r: number): void {
+  /** `color` marks a tile as something other than a plain legal target - the first half of a
+   * two-tile cast is drawn in the selection colour so the player can see what they have picked. */
+  private highlightTile(q: number, r: number, color: number = LEGAL_TILE_COLOR): void {
     const center = axialToPixel({ q, r }, HEX_SIZE);
     const points = hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - 3);
     const highlight = new Graphics()
       .poly(points)
-      .fill({ color: LEGAL_TILE_COLOR, alpha: 0.25 })
-      .stroke({ width: 2, color: LEGAL_TILE_COLOR, alpha: 0.8 });
+      .fill({ color, alpha: 0.25 })
+      .stroke({ width: 2, color, alpha: 0.8 });
     highlight.position.set(center.x, center.y);
     this.uiLayer.addChild(highlight);
   }

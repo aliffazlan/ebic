@@ -4,7 +4,7 @@
     "description": "Sets a tile up to %cast_range% tiles away ablaze for %duration% turns, immediately applying %burn_stacks_init% stacks of Burn to whoever is standing on it.",
     "details": [
         "Any enemy that ends its turn in the flames gains another %burn_stacks% stack.",
-        "Ground that is already alight cannot be set on fire again."
+        "Ground that is already alight can be lit again, which refreshes how long it burns for."
     ],
     "stats": {
         "cooldown": 3,
@@ -12,5 +12,17 @@
         "cast_range": 3,
         "burn_stacks_init": 2,
         "burn_stacks": 1
+    },
+    "upgrade": {
+        "summary": "Sets %targets% tiles ablaze with a single cast.",
+        "description": "Sets %targets% tiles up to %cast_range% tiles away ablaze for %duration% turns, immediately applying %burn_stacks_init% stacks of Burn to whoever is standing on them.",
+        "stats": {
+            "targets": 2
+        },
+        "details": [
+            "Any enemy that ends its turn in the flames gains another %burn_stacks% stack.",
+            "Ground that is already alight can be lit again, which refreshes how long it burns for.",
+            "The %targets% tiles are picked independently - burning ground already alight simply to keep it lit is a fair use of one of them."
+        ]
     }
 }

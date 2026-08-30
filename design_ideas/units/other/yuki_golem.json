@@ -1,6 +1,6 @@
 {
     "name": "Snow Golem",
-    "type": "elite",
+    "type": "basic",
     "max_hp": 1000,
     "strength": 60,
     "agility": 40,

@@ -4,5 +4,16 @@
     "description": "A landed attack brands the target, disarming it for %duration% turn. The countdown only advances on turns the branded unit ends away from this one, and repeat hits stack more time onto the brand.",
     "stats": {
         "duration": 1
+    },
+    "upgrade": {
+        "summary": "Striking a branded unit deals %bonus_damage% extra damage and stuns it for %stun_duration% turn.",
+        "stats": {
+            "bonus_damage": 30,
+            "stun_duration": 1
+        },
+        "details": [
+            "An attack that lands on an already-branded unit deals %bonus_damage% more damage and stuns it for %stun_duration% turn.",
+            "Unlike the brand, the stun does not stack - repeat hits refresh it rather than piling it up."
+        ]
     }
 }

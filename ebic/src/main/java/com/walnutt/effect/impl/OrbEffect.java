@@ -31,9 +31,17 @@ public class OrbEffect extends Effect {
     private final Position targetPosition;
     private final int radius;
     private final double intDiffMultiplier;
+    /** Upgrade: further orbs still to fall on this tile, each after the same delay. */
+    private int recastsRemaining;
+    private final int delay;
     private boolean resolved;
 
     public OrbEffect(Unit caster, Position targetPosition, int delay, int radius, double intDiffMultiplier) {
+        this(caster, targetPosition, delay, radius, intDiffMultiplier, 0);
+    }
+
+    public OrbEffect(Unit caster, Position targetPosition, int delay, int radius, double intDiffMultiplier,
+                      int recasts) {
         super("Sanity's Eclipse (pending)",
             "A delayed psionic orb that detonates at the start of Harbinger's next turn, dealing "
                 + "damage to everyone in its blast radius equal to the difference between his "
@@ -43,6 +51,8 @@ public class OrbEffect extends Effect {
         this.targetPosition = targetPosition;
         this.radius = radius;
         this.intDiffMultiplier = intDiffMultiplier;
+        this.recastsRemaining = Math.max(0, recasts);
+        this.delay = Math.max(1, delay);
     }
 
     public Position getTargetPosition() {
@@ -89,6 +99,14 @@ public class OrbEffect extends Effect {
         setRemainingTurns(getRemainingTurns() - 1);
         if (getRemainingTurns() <= 0) {
             detonate(state);
+            // Upgraded: the orb falls again on the same tile, after the same delay - wherever
+            // anyone has moved to by then. Re-armed in place rather than as a second effect so
+            // the board overlay keeps showing exactly one pending blast.
+            if (recastsRemaining > 0) {
+                recastsRemaining--;
+                resolved = false;
+                setRemainingTurns(delay);
+            }
         }
     }
 

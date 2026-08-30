@@ -15,5 +15,16 @@
         "bonus_inspiration": 1,
         "cost": 6,
         "cost_increase": 10
+    },
+    "upgrade": {
+        "summary": "Every ability cast returns %inspiration_per_ability% Inspiration.",
+        "stats": {
+            "inspiration_per_ability": 1
+        },
+        "details": [
+            "The first gadget costs %cost% Inspiration and every one after that costs %cost_increase% more.",
+            "This ability stays unavailable until the next gadget is affordable.",
+            "Casting any ability grants %inspiration_per_ability% Inspiration, as many times a turn as this unit can manage it. Moving and attacking do not count."
+        ]
     }
 }

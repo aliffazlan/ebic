@@ -60,11 +60,17 @@ public final class HeroRatings {
      * position in front of it. Superior Mastery compounds it, since playing him well
      * means sequencing casts to milk the cooldown refunds.
      *
-     * A draft round always offers two distinct heroes, so declining one always leaves a
-     * pick available. Remove either entry once the bot can evaluate a decision whose
-     * payoff is several turns out.
+     * Shawl is the third, and the clearest case of the three. His entire contribution is
+     * Hidden Potential, which spends a currency now to make an ALLY better later - the same
+     * long-horizon investment the greedy scorer cannot price, except that here the payoff
+     * lands on a different unit entirely. A bot Shawl would bank Insight it never spends
+     * well, on a hero with 760 HP and no way to use it.
+     *
+     * A round offering two avoided heroes is dealt again before anyone sees it rather than
+     * resolved by picking one anyway - see ConcurrentSetupFlow.drawTwoFor. That reroll is
+     * what lets this list grow without the bot ever being cornered into an entry.
      */
-    private static final Set<String> AVOIDED = Set.of("maxwell", "joker");
+    private static final Set<String> AVOIDED = Set.of("maxwell", "joker", "shawl");
 
     private HeroRatings() {
     }

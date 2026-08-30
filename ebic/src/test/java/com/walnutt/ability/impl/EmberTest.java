@@ -158,30 +158,40 @@ class EmberTest {
     }
 
     /**
-     * Re-igniting ground that is already alight just burns whoever stands there twice a
-     * round for the price of a second cooldown, so it's refused outright.
+     * Re-lighting ground that is already alight used to be refused. As of the v0.3.0 rebalance
+     * it refreshes instead - ground about to go out is worth a cooldown - and refreshing rather
+     * than stacking is what stops one tile burning its occupant twice a round.
      */
     @Test
-    void eruptionRefusesATileThatIsAlreadyBurning() {
+    void eruptionCanRelightBurningGround_refreshingItRatherThanStackingASecondFire() {
         setUpBoard();
         Eruption eruption = newEruption();
         ember.addAbility(eruption);
         TileTarget burning = new TileTarget(map.getTile(new Position(0, 2)));
-        TileTarget neighbour = new TileTarget(map.getTile(new Position(0, 3)));
 
         assertTrue(eruption.canUse(state, burning));
         eruption.onUse(state, burning);
+        BurningGroundEffect ground = ember.getActiveEffect(BurningGroundEffect.class).orElseThrow();
+        ground.setRemainingTurns(2);
 
-        // Cooldown would block it anyway, so clear that to isolate the new rule.
+        // Cooldown would block it anyway, so clear that to isolate the rule under test.
         eruption.decreaseCooldown(99);
         state.setRemainingMoves(3);
 
-        assertFalse(eruption.canUse(state, burning), "that ground is already on fire");
-        assertTrue(eruption.canUse(state, neighbour), "an adjacent tile is still fair game");
+        // Re-lighting used to be refused outright. It now refreshes: ground that is about to go
+        // out is worth a cooldown, and a second patch on one tile would burn its occupant twice
+        // a round rather than once.
+        assertTrue(eruption.canUse(state, burning), "burning ground can be lit again");
+        eruption.onUse(state, burning);
+
+        assertEquals(1, BurningGroundEffect.activeGrounds(state).size(), "one fire, not two");
+        assertEquals(7, BurningGroundEffect.activeGrounds(state).get(0).getRemainingTurns(),
+            "and its clock is back to full");
     }
 
+    /** A fire that has actually gone out is lit fresh, not refreshed - there is nothing to refresh. */
     @Test
-    void aTileBecomesCastableAgainOnceItsFireBurnsOut() {
+    void aBurntOutTileIsLitFreshRatherThanRefreshed() {
         setUpBoard();
         Eruption eruption = newEruption();
         ember.addAbility(eruption);
@@ -190,12 +200,13 @@ class EmberTest {
         eruption.onUse(state, tile);
         eruption.decreaseCooldown(99);
         state.setRemainingMoves(3);
-        assertFalse(eruption.canUse(state, tile));
 
         BurningGroundEffect ground = ember.getActiveEffect(BurningGroundEffect.class).orElseThrow();
         ground.setRemainingTurns(0);
         ember.removeExpiredEffects(state);
 
         assertTrue(eruption.canUse(state, tile), "the fire is out, so it can be lit again");
+        eruption.onUse(state, tile);
+        assertEquals(1, BurningGroundEffect.activeGrounds(state).size());
     }
 }

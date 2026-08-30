@@ -7,5 +7,16 @@
         "cast_range": 3,
         "barrier": 80,
         "duration": 5
+    },
+    "upgrade": {
+        "summary": "This unit also carries its own barrier, mending %passive_regen% a turn up to %passive_barrier_max%.",
+        "stats": {
+            "passive_regen": 20,
+            "passive_barrier_max": 80
+        },
+        "details": [
+            "This unit permanently wears a barrier of its own, gaining %passive_regen% at the start of each turn up to %passive_barrier_max%.",
+            "That barrier is entirely separate from the one this ability casts - a shielded Maxwell carries both at once."
+        ]
     }
 }

@@ -12,5 +12,22 @@
         "delay": 1,
         "damage": 50,
         "aoe_damage": 20
+    },
+    "upgrade": {
+        "summary": "Fires %missiles% missiles - a stunning one first, the warhead a turn behind.",
+        "description": "Locks %missiles% missiles onto an enemy up to %cast_range% tiles away. The warhead lands after %delay% turns for %damage% damage, plus %aoe_damage% to enemies beside them.",
+        "stats": {
+            "missiles": 2,
+            "delay": 2,
+            "second_missile_damage": 10,
+            "second_missile_delay": 1,
+            "second_missile_stun": 1
+        },
+        "details": [
+            "The lighter missile arrives first, after %second_missile_delay% turn, dealing %second_missile_damage% damage to the target and every enemy beside them and stunning them all for %second_missile_stun% turn.",
+            "It plays no favourites - the locked target takes the same %second_missile_damage% as its neighbours, with no bonus for being the one aimed at.",
+            "Both track the target wherever they go, so running is no escape - the tile they will hit is marked on the board.",
+            "Cleansing the lock before impact shoots down whatever is still in the air."
+        ]
     }
 }

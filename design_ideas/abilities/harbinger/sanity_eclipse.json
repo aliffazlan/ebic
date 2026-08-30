@@ -13,5 +13,16 @@
         "delay": 1,
         "radius": 1,
         "int_diff_dmg": 1
+    },
+    "upgrade": {
+        "summary": "The orb falls %recasts% more time on the same tile, after the same delay.",
+        "stats": {
+            "recasts": 1
+        },
+        "details": [
+            "The area the blast will cover is marked on the board while the orb is in the air.",
+            "The second orb lands on the same tile %delay% turn later, wherever anyone has moved to by then.",
+            "It reaches units held by Oblivion Confinement."
+        ]
     }
 }

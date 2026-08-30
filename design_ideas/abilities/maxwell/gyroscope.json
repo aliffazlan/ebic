@@ -8,5 +8,12 @@
     "stats": {
         "cast_range_boost": 1,
         "attack_range_boost": 1
+    },
+    "upgrade": {
+        "summary": "Both bonuses rise to %attack_range_boost%.",
+        "stats": {
+            "cast_range_boost": 2,
+            "attack_range_boost": 2
+        }
     }
 }

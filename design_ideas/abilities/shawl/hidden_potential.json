@@ -1,7 +1,13 @@
 {
     "name": "Hidden Potential",
     "type": "active",
-    "description": "Whenever damage is dealt, gain a stack of INSIGHT. Once %cost% insight stacks are obtained, cast this ability on an ally to unlock their hidden potential, upgrading that ability.",
+    "description": "Damage dealt by this unit builds Insight. Spend %cost% of it on an ally within %cast_range% tiles to permanently upgrade one of their abilities.",
+    "details": [
+        "One Insight per instance of damage this unit deals - a swing, a tick of acid, anything traced back to it.",
+        "The cast opens a list of the target's abilities, and whichever is chosen is upgraded for the rest of the match.",
+        "This unit is a legal target for its own brew, and there is no limit on how many of one unit's abilities may be unlocked.",
+        "Each ability can be upgraded only once, and abilities with nothing written for them - a summon's own kit, an effect - never appear in the list."
+    ],
     "tags": [
         "no_copy"
     ],
@@ -9,5 +15,18 @@
         "cooldown": 1,
         "cast_range": 4,
         "cost": 10
+    },
+    "upgrade": {
+        "repeatable": true,
+        "summary": "Every ability unlocked is worth %stat_bonus% to each of this unit's attributes and %hp_bonus% health.",
+        "details": [
+            "Every ability this unit has ever unlocked grants it %stat_bonus% strength, agility and intelligence, and %hp_bonus% maximum and current health.",
+            "It counts backwards as well as forwards: unlocks granted before this one are paid out in full the moment it lands.",
+            "This is the one ability that may be unlocked more than once. Doing so grants nothing beyond another mark on the tally, which is itself worth another %stat_bonus% and %hp_bonus%."
+        ],
+        "stats": {
+            "stat_bonus": 20,
+            "hp_bonus": 100
+        }
     }
 }

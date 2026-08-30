@@ -5,5 +5,13 @@
     "details": [
         "Damage a barrier absorbs entirely does not interrupt it."
     ],
-    "stats": {}
+    "stats": {},
+    "upgrade": {
+        "summary": "Abilities may be cast without interrupting the reload.",
+        "details": [
+            "Damage a barrier absorbs entirely does not interrupt it.",
+            "Casting abilities no longer breaks the reload - only attacking, walking, or taking damage does.",
+            "Being moved by something else, a translocation or a pull, is not walking and does not count."
+        ]
+    }
 }

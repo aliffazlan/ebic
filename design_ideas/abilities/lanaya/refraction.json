@@ -4,5 +4,16 @@
     "description": "Refracts incoming damage onto a random adjacent unit instead, up to %count% time per turn. With no adjacent unit to absorb it, the damage lands as normal.",
     "stats": {
         "count": 1
+    },
+    "upgrade": {
+        "summary": "Gains a second refraction each turn, at %second_efficiency:pct%% strength.",
+        "description": "Refracts incoming damage onto a random adjacent unit instead, up to %count% times per turn. With no adjacent unit to absorb it, the damage lands as normal.",
+        "stats": {
+            "count": 2,
+            "second_efficiency": 0.5
+        },
+        "details": [
+            "The first refraction of a turn passes the whole blow on. The second passes only %second_efficiency:pct%% of it, and this unit takes the rest."
+        ]
     }
 }

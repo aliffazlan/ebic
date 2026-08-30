@@ -89,4 +89,47 @@ class AbilityTagsTest {
         assertFalse(abilities.get("fireblast").hasTag(AbilityDefinition.NO_COPY));
         assertFalse(abilities.get("soul_rip").hasTag(AbilityDefinition.NO_COPY));
     }
+
+    /**
+     * The no_upgrade counterpart. An ability with no upgrade block is already un-upgradeable,
+     * so the tag adds no rule - it says the omission is deliberate rather than unfinished,
+     * which is the difference between "a Branchling's aura has no second form" and "nobody has
+     * written Static Link's yet".
+     */
+    private static final Set<String> MUST_NOT_BE_UPGRADEABLE =
+        Set.of("branchling_aura", "blizzard_fist", "snow_blast", "pylon_beam", "recall", "burn");
+
+    @Test
+    void summonKitsAndEffectDefinitionsCarryTheNoUpgradeTagAndNoUpgradeBlock() {
+        Map<String, AbilityDefinition> abilities = abilities();
+        List<String> problems = new ArrayList<>();
+        for (String id : MUST_NOT_BE_UPGRADEABLE) {
+            AbilityDefinition definition = abilities.get(id);
+            assertTrue(definition != null, id + ".json is missing from design_ideas/");
+            if (!definition.hasTag(AbilityDefinition.NO_UPGRADE)) {
+                problems.add(id + " is missing the no_upgrade tag");
+            }
+            if (definition.upgrade() != null) {
+                problems.add(id + " carries an upgrade block it should not have");
+            }
+        }
+        assertEquals(List.of(), problems, "see this test's javadoc");
+    }
+
+    /**
+     * The other direction, and the one that actually catches a mistake: anything a hero
+     * brings to the field is meant to have a designed upgrade, so a missing block is an
+     * oversight rather than a decision. The tag is how a deliberate exception opts out.
+     */
+    @Test
+    void everyOtherAbilityHasAnUpgradeDesignedForIt() {
+        List<String> missing = new ArrayList<>();
+        abilities().forEach((id, definition) -> {
+            if (!definition.hasTag(AbilityDefinition.NO_UPGRADE) && definition.upgrade() == null) {
+                missing.add(id);
+            }
+        });
+        assertEquals(List.of(), missing,
+            "these have neither an upgrade nor a no_upgrade tag - one or the other is required");
+    }
 }

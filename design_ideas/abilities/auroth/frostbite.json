@@ -8,5 +8,16 @@
     "stats": {
         "duration": 2,
         "kill_threshold": 0.1
+    },
+    "upgrade": {
+        "summary": "Lasts %duration% turns, and basic units shatter below %basic_kill_threshold:pct%% health.",
+        "stats": {
+            "duration": 5,
+            "basic_kill_threshold": 0.4
+        },
+        "details": [
+            "A frostbitten unit shatters and dies instantly the moment it falls below %kill_threshold:pct%% of its maximum health.",
+            "A frostbitten basic unit shatters at %basic_kill_threshold:pct%% instead - far more of them are already inside that margin."
+        ]
     }
 }

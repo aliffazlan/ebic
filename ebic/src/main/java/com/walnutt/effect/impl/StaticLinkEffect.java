@@ -27,20 +27,28 @@ public class StaticLinkEffect extends Effect {
     private final Unit target;
     private final int damageStealPerTurn;
     private final int lingerDuration;
+    /** How far the link stretches before it snaps. 1 is the base form's adjacency. */
+    private final int linkRange;
     private DamageDealtModifierEffect casterBuff;
     private DamageDealtModifierEffect targetDebuff;
 
     public StaticLinkEffect(Unit caster, Unit target, int damageStealPerTurn, int lingerDuration) {
+        this(caster, target, damageStealPerTurn, lingerDuration, 1);
+    }
+
+    public StaticLinkEffect(Unit caster, Unit target, int damageStealPerTurn, int lingerDuration,
+                             int linkRange) {
         super("Static Link",
             "A persistent link to the target: steals a growing amount of damage from it and grants a "
                 + "free attack against it at the end of each of Discharge's turns, until he ends a turn "
-                + "no longer adjacent to it (the drain/buff then lingers " + lingerDuration
-                + " more turn(s) before fading).",
+                + "more than " + linkRange + " tile(s) from it (the drain/buff then lingers "
+                + lingerDuration + " more turn(s) before fading).",
             Effect.PERMANENT);
         this.caster = caster;
         this.target = target;
         this.damageStealPerTurn = damageStealPerTurn;
         this.lingerDuration = lingerDuration;
+        this.linkRange = Math.max(1, linkRange);
     }
 
     public Unit getTarget() {
@@ -91,10 +99,13 @@ public class StaticLinkEffect extends Effect {
         if (getOwner() == null || isExpired() || event.team() != getOwner().getTeam()) {
             return;
         }
-        if (!state.getMap().areAdjacent(getOwner().getPosition(), target.getPosition())) {
+        if (state.getMap().getDistance(getOwner().getPosition(), target.getPosition()) > linkRange) {
             breakLink();
             return;
         }
+        // The free attack goes straight through CombatEngine, which has no range check of its
+        // own - so "it lands even beyond normal attack range" has always been true, and the
+        // upgrade's real change is how far the link itself will stretch.
         CombatEngine.performAttack(state, new WeightedEncounter(getOwner(), target));
     }
 

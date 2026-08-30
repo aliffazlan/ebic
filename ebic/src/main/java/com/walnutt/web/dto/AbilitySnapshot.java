@@ -13,6 +13,12 @@ public record AbilitySnapshot(
     List<String> details,
     Map<String, Double> stats,
     boolean passive,
+    // True once Shawl's Hidden Potential has unlocked this ability. The client renders it
+    // in gold; description/details/stats above are already the UPGRADED text by then, so
+    // this flag is the only thing the wire needs. Deliberately NOT accompanied by the
+    // upgrade's summary - what an ability WOULD become is shown only inside Shawl's own
+    // dialogue, never on a unit anyone can hover.
+    boolean upgraded,
     boolean ready,
     // True when this specific ability is locked for the rest of the turn by an effect
     // (Joker's Superior Mastery) even though its cooldown may read 0 - see

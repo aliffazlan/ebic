@@ -14,9 +14,12 @@ import com.walnutt.unit.Unit;
  * and strength from all units in radius (ally and enemy alike), plus direct damage.
  */
 public class Decay extends PassiveAbility {
-    private final int radius;
-    private final int healthSteal;
-    private final int strengthSteal;
+    private int radius;
+    private int healthSteal;
+    private int strengthSteal;
+    /** Upgrade only: a wider drain that touches enemies alone. 0 radius means it is not active. */
+    private int auraRadius;
+    private int auraHealthSteal;
 
     public Decay(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -36,11 +39,41 @@ public class Decay extends PassiveAbility {
             if (victim == getOwner() || victim.isDead()) {
                 continue;
             }
-            victim.addPermanentModifier(StatModifier.flat(Stat.MAX_HEALTH, -healthSteal, this));
-            getOwner().addPermanentModifier(StatModifier.flat(Stat.MAX_HEALTH, healthSteal, this));
-            victim.addPermanentModifier(StatModifier.flat(Stat.STRENGTH, -strengthSteal, this));
-            getOwner().addPermanentModifier(StatModifier.flat(Stat.STRENGTH, strengthSteal, this));
-            DamageEvent decayDamage = new DamageEvent(getOwner(), victim, healthSteal);
+            drain(state, victim, healthSteal, strengthSteal);
+        }
+        if (auraRadius <= 0) {
+            return;
+        }
+        // The outer rot is a SECOND drain rather than a wider version of the first, so an
+        // adjacent enemy sits in both and loses to each - which is what the upgrade promises.
+        for (Unit victim : state.getMap().getUnitsInRadius(getOwner().getPosition(), auraRadius)) {
+            if (victim == getOwner() || victim.isDead() || victim.getTeam() == getOwner().getTeam()) {
+                continue;
+            }
+            drain(state, victim, auraHealthSteal, 0);
+        }
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.radius = statInt("radius", radius);
+        this.healthSteal = statInt("health_steal", healthSteal);
+        this.strengthSteal = statInt("str_steal", strengthSteal);
+        this.auraRadius = statInt("aura_radius", 0);
+        this.auraHealthSteal = statInt("aura_health_steal", 0);
+    }
+
+    private void drain(GameState state, Unit victim, int health, int strength) {
+        if (health > 0) {
+            victim.addPermanentModifier(StatModifier.flat(Stat.MAX_HEALTH, -health, this));
+            getOwner().addPermanentModifier(StatModifier.flat(Stat.MAX_HEALTH, health, this));
+        }
+        if (strength > 0) {
+            victim.addPermanentModifier(StatModifier.flat(Stat.STRENGTH, -strength, this));
+            getOwner().addPermanentModifier(StatModifier.flat(Stat.STRENGTH, strength, this));
+        }
+        if (health > 0) {
+            DamageEvent decayDamage = new DamageEvent(getOwner(), victim, health);
             decayDamage.setCauseLabel("Decay");
             victim.takeDamage(state, decayDamage);
         }

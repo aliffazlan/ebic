@@ -14,5 +14,15 @@
         "initial_poison": 4,
         "duration_increase": 1,
         "infect_radius": 1
+    },
+    "upgrade": {
+        "summary": "A host that dies spreads the bloom itself, not just the poison.",
+        "details": [
+            "Each of this unit's attacks on the victim adds another %duration_increase% turn to the bloom.",
+            "When the bloom ends it bursts, poisoning every enemy within %infect_radius% tile.",
+            "It spreads whether the host dies or the venom simply runs its course - but cleansing the bloom early prevents the burst entirely.",
+            "If the host dies with the bloom still on it, the bloom takes root in everyone the burst reached.",
+            "A bloom caught that way lays down no fresh poison of its own, but bursts and spreads again in its turn just the same."
+        ]
     }
 }

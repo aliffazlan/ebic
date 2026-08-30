@@ -30,8 +30,8 @@ import com.walnutt.unit.Unit;
  * the two cannot disagree: a charge present when canUse ran is still present at onUse.
  */
 public class CapacitorBank extends PassiveAbility {
-    private final int chargePerTurn;
-    private final int maxCharges;
+    private int chargePerTurn;
+    private int maxCharges;
 
     public CapacitorBank(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -82,5 +82,12 @@ public class CapacitorBank extends PassiveAbility {
         if (charges != null) {
             charges.spend(1);
         }
+    }
+
+    /** Upgrade: banks more per turn and holds more. */
+    @Override
+    protected void onUpgraded() {
+        this.chargePerTurn = statInt("charge_per_turn", chargePerTurn);
+        this.maxCharges = statInt("max_charges", maxCharges);
     }
 }

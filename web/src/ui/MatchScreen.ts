@@ -175,7 +175,7 @@ export class MatchScreen implements Screen, MatchActions {
           // `prompt` yet, since that's what Hud uses to decide to render it.
           const payload = msg.payload;
           this.board?.strobeUnits([payload.unitId, payload.opponentUnitId]);
-          this.store.setState({ selectedAbilityId: null, attributeSubmitted: false, multiPrimaryUnitId: null });
+          this.store.setState({ selectedAbilityId: null, attributeSubmitted: false, multiPrimaryUnitId: null, multiPrimaryTile: null });
           this.pendingAttributePromptTimer = window.setTimeout(() => {
             this.pendingAttributePromptTimer = null;
             this.store.setState({ prompt: payload });
@@ -185,7 +185,7 @@ export class MatchScreen implements Screen, MatchActions {
             prompt: msg.payload,
             selectedAbilityId: null,
             attributeSubmitted: false,
-            multiPrimaryUnitId: null,
+            multiPrimaryUnitId: null, multiPrimaryTile: null,
           });
         }
         break;
@@ -200,9 +200,10 @@ export class MatchScreen implements Screen, MatchActions {
   }
 
   /**
-   * A two-part cast needs two clicks: first the unit to move, then where to put it. The
-   * prompt's `multi` block drives both stages, so there is no per-ability knowledge here -
-   * any future ability sending a `multi` block gets the same flow for free.
+   * A two-part cast needs two clicks: a unit and then a destination (Translocation), or two
+   * tiles (Eruption, Snow Golem). The prompt's `multi` block drives both stages and says which
+   * shape it is, so there is no per-ability knowledge here - any future ability sending a
+   * `multi` block gets the same flow for free.
    *
    * Returns true if the click was consumed by this flow.
    */
@@ -214,21 +215,31 @@ export class MatchScreen implements Screen, MatchActions {
     const multi = prompt.legalTargets?.[state.selectedUnitId]?.[state.selectedAbilityId]?.multi;
     if (!multi) return false;
 
-    if (!state.multiPrimaryUnitId) {
-      // Stage one. Accept a click on the unit itself or on the ground it stands on, the
-      // same "resolve what the player meant" courtesy castAtCoord extends elsewhere.
+    const chosenTile = state.multiPrimaryTile;
+    if (!state.multiPrimaryUnitId && !chosenTile) {
+      // Stage one, unit flavour. Accept a click on the unit itself or on the ground it stands
+      // on, the same "resolve what the player meant" courtesy castAtCoord extends elsewhere.
       const candidate =
         clickedUnitId ??
         this.store.getState().snapshot?.units.find((u) => u.q === coord.q && u.r === coord.r && !u.dead)?.id;
       if (candidate && multi.primaryUnitIds.includes(candidate)) {
         this.store.setState({ multiPrimaryUnitId: candidate });
+        return true;
+      }
+      // Stage one, tile flavour.
+      if ((multi.primaryTiles ?? []).some((tile) => tile.q === coord.q && tile.r === coord.r)) {
+        this.store.setState({ multiPrimaryTile: { q: coord.q, r: coord.r } });
       }
       return true;
     }
 
-    // Stage two. Clicking the chosen unit again backs out rather than trapping the player.
+    // Stage two. Clicking the first half again backs out rather than trapping the player.
     if (clickedUnitId && clickedUnitId === state.multiPrimaryUnitId) {
-      this.store.setState({ multiPrimaryUnitId: null });
+      this.store.setState({ multiPrimaryUnitId: null, multiPrimaryTile: null });
+      return true;
+    }
+    if (chosenTile && chosenTile.q === coord.q && chosenTile.r === coord.r) {
+      this.store.setState({ multiPrimaryUnitId: null, multiPrimaryTile: null });
       return true;
     }
     this.socket.send({
@@ -237,11 +248,13 @@ export class MatchScreen implements Screen, MatchActions {
       unitId: state.selectedUnitId,
       abilityId: state.selectedAbilityId,
       targetKind: "multi",
-      targetUnitId: state.multiPrimaryUnitId,
+      ...(state.multiPrimaryUnitId
+        ? { targetUnitId: state.multiPrimaryUnitId }
+        : { primaryQ: chosenTile!.q, primaryR: chosenTile!.r }),
       q: coord.q,
       r: coord.r,
     });
-    this.store.setState({ selectedAbilityId: null, prompt: null, multiPrimaryUnitId: null });
+    this.store.setState({ selectedAbilityId: null, prompt: null, multiPrimaryUnitId: null, multiPrimaryTile: null });
     return true;
   }
 
@@ -300,12 +313,12 @@ export class MatchScreen implements Screen, MatchActions {
   // ---- MatchActions ----
 
   selectUnit(unitId: string | null): void {
-    this.store.setState({ selectedUnitId: unitId, selectedAbilityId: null, multiPrimaryUnitId: null });
+    this.store.setState({ selectedUnitId: unitId, selectedAbilityId: null, multiPrimaryUnitId: null, multiPrimaryTile: null });
   }
 
   selectAbility(abilityId: string | null): void {
     // Changing or cancelling the ability abandons any half-finished two-stage pick.
-    this.store.setState({ selectedAbilityId: abilityId, multiPrimaryUnitId: null });
+    this.store.setState({ selectedAbilityId: abilityId, multiPrimaryUnitId: null, multiPrimaryTile: null });
     if (abilityId) this.castImmediatelyIfSelfTargeted(abilityId);
   }
 
@@ -395,12 +408,12 @@ export class MatchScreen implements Screen, MatchActions {
     // here too (a cast that ends this player's turn leaves the stale
     // "action" prompt's legalTargets sitting in state with nothing to
     // refresh it until this player's next turn).
-    this.store.setState({ selectedAbilityId: null, prompt: null, multiPrimaryUnitId: null });
+    this.store.setState({ selectedAbilityId: null, prompt: null, multiPrimaryUnitId: null, multiPrimaryTile: null });
   }
 
   endTurn(): void {
     this.socket.send({ type: "action", kind: "end_turn" });
-    this.store.setState({ prompt: null, multiPrimaryUnitId: null });
+    this.store.setState({ prompt: null, multiPrimaryUnitId: null, multiPrimaryTile: null });
   }
 
   sendAttribute(value: Attribute): void {
@@ -414,6 +427,11 @@ export class MatchScreen implements Screen, MatchActions {
     // `attributeSubmitted` the moment a vfx/state/new-prompt message signals
     // the encounter actually resolved.
     this.store.setState({ attributeSubmitted: true });
+  }
+
+  cancelChoice(): void {
+    this.socket.send({ type: "choice", cancel: true });
+    this.store.setState({ prompt: null });
   }
 
   sendChoice(optionId: string): void {

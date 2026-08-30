@@ -4,15 +4,20 @@ import com.walnutt.ability.Ability;
 import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.data.AbilityDefinition;
+import com.walnutt.effect.Effect;
 import com.walnutt.effect.impl.HomingMissileEffect;
 import com.walnutt.game.GameState;
 import com.walnutt.unit.Unit;
 
 /** Maxwell gadget - a long-range missile that lands a turn later, wherever its target has gone. */
 public class HomingMissile extends Ability {
-    private final int delay;
-    private final int damage;
-    private final int aoeDamage;
+    private int delay;
+    private int damage;
+    private int aoeDamage;
+    /** The upgrade's second, lighter missile. All 0 until upgraded. */
+    private int secondMissileDamage;
+    private int secondMissileDelay;
+    private int secondMissileStun;
 
     public HomingMissile(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -39,14 +44,42 @@ public class HomingMissile extends Ability {
         // A second lock on an already-tracked target refreshes rather than stacking - two
         // missiles chasing one unit is not what the ability describes, and the 6-turn
         // cooldown makes it a rare case anyway.
-        HomingMissileEffect existing = enemy.getActiveEffect(HomingMissileEffect.class).orElse(null);
-        if (existing != null) {
-            existing.setRemainingTurns(delay);
-        } else {
-            enemy.addEffect(new HomingMissileEffect(owner, delay, damage, aoeDamage));
+        refreshOrLock(enemy, "Missile Lock", delay, damage, aoeDamage, 0);
+        // Upgraded, a second and much lighter missile is launched with it, arriving a turn ahead
+        // of the warhead. It plays no favourites - the locked target takes exactly what its
+        // neighbours take - which is why the same number is passed for both.
+        if (secondMissileDamage > 0) {
+            refreshOrLock(enemy, "Missile Lock (stunning)", secondMissileDelay,
+                secondMissileDamage, secondMissileDamage, secondMissileStun);
         }
 
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    @Override
+    protected void onUpgraded() {
+        this.delay = Math.max(1, statInt("delay", delay));
+        this.damage = statInt("damage", damage);
+        this.aoeDamage = statInt("aoe_damage", aoeDamage);
+        this.secondMissileDamage = statInt("second_missile_damage", 0);
+        this.secondMissileDelay = Math.max(1, statInt("second_missile_delay", 1));
+        this.secondMissileStun = statInt("second_missile_stun", 0);
+    }
+
+    /**
+     * One lock, matched by NAME rather than by type: upgraded, two HomingMissileEffects sit on
+     * the same victim with different delays, and getActiveEffect would only ever find the first
+     * of them. A repeat cast refreshes each in place rather than stacking a third.
+     */
+    private void refreshOrLock(Unit enemy, String name, int lockDelay, int impact, int splash, int stun) {
+        for (Effect effect : enemy.getEffects()) {
+            if (effect instanceof HomingMissileEffect && name.equals(effect.getName())
+                && !effect.isExpired()) {
+                effect.setRemainingTurns(lockDelay);
+                return;
+            }
+        }
+        enemy.addEffect(new HomingMissileEffect(owner, lockDelay, impact, splash, stun));
     }
 }
