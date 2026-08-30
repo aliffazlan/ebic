@@ -89,7 +89,19 @@ public abstract class Effect extends TriggerHandler {
         this.remainingTurns = remainingTurns;
     }
 
-    /** Stacking/refreshing effects (Poison Sting, Poison Bloom) use this instead of replacing the instance. */
+    /**
+     * Stacking/refreshing effects (Poison Sting, Poison Bloom) use this instead of replacing the
+     * instance.
+     *
+     * IMPORTANT: extending is not the whole of re-applying. An effect already on a unit was built
+     * with the numbers and flags its source had AT THE TIME, and those can since have changed -
+     * Shawl unlocks an ability mid-match and its effect's damage, thresholds or status flags all
+     * move. A re-application that only touches the duration silently keeps the stale ones, which
+     * is a bug that reads as "the upgrade did nothing".
+     *
+     * So every applyOrExtend-style helper pairs this with a refresh of the effect's own
+     * parameters - see BlizzardEffect, FrostbiteEffect, PoisonEffect and ShrinkRayEffect.
+     */
     public void extendDuration(int amount) {
         this.remainingTurns += amount;
     }

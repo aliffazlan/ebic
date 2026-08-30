@@ -146,4 +146,43 @@ class YukiUpgradeTest {
         assertEquals(1, golems.size());
         assertEquals(1000, golems.get(0).getMaxHealth(), "the full-strength single golem");
     }
+
+    /**
+     * Re-applying an effect has to carry the CURRENT storm's flags, not just extend the clock -
+     * see Effect.extendDuration. Unlocking Blizzard used to leave anyone already buried rooted
+     * but never disarmed, however many times Yuki re-cast it on them.
+     */
+    @Test
+    void unlockingBlizzardDisarmsSomeoneAlreadyBuriedOnTheNextCast() {
+        UpgradeFixture f = UpgradeFixture.create();
+        Unit yuki = f.heroWith("Yuki", Team.PLAYER_ONE, new UnitStats(40, 20, 40, 1000),
+            0, 0, false, "blizzard");
+        Unit victim = f.basic("Victim", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 1000), 0, 2);
+
+        on(yuki, "blizzard").onUse(f.state(), new UnitTarget(victim));
+        assertFalse(victim.hasStatus(StatusFlag.DISARMED), "the base storm only roots");
+
+        on(yuki, "blizzard").upgrade();
+        on(yuki, "blizzard").decreaseCooldown(99);
+        f.state().setRemainingMoves(5);
+        on(yuki, "blizzard").onUse(f.state(), new UnitTarget(victim));
+
+        assertTrue(victim.hasStatus(StatusFlag.DISARMED), "the storm they are standing in is upgraded too");
+        assertTrue(victim.hasStatus(StatusFlag.ROOTED));
+    }
+
+    /** And the reverse must not happen: a golem's damage-less fist cannot water down Yuki's storm. */
+    @Test
+    void aGolemsFistNeverStripsADisarmFromYukisOwnStorm() {
+        UpgradeFixture f = UpgradeFixture.create();
+        Unit yuki = f.heroWith("Yuki", Team.PLAYER_ONE, new UnitStats(40, 20, 40, 1000),
+            0, 0, true, "blizzard");
+        Unit victim = f.basic("Victim", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 1000), 0, 2);
+
+        on(yuki, "blizzard").onUse(f.state(), new UnitTarget(victim));
+        // An un-upgraded fist re-applying onto the same target.
+        com.walnutt.effect.impl.BlizzardEffect.applyOrExtend(victim, yuki, 1, 0, false);
+
+        assertTrue(victim.hasStatus(StatusFlag.DISARMED));
+    }
 }

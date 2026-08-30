@@ -95,6 +95,15 @@ Several abilities were re-tuned in their **base** form so their unlocked form ha
   Re-lighting tops the fire back up rather than laying a second one, so a tile never burns its
   occupant twice a round.
 
+### Fixed
+
+- **Dirge's Decay was wrong at both ends of the transfer.** Its victims were charged current
+  health twice — the maximum dropped, dragging current health down with it, and then the rot's
+  damage landed on top, so a 5-point steal cost a healthy unit 10. Dirge, meanwhile, gained the
+  maximum health without any of the blood to fill it, so a long grind left him with a large empty
+  pool. A drain now costs its victim exactly what it steals, from both, and hands exactly that
+  much to Dirge — the same shape Grivath's Cripple has always used.
+
 ## [0.2.1] — 2026-08-29
 
 A place to read the roster outside a match, a hero you can promise yourself in every draft,

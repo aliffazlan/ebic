@@ -30,6 +30,7 @@ public class Frostbite extends PassiveAbility {
         Optional<FrostbiteEffect> existing = target.getActiveEffect(FrostbiteEffect.class);
         if (existing.isPresent()) {
             existing.get().setRemainingTurns(duration);
+            existing.get().refresh(killThreshold, basicKillThreshold);
         } else {
             target.addEffect(new FrostbiteEffect(getOwner(), duration, killThreshold, basicKillThreshold));
         }

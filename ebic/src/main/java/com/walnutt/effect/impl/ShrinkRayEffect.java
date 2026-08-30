@@ -27,8 +27,8 @@ import com.walnutt.unit.Unit;
  * them in step automatically, so this does it explicitly on both apply and expiry.
  */
 public class ShrinkRayEffect extends Effect {
-    private final double statReduction;
-    private final double hpReduction;
+    private double statReduction;
+    private double hpReduction;
     private int strengthTaken;
     private int agilityTaken;
     private int intelligenceTaken;
@@ -49,6 +49,11 @@ public class ShrinkRayEffect extends Effect {
         ShrinkRayEffect existing = target.getActiveEffect(ShrinkRayEffect.class).orElse(null);
         if (existing != null) {
             existing.setRemainingTurns(duration);
+            // The new cut is taken at the CURRENT percentage, not the one the first cast was made
+            // at - see Effect.extendDuration. Everything already taken is still returned in full,
+            // because the effect restores what it recorded rather than recomputing it.
+            existing.statReduction = statReduction;
+            existing.hpReduction = hpReduction;
             existing.shrink();
             return;
         }

@@ -17,7 +17,7 @@ import com.walnutt.unit.Unit;
  */
 public class PoisonEffect extends Effect {
     private final Unit source;
-    private final int damagePerTurnRemaining;
+    private int damagePerTurnRemaining;
     /** Upgrade: extra damage the victim takes from EVERYTHING, per turn still on the poison. */
     private int vulnerabilityPerTurn;
 
@@ -41,9 +41,16 @@ public class PoisonEffect extends Effect {
         return vulnerabilityPerTurn;
     }
 
-    /** Raised, never lowered: a weaker re-application must not undo a stronger one. */
-    public void raiseVulnerability(int perTurn) {
-        this.vulnerabilityPerTurn = Math.max(this.vulnerabilityPerTurn, perTurn);
+    /**
+     * Brings an existing poison up to the current sting - see Effect.extendDuration for why a
+     * re-application has to carry the numbers and not only the clock.
+     *
+     * Raised, never lowered: Poison Bloom's spread re-applies at whatever the poison it came
+     * from was worth, and must not water down a stronger poison already on its new host.
+     */
+    public void raiseTo(int damagePerTurn, int vulnerabilityPerTurn) {
+        this.damagePerTurnRemaining = Math.max(this.damagePerTurnRemaining, damagePerTurn);
+        this.vulnerabilityPerTurn = Math.max(this.vulnerabilityPerTurn, vulnerabilityPerTurn);
     }
 
     public int getDamagePerTurn() {
@@ -122,10 +129,10 @@ public class PoisonEffect extends Effect {
         PoisonEffect existing = on(target);
         if (existing != null) {
             existing.extendDuration(duration);
-            existing.raiseVulnerability(vulnerabilityPerTurn);
+            existing.raiseTo(damagePerTurn, vulnerabilityPerTurn);
         } else {
             PoisonEffect poison = new PoisonEffect(source, duration, damagePerTurn);
-            poison.raiseVulnerability(vulnerabilityPerTurn);
+            poison.raiseTo(damagePerTurn, vulnerabilityPerTurn);
             target.addEffect(poison);
         }
     }

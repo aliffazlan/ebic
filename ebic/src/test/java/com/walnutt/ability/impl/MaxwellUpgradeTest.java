@@ -15,6 +15,7 @@ import com.walnutt.effect.Effect;
 import com.walnutt.effect.impl.HomingMissileEffect;
 import com.walnutt.status.StatusFlag;
 import java.util.List;
+import com.walnutt.combat.Attribute;
 import org.junit.jupiter.api.Test;
 
 import com.walnutt.ability.Ability;
@@ -380,5 +381,28 @@ class MaxwellUpgradeTest {
 
         assertEquals(1, locksOn(victim).size());
         assertEquals(1, locksOn(victim).get(0).getRemainingTurns());
+    }
+
+    /**
+     * Shrink Ray stacks onto an existing shrink, and the new cut must be taken at the CURRENT
+     * percentage - see Effect.extendDuration. It used to re-use the percentage the FIRST cast was
+     * made at, so unlocking it changed nothing for anything already shrunk.
+     */
+    @Test
+    void unlockingShrinkRayDeepensAnExistingShrinkAtTheNewPercentage() {
+        UpgradeFixture f = UpgradeFixture.create();
+        Unit maxwell = f.heroWith("Maxwell", Team.PLAYER_ONE, new UnitStats(30, 30, 60, 800),
+            0, 0, false, "shrink_ray");
+        Unit victim = f.basic("Victim", Team.PLAYER_TWO, new UnitStats(100, 100, 100, 1000), 0, 2);
+
+        on(maxwell, "shrink_ray").onUse(f.state(), new UnitTarget(victim));
+        assertEquals(80, victim.getAttributeValue(Attribute.STRENGTH), "20% off 100");
+
+        on(maxwell, "shrink_ray").upgrade();
+        on(maxwell, "shrink_ray").decreaseCooldown(99);
+        f.state().setRemainingMoves(5);
+        on(maxwell, "shrink_ray").onUse(f.state(), new UnitTarget(victim));
+
+        assertEquals(48, victim.getAttributeValue(Attribute.STRENGTH), "40% off 80, not another 20%");
     }
 }

@@ -110,4 +110,33 @@ class GrivathUpgradeTest {
         assertEquals(1, grivath.getEffects().stream()
             .filter(FeastEffect.class::isInstance).count(), "and raised no second frenzy");
     }
+
+    /**
+     * Upgraded, the cast is nothing but the free attack - so with nothing adjacent it would burn a
+     * seven-turn cooldown on empty air and look, correctly, like it did nothing at all.
+     */
+    @Test
+    void upgradedFeastRefusesACastWithNothingToBite() {
+        UpgradeFixture f = UpgradeFixture.create();
+        Unit grivath = f.heroWith("Grivath", Team.PLAYER_ONE, new UnitStats(50, 20, 20, 2000),
+            0, 0, true, "feast");
+        f.basic("Distant", Team.PLAYER_TWO, new UnitStats(0, 0, 10, 2000), 0, 3);
+
+        assertFalse(feastOn(grivath).canUse(f.state(), new NoTarget()));
+
+        f.basic("Adjacent", Team.PLAYER_TWO, new UnitStats(0, 0, 10, 2000), 0, 1);
+
+        assertTrue(feastOn(grivath).canUse(f.state(), new NoTarget()), "prey in reach, so it bites");
+    }
+
+    /** The base form still opens a window anywhere - prey can walk into it over the next few turns. */
+    @Test
+    void theBaseFeastIsStillCastableWithNothingNearby() {
+        UpgradeFixture f = UpgradeFixture.create();
+        Unit grivath = f.heroWith("Grivath", Team.PLAYER_ONE, new UnitStats(50, 20, 20, 2000),
+            0, 0, false, "feast");
+        f.basic("Distant", Team.PLAYER_TWO, new UnitStats(0, 0, 10, 2000), 0, 3);
+
+        assertTrue(feastOn(grivath).canUse(f.state(), new NoTarget()));
+    }
 }

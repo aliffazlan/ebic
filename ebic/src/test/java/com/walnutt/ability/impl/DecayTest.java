@@ -54,9 +54,11 @@ class DecayTest {
         assertEquals(18, ally.getAttributeValue(Attribute.STRENGTH));
         assertEquals(95, enemy.getMaxHealth());
         assertEquals(18, enemy.getAttributeValue(Attribute.STRENGTH));
-        // Direct health damage on top of the max-health clamp: 100 -> clamped to 95 -> -5 damage = 90.
-        assertEquals(90, ally.getHealth());
-        assertEquals(90, enemy.getHealth());
+        // The damage lands BEFORE the ceiling drops, so a victim loses exactly the steal from
+        // each: 100 -> 95 damage, then the ceiling follows it down to 95. It used to charge twice,
+        // clamping to 95 and then dealing another 5 on top.
+        assertEquals(95, ally.getHealth());
+        assertEquals(95, enemy.getHealth());
         // HealthPool ceiling actually moved, not just the reported effective stat.
         ally.heal(state, 1000);
         assertEquals(95, ally.getHealth());

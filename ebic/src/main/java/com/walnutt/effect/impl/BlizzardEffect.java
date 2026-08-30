@@ -11,7 +11,7 @@ import com.walnutt.unit.Unit;
 /** Yuki's Blizzard: rooted + damage per turn. Reused (with 0 damage) by the golem's Blizzard Fist/Snow Blast. */
 public class BlizzardEffect extends Effect {
     private final Unit source;
-    private final int damagePerTurn;
+    private int damagePerTurn;
 
     public BlizzardEffect(Unit source, int duration, int damagePerTurn) {
         this(source, duration, damagePerTurn, false);
@@ -46,6 +46,21 @@ public class BlizzardEffect extends Effect {
         getOwner().takeDamage(state, damageEvent);
     }
 
+    /**
+     * Brings an existing storm up to the caster's current one - see Effect.extendDuration for why
+     * this matters. Yuki unlocking Blizzard mid-match must start disarming whoever is ALREADY
+     * buried, not only the next victim.
+     *
+     * Raised, never lowered: the golem's damage-less Blizzard Fist must not water down a storm
+     * Yuki herself laid, and an un-upgraded fist must not strip a disarm.
+     */
+    private void refresh(int damagePerTurn, boolean disarms) {
+        this.damagePerTurn = Math.max(this.damagePerTurn, damagePerTurn);
+        if (disarms) {
+            this.flags.add(StatusFlag.DISARMED);
+        }
+    }
+
     /** "If the target is already affected by blizzard, the duration is increased." */
     public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn) {
         applyOrExtend(target, source, duration, damagePerTurn, false);
@@ -54,7 +69,10 @@ public class BlizzardEffect extends Effect {
     public static void applyOrExtend(Unit target, Unit source, int duration, int damagePerTurn,
                                       boolean disarms) {
         target.getActiveEffect(BlizzardEffect.class).ifPresentOrElse(
-            existing -> existing.extendDuration(duration),
+            existing -> {
+                existing.extendDuration(duration);
+                existing.refresh(damagePerTurn, disarms);
+            },
             () -> target.addEffect(new BlizzardEffect(source, duration, damagePerTurn, disarms)));
     }
 }

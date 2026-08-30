@@ -30,7 +30,20 @@ public class Feast extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        return super.canUse(state, target) && target instanceof NoTarget;
+        if (!super.canUse(state, target) || !(target instanceof NoTarget)) {
+            return false;
+        }
+        // Upgraded, the cast is NOTHING but the free attack - the lifesteal and the root are
+        // already permanent. So with nothing adjacent to bite there is genuinely nothing for it
+        // to do, and casting it would burn a seven-turn cooldown on empty air. The base form is
+        // still castable anywhere: it opens a window, and prey can walk into it later.
+        return !isUpgraded() || hasAdjacentPrey(state);
+    }
+
+    private boolean hasAdjacentPrey(GameState state) {
+        return owner != null && owner.getPosition() != null
+            && !state.getMap().getAdjacentUnits(owner.getPosition(),
+                u -> u.getTeam() != owner.getTeam() && !u.isDead()).isEmpty();
     }
 
     @Override

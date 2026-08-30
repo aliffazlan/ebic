@@ -46,6 +46,9 @@ public class InfernalBladeEffect extends Effect {
 
     /** If the target is already cursed, stack duration onto the existing instance instead of refreshing it. */
     public static void applyOrExtend(Unit target, Unit source, int duration) {
+        // Nothing to refresh alongside the duration: the brand holds no tuning of its own, and
+        // the upgrade's extra damage and stun are dealt by the ability at strike time rather than
+        // stored here. See Effect.extendDuration for why that is worth saying out loud.
         target.getActiveEffect(InfernalBladeEffect.class).ifPresentOrElse(
             existing -> existing.extendDuration(duration),
             () -> target.addEffect(new InfernalBladeEffect(source, duration)));

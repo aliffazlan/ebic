@@ -112,4 +112,25 @@ class AurothUpgradeTest {
         assertTrue(ally.hasStatus(StatusFlag.FROZEN));
         assertFalse(ally.hasStatus(StatusFlag.SILENCED));
     }
+
+    /**
+     * The same re-application trap as Blizzard: unlocking Frostbite used to leave everyone
+     * already bitten on the old thresholds, so a basic on 35% health simply would not shatter.
+     */
+    @Test
+    void unlockingFrostbiteAppliesTheNewThresholdToSomeoneAlreadyBitten() {
+        UpgradeFixture f = UpgradeFixture.create();
+        Unit auroth = f.heroWith("Auroth", Team.PLAYER_ONE, new UnitStats(40, 20, 20, 500),
+            0, 0, false, "frostbite");
+        Unit basic = f.basic("Basic", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 100), 0, 1);
+
+        bite(f, auroth, basic, 10);
+        assertFalse(basic.isDead(), "90% of maximum, nowhere near the base 10% bar");
+
+        frostbiteOn(auroth).upgrade();
+        // Down to 35%: past the upgraded 40% basic bar, still well clear of the base 10% one.
+        bite(f, auroth, basic, 55);
+
+        assertTrue(basic.isDead(), "the frostbite they are already carrying is upgraded too");
+    }
 }

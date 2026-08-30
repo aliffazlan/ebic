@@ -63,19 +63,34 @@ public class Decay extends PassiveAbility {
         this.auraHealthSteal = statInt("aura_health_steal", 0);
     }
 
+    /**
+     * Moves health and strength off a victim and onto Dirge. Deliberately identical in shape to
+     * Cripple's transferHealth, including the ordering on each side, which is not cosmetic:
+     *
+     * - The victim takes the damage BEFORE its ceiling drops. Dropping the ceiling first clamps
+     *   current health down to it, and the damage then lands on top - charging a full-health
+     *   victim twice over, 10 current health for a 5 steal.
+     * - Dirge's ceiling rises BEFORE he is healed into it. HealthPool.setMax never raises current
+     *   health on its own, so without the heal he gains a bigger pool and none of the blood that
+     *   was supposed to fill it.
+     *
+     * Net effect either way: the victim loses exactly `health` from both current and maximum, and
+     * Dirge gains exactly that much of each.
+     */
     private void drain(GameState state, Unit victim, int health, int strength) {
-        if (health > 0) {
-            victim.addPermanentModifier(StatModifier.flat(Stat.MAX_HEALTH, -health, this));
-            getOwner().addPermanentModifier(StatModifier.flat(Stat.MAX_HEALTH, health, this));
-        }
         if (strength > 0) {
             victim.addPermanentModifier(StatModifier.flat(Stat.STRENGTH, -strength, this));
             getOwner().addPermanentModifier(StatModifier.flat(Stat.STRENGTH, strength, this));
         }
-        if (health > 0) {
-            DamageEvent decayDamage = new DamageEvent(getOwner(), victim, health);
-            decayDamage.setCauseLabel("Decay");
-            victim.takeDamage(state, decayDamage);
+        if (health <= 0) {
+            return;
         }
+        DamageEvent decayDamage = new DamageEvent(getOwner(), victim, health);
+        decayDamage.setCauseLabel("Decay");
+        victim.takeDamage(state, decayDamage);
+        victim.addPermanentModifier(StatModifier.flat(Stat.MAX_HEALTH, -health, this));
+
+        getOwner().addPermanentModifier(StatModifier.flat(Stat.MAX_HEALTH, health, this));
+        getOwner().heal(state, health);
     }
 }
