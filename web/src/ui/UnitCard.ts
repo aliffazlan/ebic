@@ -1,32 +1,35 @@
 import type { AbilityPreviewSnapshot, UnitDefinitionSnapshot } from "../types/contract";
-import { renderUnitPortrait } from "../units/UnitPortrait";
+import { renderUnitFullBody } from "../units/UnitPortrait";
 import { abilityPreviewTooltip, type Tooltip } from "./Tooltip";
-
-// Large square portrait shown on each unit card (see API_CONTRACT.md /
-// web/public/icons/README.md) - big enough to read clearly in a modal, still
-// comfortably under the recommended 256x256 source art so nothing upscales.
-const CARD_ICON_SIZE = 140;
 
 /**
  * One unit's card: portrait, name, type, statline, ability chips. Shared by the draft
  * modal and the codex so a hero reads identically wherever you meet them - the codex
  * exists precisely so you can study the card you will later be asked to pick from.
  *
- * No real art is dropped in for any unit yet (see web/public/icons/README.md) - the large
- * initial-letter badge is the deliberate placeholder, the same fallback the board's
- * sprites use, just bigger and square. There is no `team` here either: these are
+ * The portrait is the hero's full-body art (see web/public/icons/README.md), sized by
+ * `.unit-card .unit-art` rather than here; a hero with no art file falls back to the same
+ * initial-letter badge the board's sprites use. There is no `team` here either: these are
  * undrafted definitions, owned by nobody, so the badge stays neutral rather than guessing.
+ *
+ * `mirrored` flips the art, which the draft uses to turn the opponent's column to face
+ * yours. It defaults off: the codex is one grid with nobody to face, and an undrafted
+ * definition has no team to derive a direction from anyway.
  */
 export function renderUnitCard(
   def: UnitDefinitionSnapshot,
   tooltip: Tooltip,
   onClick?: (def: UnitDefinitionSnapshot) => void,
+  mirrored = false,
 ): HTMLElement {
   const card = document.createElement("div");
   card.className = onClick ? "unit-card clickable" : "unit-card";
 
   card.appendChild(
-    renderUnitPortrait({ definitionId: def.definitionId, unitType: def.type, name: def.name }, CARD_ICON_SIZE, "square"),
+    renderUnitFullBody(
+      { definitionId: def.definitionId, unitType: def.type, name: def.name },
+      mirrored,
+    ),
   );
 
   const name = document.createElement("h5");

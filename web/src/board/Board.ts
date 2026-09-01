@@ -10,10 +10,17 @@ import type {
   PlacementUnitSnapshot,
   TileEffectSnapshot,
   UnitSnapshot,
+  UnitType,
   VfxEvent,
 } from "../types/contract";
 
 export const HEX_SIZE = 34;
+
+// Unit tokens are drawn a little larger than a hex. The face art inside a token
+// is ringed in team and type colours (see UnitIconFactory), and those rings eat
+// into the visible art, so this is a touch more generous than the bare
+// placeholder badge needed.
+const UNIT_SPRITE_SCALE = 1.25;
 
 const TILE_FILL = 0x1e293b;
 const TILE_STROKE = 0x334155;
@@ -200,6 +207,17 @@ export class Board {
    * happen - both ids come from the last real state push) is silently
    * skipped rather than erroring.
    */
+  /**
+   * Composes and caches the tokens for a roster before the board is asked to
+   * draw it - see UnitIconFactory.preload. Safe to call repeatedly: everything
+   * after the first call is a cache hit.
+   */
+  preloadArt(units: { definitionId: string; name: string; unitType: UnitType }[]): void {
+    // Warming art must never be able to break a match - swallow anything that
+    // escapes the factory's own per-file error handling.
+    void this.iconFactory.preload(units).catch(() => {});
+  }
+
   strobeUnits(unitIds: string[]): void {
     for (const unitId of new Set(unitIds)) {
       const sprite = this.unitSprites.get(unitId);
@@ -452,11 +470,12 @@ export class Board {
       unit.team,
       unit.unitType,
       unit.name.charAt(0),
+      unit.name,
     );
     const sprite = new Sprite(texture);
     sprite.anchor.set(0.5);
-    sprite.width = HEX_SIZE * 1.15;
-    sprite.height = HEX_SIZE * 1.15;
+    sprite.width = HEX_SIZE * UNIT_SPRITE_SCALE;
+    sprite.height = HEX_SIZE * UNIT_SPRITE_SCALE;
     container.addChild(sprite);
 
     if (unit.dead) {
@@ -737,7 +756,8 @@ export class Board {
     for (let i = 0; i < units.length; i++) {
       const unit = units[i];
       const x = startX + i * spacing;
-      const texture = await this.iconFactory.getTexture(unit.definitionId, unit.team, unit.unitType, unit.name.charAt(0));
+      const texture = await this.iconFactory.getTexture(
+        unit.definitionId, unit.team, unit.unitType, unit.name.charAt(0), unit.name);
 
       const ring = new Graphics().circle(0, 0, iconSize / 2 + 3).stroke({ width: 2, color: SELECTED_RING_COLOR });
       ring.position.set(x, y);

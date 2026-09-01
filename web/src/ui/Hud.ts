@@ -10,7 +10,7 @@ import type {
   UnitSnapshot,
 } from "../types/contract";
 import type { MatchActions } from "./MatchActions";
-import { renderUnitPortrait } from "../units/UnitPortrait";
+import { renderUnitFullBody } from "../units/UnitPortrait";
 import { abilityTooltip, Tooltip } from "./Tooltip";
 import { renderUnitCard } from "./UnitCard";
 
@@ -40,6 +40,9 @@ const BLOCKS_ABILITY = new Set(["STUNNED", "SILENCED", "FROZEN", "DUELING"]);
 export class Hud {
   private unsubscribe: () => void;
   private hudHost: HTMLElement;
+  // The logs live in their own column on the far side of the board, so the right
+  // sidebar is only ever "the unit you have selected, and what it can do".
+  private logHost: HTMLElement;
   private matchId: string;
   private store: GameStateStore;
   private actions: MatchActions;
@@ -47,8 +50,15 @@ export class Hud {
   // inside the subtree render() wipes on every store update.
   private tooltip: Tooltip;
 
-  constructor(hudHost: HTMLElement, matchId: string, store: GameStateStore, actions: MatchActions) {
+  constructor(
+    hudHost: HTMLElement,
+    logHost: HTMLElement,
+    matchId: string,
+    store: GameStateStore,
+    actions: MatchActions,
+  ) {
     this.hudHost = hudHost;
+    this.logHost = logHost;
     this.matchId = matchId;
     this.store = store;
     this.actions = actions;
@@ -59,17 +69,26 @@ export class Hud {
   destroy(): void {
     this.unsubscribe();
     this.hudHost.innerHTML = "";
+    this.logHost.innerHTML = "";
     this.tooltip.destroy();
   }
 
   private render(state: MatchUiState): void {
     this.hudHost.innerHTML = "";
+    this.logHost.innerHTML = "";
     // The chip that was being hovered (if any) just got destroyed by the
     // innerHTML wipe above, so its mouseleave will never fire - hide
     // explicitly rather than leaving a stale tooltip stuck on screen.
     this.tooltip.hide();
 
-    this.hudHost.appendChild(this.renderTopBar(state));
+    // Everything above End Turn scrolls as one block; End Turn itself is a
+    // sibling of the scroller, not part of it, which is what keeps it in the
+    // same place no matter how many abilities the selected unit happens to have.
+    const body = document.createElement("div");
+    body.className = "hud-scroll";
+    this.hudHost.appendChild(body);
+
+    body.appendChild(this.renderTopBar(state));
 
     const isYourTurn = state.snapshot?.currentTeam === state.yourTeam;
     if (state.snapshot && !isYourTurn && !state.gameOver) {
@@ -79,16 +98,26 @@ export class Hud {
       inner.className = "waiting-banner";
       inner.textContent = "Waiting for opponent...";
       banner.appendChild(inner);
-      this.hudHost.appendChild(banner);
+      body.appendChild(banner);
     }
 
     if (state.placementState) {
-      this.hudHost.appendChild(this.renderPlacementPanel(state));
+      body.appendChild(this.renderPlacementPanel(state));
     } else {
-      this.hudHost.appendChild(this.renderUnitPanel(state, isYourTurn));
+      body.appendChild(this.renderUnitPanel(state, isYourTurn));
     }
-    this.hudHost.appendChild(this.renderCombatLog(state));
-    this.hudHost.appendChild(this.renderMessageLog(state));
+
+    // Not during placement: that phase has no turn to end, and its panel carries
+    // its own "Confirm placement" action.
+    if (!state.placementState) {
+      const footer = document.createElement("div");
+      footer.className = "hud-footer";
+      footer.appendChild(this.renderEndTurnButton(state, isYourTurn));
+      this.hudHost.appendChild(footer);
+    }
+
+    this.logHost.appendChild(this.renderCombatLog(state));
+    this.logHost.appendChild(this.renderMessageLog(state));
 
     // Modal overlays, highest priority first.
     if (state.gameOver) {
@@ -227,7 +256,7 @@ export class Hud {
 
   private renderUnitPanel(state: MatchUiState, isYourTurn: boolean): HTMLElement {
     const section = document.createElement("div");
-    section.className = "hud-section";
+    section.className = "hud-section unit-panel";
     const h3 = document.createElement("h3");
     h3.textContent = "Selected unit";
     section.appendChild(h3);
@@ -238,7 +267,6 @@ export class Hud {
       empty.className = "hint";
       empty.textContent = "Click a unit to inspect it.";
       section.appendChild(empty);
-      section.appendChild(this.renderEndTurnButton(state, isYourTurn));
       return section;
     }
 
@@ -280,6 +308,19 @@ export class Hud {
       }
       section.appendChild(effectsRow);
     }
+
+    // Between what the unit *is* (name, statline, effects) and what it can *do*
+    // below. Facing follows the board's rule rather than a slot's - there is no
+    // opponent alongside it here, so a unit should simply look the way it looks
+    // on the map.
+    section.appendChild(
+      renderUnitFullBody({
+        definitionId: unit.definitionId,
+        team: unit.team,
+        unitType: unit.unitType,
+        name: unit.name,
+      }),
+    );
 
     const canAct = unit.team === state.yourTeam && isYourTurn && state.prompt?.kind !== "attribute";
     const abilityList = document.createElement("div");
@@ -331,8 +372,6 @@ export class Hud {
       section.appendChild(row);
     }
 
-    section.appendChild(this.renderEndTurnButton(state, isYourTurn));
-
     return section;
   }
 
@@ -340,11 +379,15 @@ export class Hud {
    * Persistent regardless of selection (see CLAUDE.md's frontend fixes) -
    * greyed out via `disabled` rather than only appearing once a unit of
    * yours is selected, so it's always visible where a player expects it.
+   *
+   * It lives in the sidebar's pinned footer rather than at the end of the
+   * selected-unit panel: hung off the ability list it slid up and down as units
+   * with different numbers of abilities were selected, which is a bad thing for
+   * the one button a player reaches for every single turn.
    */
   private renderEndTurnButton(state: MatchUiState, isYourTurn: boolean): HTMLElement {
     const btn = document.createElement("button");
     btn.className = "primary";
-    btn.style.marginTop = "10px";
     btn.style.width = "100%";
     btn.textContent = "End Turn";
     btn.disabled = !isYourTurn || state.prompt?.kind === "attribute" || !!state.gameOver;
@@ -540,9 +583,12 @@ export class Hud {
     columns.className = "draft-columns";
     panel.appendChild(columns);
 
+    // The opponent's column is on the right, so its art is turned to face yours.
+    // Keyed on the column, not on a team: these heroes are undrafted and belong
+    // to nobody yet, and the layout is relative to the viewer either way.
     columns.appendChild(this.renderDraftColumn("Your options", state.draftRound!.options, true));
     columns.appendChild(
-      this.renderDraftColumn("Opponent options", state.draftRound!.opponentOptions, false),
+      this.renderDraftColumn("Opponent options", state.draftRound!.opponentOptions, false, true),
     );
 
     return backdrop;
@@ -552,6 +598,7 @@ export class Hud {
     heading: string,
     options: UnitDefinitionSnapshot[],
     clickable: boolean,
+    mirrored = false,
   ): HTMLElement {
     const col = document.createElement("div");
     col.className = "draft-column";
@@ -563,7 +610,8 @@ export class Hud {
     cards.className = "draft-cards";
     for (const def of options) {
       cards.appendChild(renderUnitCard(def, this.tooltip,
-        clickable ? (picked) => this.actions.sendPick(picked.definitionId) : undefined));
+        clickable ? (picked) => this.actions.sendPick(picked.definitionId) : undefined,
+        mirrored));
     }
     col.appendChild(cards);
     return col;
@@ -664,14 +712,19 @@ export class Hud {
 
     const encounter = document.createElement("div");
     encounter.className = "encounter-row";
-    encounter.appendChild(this.renderEncounterCard(self, state.yourTeam));
+    // Your unit is always the left card, so it faces right and the opponent's
+    // faces left. That is deliberately the *slot's* rule rather than the board's
+    // "PLAYER_TWO turns" one: which team sits on the left here depends on who is
+    // looking, so keying the flip on team would leave a PLAYER_TWO viewer
+    // watching their own hero and the enemy face away from each other.
+    encounter.appendChild(this.renderEncounterCard(self, state.yourTeam, false));
 
     const vs = document.createElement("div");
     vs.className = "encounter-vs";
     vs.textContent = "VS";
     encounter.appendChild(vs);
 
-    encounter.appendChild(this.renderEncounterCard(opponent, state.yourTeam));
+    encounter.appendChild(this.renderEncounterCard(opponent, state.yourTeam, true));
     panel.appendChild(encounter);
 
     // Once this client has sent its own attribute pick, keep the encounter
@@ -720,7 +773,11 @@ export class Hud {
     return backdrop;
   }
 
-  private renderEncounterCard(unit: UnitSnapshot | null, yourTeam: Team): HTMLElement {
+  private renderEncounterCard(
+    unit: UnitSnapshot | null,
+    yourTeam: Team,
+    mirrored: boolean,
+  ): HTMLElement {
     const card = document.createElement("div");
     card.className = "encounter-card";
 
@@ -732,9 +789,9 @@ export class Hud {
     }
 
     card.appendChild(
-      renderUnitPortrait(
+      renderUnitFullBody(
         { definitionId: unit.definitionId, team: unit.team, unitType: unit.unitType, name: unit.name },
-        72,
+        mirrored,
       ),
     );
 

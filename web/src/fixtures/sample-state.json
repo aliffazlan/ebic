@@ -37,7 +37,12 @@
           ],
           "stats": {
             "damage_reduction": 0.2
-          }
+          },
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 0,
+          "range": 1,
+          "minRange": 0
         },
         {
           "id": "duel",
@@ -45,7 +50,15 @@
           "passive": false,
           "ready": true,
           "currentCooldown": 0,
-          "maxCooldown": 3
+          "maxCooldown": 3,
+          "description": "",
+          "details": [],
+          "stats": {},
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 1,
+          "range": 1,
+          "minRange": 0
         },
         {
           "id": "overwhelming_odds",
@@ -53,9 +66,20 @@
           "passive": false,
           "ready": false,
           "currentCooldown": 2,
-          "maxCooldown": 4
+          "maxCooldown": 4,
+          "description": "",
+          "details": [],
+          "stats": {},
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 1,
+          "range": 1,
+          "minRange": 0
         }
-      ]
+      ],
+      "attackRange": 1,
+      "minAttackRange": 0,
+      "effects": []
     },
     {
       "id": "u-dirge",
@@ -83,7 +107,15 @@
           "passive": false,
           "ready": true,
           "currentCooldown": 0,
-          "maxCooldown": 3
+          "maxCooldown": 3,
+          "description": "",
+          "details": [],
+          "stats": {},
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 1,
+          "range": 1,
+          "minRange": 0
         },
         {
           "id": "decay",
@@ -91,9 +123,20 @@
           "passive": true,
           "ready": true,
           "currentCooldown": 0,
-          "maxCooldown": 0
+          "maxCooldown": 0,
+          "description": "",
+          "details": [],
+          "stats": {},
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 0,
+          "range": 1,
+          "minRange": 0
         }
-      ]
+      ],
+      "attackRange": 1,
+      "minAttackRange": 0,
+      "effects": []
     },
     {
       "id": "u-basic-1",
@@ -112,7 +155,10 @@
       "hasMovedThisTurn": false,
       "hasAttackedThisTurn": false,
       "statusFlags": [],
-      "abilities": []
+      "abilities": [],
+      "attackRange": 1,
+      "minAttackRange": 0,
+      "effects": []
     },
     {
       "id": "u-basic-2",
@@ -131,7 +177,10 @@
       "hasMovedThisTurn": false,
       "hasAttackedThisTurn": false,
       "statusFlags": [],
-      "abilities": []
+      "abilities": [],
+      "attackRange": 1,
+      "minAttackRange": 0,
+      "effects": []
     },
     {
       "id": "u-harbinger",
@@ -159,7 +208,15 @@
           "passive": true,
           "ready": true,
           "currentCooldown": 0,
-          "maxCooldown": 0
+          "maxCooldown": 0,
+          "description": "",
+          "details": [],
+          "stats": {},
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 0,
+          "range": 1,
+          "minRange": 0
         },
         {
           "id": "oblivion_confinement",
@@ -167,7 +224,15 @@
           "passive": false,
           "ready": true,
           "currentCooldown": 0,
-          "maxCooldown": 4
+          "maxCooldown": 4,
+          "description": "",
+          "details": [],
+          "stats": {},
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 1,
+          "range": 1,
+          "minRange": 0
         },
         {
           "id": "sanitys_eclipse",
@@ -175,9 +240,20 @@
           "passive": false,
           "ready": false,
           "currentCooldown": 3,
-          "maxCooldown": 5
+          "maxCooldown": 5,
+          "description": "",
+          "details": [],
+          "stats": {},
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 1,
+          "range": 1,
+          "minRange": 0
         }
-      ]
+      ],
+      "attackRange": 1,
+      "minAttackRange": 0,
+      "effects": []
     },
     {
       "id": "u-evayne",
@@ -206,7 +282,15 @@
           "passive": true,
           "ready": true,
           "currentCooldown": 0,
-          "maxCooldown": 0
+          "maxCooldown": 0,
+          "description": "",
+          "details": [],
+          "stats": {},
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 0,
+          "range": 1,
+          "minRange": 0
         },
         {
           "id": "cloak_and_dagger",
@@ -214,9 +298,20 @@
           "passive": false,
           "ready": true,
           "currentCooldown": 0,
-          "maxCooldown": 5
+          "maxCooldown": 5,
+          "description": "",
+          "details": [],
+          "stats": {},
+          "upgraded": false,
+          "usedThisTurn": false,
+          "moveCost": 1,
+          "range": 1,
+          "minRange": 0
         }
-      ]
+      ],
+      "attackRange": 1,
+      "minAttackRange": 0,
+      "effects": []
     },
     {
       "id": "u-basic-3",
@@ -235,7 +330,10 @@
       "hasMovedThisTurn": false,
       "hasAttackedThisTurn": false,
       "statusFlags": [],
-      "abilities": []
+      "abilities": [],
+      "attackRange": 1,
+      "minAttackRange": 0,
+      "effects": []
     }
   ],
   "tileEffects": [

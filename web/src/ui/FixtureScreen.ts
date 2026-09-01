@@ -43,12 +43,17 @@ export class FixtureScreen implements Screen, MatchActions {
     canvasHost.className = "canvas-host";
     const hudHost = document.createElement("div");
     hudHost.className = "hud-host";
-    container.append(canvasHost, hudHost);
+
+    // Combat and status logs get their own column on the left, opposite the
+    // sidebar, so the board sits between what happened and what you can do.
+    const logHost = document.createElement("div");
+    logHost.className = "log-host";
+    container.append(logHost, canvasHost, hudHost);
     this.root.appendChild(container);
     this.container = container;
 
     void this.initPixi(canvasHost);
-    this.hud = new Hud(hudHost, "fixture-preview", this.store, this);
+    this.hud = new Hud(hudHost, logHost, "fixture-preview", this.store, this);
 
     if (this.mode === "placement") {
       this.store.setState({ placementState: this.placementFixture, connected: true });

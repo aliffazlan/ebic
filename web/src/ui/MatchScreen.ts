@@ -4,9 +4,10 @@ import { GameStateStore } from "../state/GameStateStore";
 import { GameSocket } from "../net/GameSocket";
 import { Hud } from "./Hud";
 import type { AxialCoord } from "../hex/HexMath";
-import type { Attribute, ServerMessage, Team, UnitSnapshot } from "../types/contract";
+import type { Attribute, ServerMessage, Team, UnitSnapshot, UnitType } from "../types/contract";
 import type { MatchActions } from "./MatchActions";
 import type { Screen } from "./Screen";
+import { artId, warmPortraits } from "../units/UnitArt";
 
 // How long the pre-encounter strobe plays on the board before the attribute
 // modal actually appears - see API_CONTRACT.md's explanation of the
@@ -15,6 +16,30 @@ import type { Screen } from "./Screen";
 // STROBE_TOTAL_FRAMES so the ring visually finishes right around when the
 // modal shows up.
 const ATTRIBUTE_STROBE_MS = 1800;
+
+/**
+ * Pulls a roster's art into cache ahead of the UI that shows it. Called from the
+ * draft, placement and first-state messages rather than at app boot on purpose:
+ * a player sitting in the lobby should not be made to download several megabytes
+ * of hero art they may never look at, and placement is a whole phase earlier
+ * than the board's first draw, which is what actually removes the pop-in.
+ *
+ * `board` is null during the draft (there is no canvas yet) - portraits are all
+ * the draft cards need anyway, and the placement message that follows warms the
+ * board tokens.
+ *
+ * Team matters: a generic basic's art is its team's colour, so warming the wrong
+ * team would fetch a file nothing goes on to show. A unit snapshot carries its
+ * own team; a placement snapshot doesn't, hence the fallback.
+ */
+function warmArt(
+  board: Board | null,
+  units: { definitionId: string; name: string; unitType: UnitType; team?: Team }[],
+  fallbackTeam?: Team,
+): void {
+  board?.preloadArt(units);
+  warmPortraits(units.map((u) => artId(u.definitionId, u.name, u.team ?? fallbackTeam)));
+}
 
 export class MatchScreen implements Screen, MatchActions {
   private container: HTMLDivElement | null = null;
@@ -71,14 +96,19 @@ export class MatchScreen implements Screen, MatchActions {
     const hudHost = document.createElement("div");
     hudHost.className = "hud-host";
 
-    container.append(canvasHost, hudHost);
+    // Combat and status logs get their own column on the left, opposite the
+    // sidebar, so the board sits between what happened and what you can do.
+    const logHost = document.createElement("div");
+    logHost.className = "log-host";
+
+    container.append(logHost, canvasHost, hudHost);
     this.root.appendChild(container);
 
     this.container = container;
 
     void this.initPixi(canvasHost);
 
-    this.hud = new Hud(hudHost, this.matchId, this.store, this);
+    this.hud = new Hud(hudHost, logHost, this.matchId, this.store, this);
     this.socket.connect();
 
     window.addEventListener("resize", this.resizeListener);
@@ -120,6 +150,9 @@ export class MatchScreen implements Screen, MatchActions {
       case "state": {
         const priorState = this.store.getState();
         const wasGameOver = priorState.gameOver;
+        // Placement only ever showed this client its own roster; the opponent's
+        // units first appear here.
+        warmArt(this.board, msg.payload.units);
         // Detect a PLAYER_TWO -> PLAYER_ONE transition (one full round just
         // completed) before applying the new snapshot - see the store
         // method's own doc comment for why the very first "state" message
@@ -154,9 +187,16 @@ export class MatchScreen implements Screen, MatchActions {
         }
         break;
       case "draft_round":
+        // Both option lists - the cards are about to be rendered, and the
+        // opponent's are shown alongside for transparency.
+        warmArt(this.board, [...msg.payload.options, ...msg.payload.opponentOptions]
+          .map((d) => ({ definitionId: d.definitionId, name: d.name, unitType: d.type })));
         this.store.setState({ draftRound: msg.payload });
         break;
       case "placement_state":
+        warmArt(this.board, msg.payload.units.map((u) => ({
+          definitionId: u.definitionId, name: u.name, unitType: u.unitType,
+        })), this.store.getState().yourTeam);
         this.store.setState({ placementState: msg.payload, selectedUnitId: null });
         break;
       case "prompt": {

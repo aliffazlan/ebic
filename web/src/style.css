@@ -157,6 +157,17 @@ input {
   display: block;
 }
 
+/* Combat and status logs, opposite the sidebar with the board between them.
+   Splitting them out is what lets the sidebar be purely "the selected unit". */
+.log-host {
+  flex: 0 0 300px;
+  background: #111827;
+  border-right: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .hud-host {
   flex: 0 0 320px;
   background: #111827;
@@ -164,6 +175,22 @@ input {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Two children, and only one of them scrolls. A champion's panel - full-width
+   portrait plus five abilities - overflows a short viewport, and if the whole
+   column scrolled, End Turn would scroll away with it. */
+.hud-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.hud-footer {
+  flex: 0 0 auto;
+  padding: 12px 14px;
+  border-top: 1px solid #334155;
+  background: #111827;
 }
 
 .hud-section {
@@ -216,6 +243,17 @@ input {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* Fixed width, height following the source ratio - the same rule as the encounter
+   card, just narrower. Not the panel's full 292px: at these ratios that runs to
+   ~390px tall and pushes Move and Attack below the fold on a laptop, and the
+   ability list is the one thing in here you touch every turn. The panel is still
+   taller for some heroes than others; .hud-scroll absorbs that, and End Turn sits
+   outside the scroller so it never moves. */
+.unit-panel .unit-art {
+  width: 180px;
+  margin: 8px auto 10px;
 }
 
 .unit-panel-name {
@@ -544,8 +582,12 @@ input {
   border-color: #60a5fa;
 }
 
-.unit-card .unit-portrait {
-  display: block;
+/* A fixed box, unlike the encounter's - a wrapping grid of every draftable hero
+   should sit on one baseline, and the portraits are not all the same ratio. The
+   image inside still keeps its own shape and stands on the bottom edge. */
+.unit-card .unit-art {
+  width: 156px;
+  height: 210px;
   margin: 0 auto 10px;
 }
 
@@ -649,7 +691,7 @@ input {
 
 .encounter-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 16px;
   margin-top: 8px;
 }
@@ -665,6 +707,12 @@ input {
   border-radius: 8px;
   padding: 14px 10px;
   text-align: center;
+}
+
+/* No fixed height here, unlike a draft card: the taller fighter simply extends
+   upward, and .encounter-row bottom-aligns the pair so their stat blocks match. */
+.encounter-card .unit-art {
+  width: 220px;
 }
 
 .encounter-card .hp-bar-outer {
@@ -684,7 +732,62 @@ input {
   color: #f97316;
 }
 
-.unit-portrait-glyph {
+/* ---- full-body unit art (encounter cards, draft/codex cards) ---- */
+
+/* Width comes from the caller; height is deliberately left to the image so each
+   portrait keeps its source ratio (they run 0.67 to 0.87 wide-to-tall). Bottom
+   alignment is what makes two heroes of different heights stand on one ground
+   line instead of floating. */
+.unit-art {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Stays in flow - that is what lets `height: auto` give the wrapper the image's
+   own ratio - but positioned, so it paints above the absolutely-positioned
+   fallback glyph rather than under it. */
+.unit-art img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* All the portrait art is drawn facing right; flipping one side is what makes two
+   units face each other. Only the image turns - the team wash behind it is
+   radially symmetric, and flipping the glyph fallback would render its letters
+   backwards. */
+.unit-art-mirrored img {
+  transform: scaleX(-1);
+}
+
+/* A soft wash of the owning team's colour behind a cut-out portrait - see
+   renderUnitFullBody, which supplies the gradient itself. */
+.unit-art-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The no-art fallback, underneath the image: the same team-coloured, type-ringed
+   initials badge the board falls back to, filling the art slot. Removed outright
+   once real art loads, so it never shows through a transparent portrait. */
+.unit-art-glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 40px;
+  font-weight: bold;
+  color: #ffffff;
   pointer-events: none;
 }
 
