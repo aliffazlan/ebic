@@ -160,12 +160,55 @@ input {
 /* Combat and status logs, opposite the sidebar with the board between them.
    Splitting them out is what lets the sidebar be purely "the selected unit". */
 .log-host {
-  flex: 0 0 300px;
+  /* Width comes from the children now: the panel is fixed, and collapsing it
+     leaves only the tab rail, which the board then expands into. */
+  flex: 0 0 auto;
   background: #111827;
   border-right: 1px solid #334155;
   display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.log-panel {
+  width: 300px;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Always rendered, even when the panel is closed - it's the only way to reopen
+   it. Pinned to the outer screen edge so it stays put as the panel opens and
+   closes to its right. */
+.log-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 4px;
+  background: #0f172a;
+  border-right: 1px solid #334155;
+}
+
+.log-tab {
+  writing-mode: vertical-rl;
+  padding: 10px 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  position: relative;
+}
+
+/* Unread system message while the tab is hidden. */
+.log-tab-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f87171;
 }
 
 .hud-host {
@@ -234,10 +277,17 @@ input {
   text-align: center;
 }
 
+.message-log-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .message-log {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  padding: 12px 14px;
   font-size: 12px;
   color: #94a3b8;
   display: flex;
@@ -443,8 +493,36 @@ input {
 
 /* ---- combat log ---- */
 
+/* min-height: 0 throughout this column - a flex item defaults to min-height:
+   auto and would refuse to shrink, so the inner scrollers would never appear. */
 .combat-log-section {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.combat-log-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* One half per player's turn, top P1 / bottom P2, each scrolling on its own. */
+.combat-log-half {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.combat-log-half-heading {
+  margin: 0 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .combat-log-header {
@@ -472,7 +550,8 @@ input {
 }
 
 .combat-log {
-  max-height: 160px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   font-size: 12px;
   color: #cbd5e1;
@@ -853,4 +932,38 @@ input {
   gap: 12px;
   align-content: flex-start;
   padding-bottom: 20px;
+}
+
+/* ---- turn banner ----
+   Flashes over the board when the turn flips to you. Lives on .canvas-host
+   (already position: relative) rather than in the HUD, whose subtree is
+   rebuilt on every store update - see TurnBanner.ts. */
+
+.turn-banner {
+  position: absolute;
+  top: 32%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  /* Green-400, the same "you can act" green the board uses for legal tiles. */
+  color: #4ade80;
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: 8px;
+  text-shadow: 0 2px 16px rgba(2, 6, 23, 0.9);
+  /* Never eat a board click - the banner sits directly over the play area. */
+  pointer-events: none;
+  opacity: 0;
+}
+
+.turn-banner.visible {
+  animation: turn-banner-flash 2s ease-out forwards;
+}
+
+@keyframes turn-banner-flash {
+  0% { opacity: 0; transform: scale(0.85); }
+  12% { opacity: 1; transform: scale(1.03); }
+  20% { transform: scale(1); }
+  70% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
 }

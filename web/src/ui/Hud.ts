@@ -13,8 +13,33 @@ import type { MatchActions } from "./MatchActions";
 import { renderUnitFullBody } from "../units/UnitPortrait";
 import { abilityTooltip, Tooltip } from "./Tooltip";
 import { renderUnitCard } from "./UnitCard";
+import { teamCssColor } from "./Colors";
+import type { CombatLogEntry, CombatLogSegment } from "../state/CombatLog";
 
 const ATTRIBUTES: Attribute[] = ["STRENGTH", "AGILITY", "INTELLIGENCE"];
+
+/** Which log the left column shows; null means collapsed to just the tab rail. */
+type LogTab = "combat" | "system" | null;
+
+/** Combat-log halves, top to bottom. */
+const TEAMS: Team[] = ["PLAYER_ONE", "PLAYER_TWO"];
+
+/**
+ * One combat-log line. Segments carry their own colour and weight so a unit
+ * name reads in its team colour and a damage number stands out bold - see
+ * CombatLog.buildCombatLogLines, which decides both.
+ */
+function renderLogLine(segments: CombatLogSegment[]): HTMLElement {
+  const line = document.createElement("div");
+  for (const segment of segments) {
+    const span = document.createElement("span");
+    span.textContent = segment.text;
+    if (segment.color) span.style.color = segment.color;
+    if (segment.bold) span.style.fontWeight = "700";
+    line.appendChild(span);
+  }
+  return line;
+}
 
 /**
  * "Range 4", or "Range 7 (min 3)" while something like Steady Focus forbids close shots.
@@ -46,6 +71,14 @@ export class Hud {
   private matchId: string;
   private store: GameStateStore;
   private actions: MatchActions;
+  // Which log the left column shows, or null for collapsed. Lives here rather
+  // than in the store because it's view state, not game state - and render()
+  // rebuilds logHost from scratch on every store update, so it has to survive
+  // outside the DOM either way.
+  private logTab: LogTab = "combat";
+  // How many system messages had been seen last time the System tab was open,
+  // so a message arriving while it's hidden can raise an unread dot.
+  private lastSeenMessageCount = 0;
   // One tooltip for the whole HUD - see Tooltip, which explains why it cannot live
   // inside the subtree render() wipes on every store update.
   private tooltip: Tooltip;
@@ -116,8 +149,7 @@ export class Hud {
       this.hudHost.appendChild(footer);
     }
 
-    this.logHost.appendChild(this.renderCombatLog(state));
-    this.logHost.appendChild(this.renderMessageLog(state));
+    this.renderLogColumn(state);
 
     // Modal overlays, highest priority first.
     if (state.gameOver) {
@@ -488,6 +520,58 @@ export class Hud {
     return chip;
   }
 
+  /**
+   * The left column: the tab rail, then one log panel (or none, when collapsed).
+   *
+   * The rail comes first in the DOM so it pins to the screen's outer edge and
+   * stays put as the panel opens and closes beside it. It is always rendered,
+   * even when collapsed - it is the only way back.
+   */
+  private renderLogColumn(state: MatchUiState): void {
+    // Looking at the System tab *is* seeing its messages.
+    if (this.logTab === "system") this.lastSeenMessageCount = state.messages.length;
+
+    this.logHost.appendChild(this.renderLogTabs(state));
+
+    if (this.logTab !== null) {
+      const panel = document.createElement("div");
+      panel.className = "log-panel";
+      panel.appendChild(
+        this.logTab === "combat" ? this.renderCombatLog(state) : this.renderMessageLog(state),
+      );
+      this.logHost.appendChild(panel);
+    }
+  }
+
+  private renderLogTabs(state: MatchUiState): HTMLElement {
+    const rail = document.createElement("div");
+    rail.className = "log-tabs";
+    rail.appendChild(this.renderLogTab("combat", "Combat", false));
+    rail.appendChild(
+      this.renderLogTab("system", "System", state.messages.length > this.lastSeenMessageCount),
+    );
+    return rail;
+  }
+
+  private renderLogTab(tab: LogTab, label: string, unread: boolean): HTMLElement {
+    const btn = document.createElement("button");
+    btn.className = "log-tab";
+    // Same "active tab carries .primary" idiom the codex filters use.
+    if (this.logTab === tab) btn.classList.add("primary");
+    btn.textContent = label;
+    if (unread) {
+      const dot = document.createElement("span");
+      dot.className = "log-tab-dot";
+      btn.appendChild(dot);
+    }
+    btn.addEventListener("click", () => {
+      // Clicking the tab you're already on closes the panel entirely.
+      this.logTab = this.logTab === tab ? null : tab;
+      this.render(this.store.getState());
+    });
+    return btn;
+  }
+
   private renderCombatLog(state: MatchUiState): HTMLElement {
     const section = document.createElement("div");
     section.className = "hud-section combat-log-section";
@@ -499,7 +583,7 @@ export class Hud {
     header.appendChild(h3);
 
     // One page per full round (Player One's turn through the end of Player
-    // Two's turn) - see GameStateStore.startNewCombatLogPageIfRoundJustCompleted.
+    // Two's turn) - see GameStateStore.commitCombatLog.
     const pageCount = state.combatLogPages.length;
     const pager = document.createElement("div");
     pager.className = "combat-log-pager";
@@ -512,7 +596,9 @@ export class Hud {
 
     const pageLabel = document.createElement("span");
     pageLabel.className = "hint";
-    pageLabel.textContent = `Turn ${state.viewedLogPage + 1} / ${pageCount}`;
+    // "Round", not "Turn": a page has always spanned both players' turns, and
+    // now that the body splits them apart the distinction is visible.
+    pageLabel.textContent = `Round ${state.viewedLogPage + 1} / ${pageCount}`;
     pager.appendChild(pageLabel);
 
     const nextBtn = document.createElement("button");
@@ -524,32 +610,58 @@ export class Hud {
     header.appendChild(pager);
     section.appendChild(header);
 
-    const log = document.createElement("div");
-    log.className = "combat-log";
-    const pageLines = state.combatLogPages[state.viewedLogPage] ?? [];
-    if (pageLines.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "hint";
-      empty.textContent = "No damage dealt yet.";
-      log.appendChild(empty);
-    } else {
-      for (const entry of pageLines) {
-        const line = document.createElement("div");
-        line.textContent = entry;
-        log.appendChild(line);
-      }
+    // Split into halves by whose turn produced each line. Both halves are always
+    // rendered, empty or not, so the layout doesn't jump around as a round fills.
+    const body = document.createElement("div");
+    body.className = "combat-log-body";
+    const entries = state.combatLogPages[state.viewedLogPage] ?? [];
+    // Only auto-scroll the newest round - an older one the user deliberately
+    // paged back to shouldn't jump.
+    const isLatestPage = state.viewedLogPage === pageCount - 1;
+    for (const team of TEAMS) {
+      body.appendChild(
+        this.renderCombatLogHalf(team, entries.filter((e) => e.team === team), isLatestPage),
+      );
     }
-    // Only auto-scroll to the bottom when looking at the latest page - an
-    // older page the user deliberately navigated back to shouldn't jump.
-    if (state.viewedLogPage === pageCount - 1) {
-      log.scrollTop = log.scrollHeight;
-    }
-    section.appendChild(log);
+    section.appendChild(body);
 
     return section;
   }
 
+  private renderCombatLogHalf(team: Team, entries: CombatLogEntry[], autoScroll: boolean): HTMLElement {
+    const half = document.createElement("div");
+    half.className = "combat-log-half";
+
+    const heading = document.createElement("h4");
+    heading.className = "combat-log-half-heading";
+    heading.textContent = team === "PLAYER_ONE" ? "Player One" : "Player Two";
+    heading.style.color = teamCssColor(team);
+    half.appendChild(heading);
+
+    const log = document.createElement("div");
+    log.className = "combat-log";
+    if (entries.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "hint";
+      empty.textContent = "Nothing yet.";
+      log.appendChild(empty);
+    } else {
+      for (const entry of entries) log.appendChild(renderLogLine(entry.segments));
+    }
+    if (autoScroll) log.scrollTop = log.scrollHeight;
+    half.appendChild(log);
+
+    return half;
+  }
+
   private renderMessageLog(state: MatchUiState): HTMLElement {
+    const section = document.createElement("div");
+    section.className = "hud-section message-log-section";
+
+    const h3 = document.createElement("h3");
+    h3.textContent = "System";
+    section.appendChild(h3);
+
     const log = document.createElement("div");
     log.className = "message-log";
     for (const msg of state.messages) {
@@ -558,7 +670,9 @@ export class Hud {
       log.appendChild(line);
     }
     log.scrollTop = log.scrollHeight;
-    return log;
+    section.appendChild(log);
+
+    return section;
   }
 
   private renderDraftModal(state: MatchUiState): HTMLElement {

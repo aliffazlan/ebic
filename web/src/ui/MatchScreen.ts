@@ -3,8 +3,11 @@ import { Board } from "../board/Board";
 import { GameStateStore } from "../state/GameStateStore";
 import { GameSocket } from "../net/GameSocket";
 import { Hud } from "./Hud";
+import { TurnBanner } from "./TurnBanner";
+import { INDICATOR_GROUP_GAP_MS, IndicatorScheduler } from "../vfx/IndicatorScheduler";
+import { groupIndicators } from "../vfx/VfxIndicators";
 import type { AxialCoord } from "../hex/HexMath";
-import type { Attribute, ServerMessage, Team, UnitSnapshot, UnitType } from "../types/contract";
+import type { Attribute, ServerMessage, Team, UnitSnapshot, UnitType, VfxEvent } from "../types/contract";
 import type { MatchActions } from "./MatchActions";
 import type { Screen } from "./Screen";
 import { artId, warmPortraits } from "../units/UnitArt";
@@ -48,7 +51,6 @@ export class MatchScreen implements Screen, MatchActions {
   private hud: Hud | null = null;
   private socket: GameSocket;
   private store: GameStateStore;
-  private resizeListener = () => this.handleResize();
   private root: HTMLElement;
   private matchId: string;
   // Tracks the delayed "show the attribute modal after the strobe"
@@ -56,6 +58,15 @@ export class MatchScreen implements Screen, MatchActions {
   // otherwise a fast second attribute prompt could have its immediate strobe
   // clobbered a moment later by an earlier prompt's delayed setState.
   private pendingAttributePromptTimer: number | null = null;
+  // Serial timeline for staggered damage numbers and the turn banner. Keeping
+  // one shared queue is what makes the banner land *after* the turn-start DoT
+  // numbers without either side coordinating - see IndicatorScheduler.
+  private indicators = new IndicatorScheduler();
+  private turnBanner: TurnBanner | null = null;
+  // Previous snapshot's currentTeam, to spot the turn flipping to this client.
+  // Tracked here rather than in the store, whose own lastSeenCurrentTeam exists
+  // for combat-log pagination and only fires on the P2 -> P1 round boundary.
+  private previousCurrentTeam: Team | null = null;
   private onExit: () => void;
 
   constructor(root: HTMLElement, matchId: string, yourTeam: Team, onExit: () => void) {
@@ -105,17 +116,18 @@ export class MatchScreen implements Screen, MatchActions {
     this.root.appendChild(container);
 
     this.container = container;
+    this.turnBanner = new TurnBanner(canvasHost);
 
     void this.initPixi(canvasHost);
 
     this.hud = new Hud(hudHost, logHost, this.matchId, this.store, this);
     this.socket.connect();
-
-    window.addEventListener("resize", this.resizeListener);
   }
 
   unmount(): void {
-    window.removeEventListener("resize", this.resizeListener);
+    this.indicators.clear();
+    this.turnBanner?.destroy();
+    this.turnBanner = null;
     if (this.pendingAttributePromptTimer !== null) {
       window.clearTimeout(this.pendingAttributePromptTimer);
       this.pendingAttributePromptTimer = null;
@@ -141,8 +153,32 @@ export class MatchScreen implements Screen, MatchActions {
     app.stage.addChild(this.board.root);
   }
 
-  private handleResize(): void {
-    this.board?.recenter();
+  /**
+   * Queues one vfx batch's damage numbers onto the shared timeline, split so
+   * poison, then burn, then everything else each get their own beat.
+   *
+   * A batch from an ordinary cast only ever has the third group, so normal
+   * combat still shows its numbers immediately - the stagger only costs time
+   * when there is genuinely more than one damage source to read, which is
+   * exactly the turn-start damage-over-time case it exists for.
+   */
+  private scheduleIndicators(events: VfxEvent[]): void {
+    for (const group of groupIndicators(events)) {
+      this.indicators.enqueue(() => this.board?.showIndicators(group), INDICATOR_GROUP_GAP_MS);
+    }
+  }
+
+  /**
+   * Flashes "YOUR TURN" when the turn passes to this client. Queued on the same
+   * timeline as the damage numbers rather than shown immediately: a turn starts
+   * with its damage-over-time ticks, and the banner should be the last thing
+   * you see, after you've been shown what they did to you.
+   */
+  private announceTurnIfItJustBecameYours(currentTeam: Team): void {
+    const previous = this.previousCurrentTeam;
+    this.previousCurrentTeam = currentTeam;
+    if (currentTeam !== this.store.getState().yourTeam || currentTeam === previous) return;
+    this.indicators.enqueue(() => this.turnBanner?.show(), 0);
   }
 
   private handleMessage(msg: ServerMessage): void {
@@ -157,7 +193,9 @@ export class MatchScreen implements Screen, MatchActions {
         // completed) before applying the new snapshot - see the store
         // method's own doc comment for why the very first "state" message
         // doesn't count.
-        this.store.startNewCombatLogPageIfRoundJustCompleted(msg.payload.currentTeam);
+        // Files the vfx batch that just arrived under the turn this state names.
+        this.store.commitCombatLog(msg.payload.currentTeam);
+        this.announceTurnIfItJustBecameYours(msg.payload.currentTeam);
         this.store.setState({
           snapshot: msg.payload,
           gameOver: msg.payload.gameOver ? wasGameOver : null,
@@ -175,6 +213,7 @@ export class MatchScreen implements Screen, MatchActions {
       case "vfx":
         this.board?.playVfx(msg.payload);
         this.store.appendCombatLog(msg.payload);
+        this.scheduleIndicators(msg.payload);
         {
           // The "attribute" prompt's own encounter resolving is signaled by
           // the next vfx/state push, not by a fresh prompt necessarily aimed

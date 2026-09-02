@@ -15,11 +15,7 @@ import { Assets, Container, Graphics, Sprite, Text, RenderTexture, Texture } fro
 import type { Renderer } from "pixi.js";
 import type { Team, UnitType } from "../types/contract";
 import { artId, faceUrl } from "./UnitArt";
-
-const TEAM_COLORS: Record<Team, number> = {
-  PLAYER_ONE: 0x3b82f6, // blue
-  PLAYER_TWO: 0xef4444, // red
-};
+import { TEAM_COLOR as TEAM_COLORS } from "../ui/Colors";
 
 const TYPE_RING_COLORS: Record<UnitType, number> = {
   CHAMPION: 0xd4af37, // gold

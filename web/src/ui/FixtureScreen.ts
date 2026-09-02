@@ -11,13 +11,37 @@ import { Application } from "pixi.js";
 import { Board } from "../board/Board";
 import { GameStateStore } from "../state/GameStateStore";
 import { Hud } from "./Hud";
+import { TurnBanner } from "./TurnBanner";
+import { INDICATOR_GROUP_GAP_MS, IndicatorScheduler } from "../vfx/IndicatorScheduler";
+import { groupIndicators } from "../vfx/VfxIndicators";
 import sampleState from "../fixtures/sample-state.json";
 import samplePlacement from "../fixtures/sample-placement.json";
-import type { Attribute, GameStateSnapshot, PlacementStateSnapshot } from "../types/contract";
+import type { Attribute, GameStateSnapshot, PlacementStateSnapshot, VfxEvent } from "../types/contract";
 import type { MatchActions } from "./MatchActions";
 import type { Screen } from "./Screen";
 
 export type FixtureMode = "match" | "placement";
+
+/**
+ * A synthetic vfx batch covering every indicator kind, fired by pressing "v" in
+ * the match fixture. Damage numbers otherwise need a live two-player match to
+ * see at all, which makes tweaking the animation or the colours painful.
+ *
+ * Deliberately spans all three stagger groups (poison, burn, everything else)
+ * and includes a unit taking two hits at once, so the stacking offset shows up.
+ */
+const DEMO_VFX: VfxEvent[] = [
+  { type: "damage", abilityId: null, sourceUnitId: "u-harbinger", targetUnitId: "u-valor", amount: 12, causeLabel: "Poison" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-harbinger", targetUnitId: "u-dirge", amount: 8, causeLabel: "Poison" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-evayne", targetUnitId: "u-valor", amount: 15, causeLabel: "Burn" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-basic-3", targetUnitId: "u-basic-1", amount: 34, causeLabel: "Attack" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-basic-3", targetUnitId: "u-basic-2", amount: 0, causeLabel: "Attack" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-evayne", targetUnitId: "u-dirge", amount: 60, causeLabel: "Sanity's Eclipse" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-evayne", targetUnitId: "u-dirge", amount: 25, causeLabel: "Acidic Brew" },
+  { type: "heal", abilityId: null, sourceUnitId: null, targetUnitId: "u-basic-1", amount: 40, causeLabel: null },
+  // Gets no number at all - only damage and heals do.
+  { type: "ability_used", abilityId: "fireblast", sourceUnitId: "u-evayne", targetUnitId: "u-valor", amount: null, causeLabel: null },
+];
 
 export class FixtureScreen implements Screen, MatchActions {
   private container: HTMLDivElement | null = null;
@@ -27,6 +51,11 @@ export class FixtureScreen implements Screen, MatchActions {
   private store = new GameStateStore("PLAYER_ONE");
   private root: HTMLElement;
   private mode: FixtureMode;
+  private indicators = new IndicatorScheduler();
+  private turnBanner: TurnBanner | null = null;
+  // Dev-only: damage numbers and the turn banner need a live match to trigger
+  // otherwise, so the fixture harness fakes them on a keypress.
+  private demoKeyListener = (e: KeyboardEvent) => this.handleDemoKey(e);
   private placementFixture: PlacementStateSnapshot = structuredClone(
     samplePlacement as PlacementStateSnapshot,
   );
@@ -52,8 +81,13 @@ export class FixtureScreen implements Screen, MatchActions {
     this.root.appendChild(container);
     this.container = container;
 
+    this.turnBanner = new TurnBanner(canvasHost);
     void this.initPixi(canvasHost);
     this.hud = new Hud(hudHost, logHost, "fixture-preview", this.store, this);
+    if (this.mode === "match") {
+      window.addEventListener("keydown", this.demoKeyListener);
+      this.store.pushMessage("Fixture dev keys: v = damage indicators, t = YOUR TURN banner.");
+    }
 
     if (this.mode === "placement") {
       this.store.setState({ placementState: this.placementFixture, connected: true });
@@ -67,6 +101,10 @@ export class FixtureScreen implements Screen, MatchActions {
   }
 
   unmount(): void {
+    window.removeEventListener("keydown", this.demoKeyListener);
+    this.indicators.clear();
+    this.turnBanner?.destroy();
+    this.turnBanner = null;
     this.hud?.destroy();
     this.board?.destroy();
     this.app?.destroy(true, { children: true });
@@ -84,6 +122,29 @@ export class FixtureScreen implements Screen, MatchActions {
       onUnitClick: (unit) => this.handleUnitClick(unit.id),
     });
     app.stage.addChild(this.board.root);
+  }
+
+  /**
+   * Dev-only board-feedback triggers. Deliberately plain letters and no
+   * modifier: the fixture harness has no text inputs to conflict with, and the
+   * board's own pan/zoom keys (arrows, WASD, Home) are all elsewhere.
+   */
+  private handleDemoKey(e: KeyboardEvent): void {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "v") {
+      // Drive the combat log too - the real flow commits on the "state" message
+      // that follows a vfx batch, which the fixture has no server to send.
+      this.store.appendCombatLog(DEMO_VFX);
+      this.store.commitCombatLog(this.store.getState().snapshot?.currentTeam ?? "PLAYER_ONE");
+      for (const group of groupIndicators(DEMO_VFX)) {
+        this.indicators.enqueue(() => this.board?.showIndicators(group), INDICATOR_GROUP_GAP_MS);
+      }
+      // Queued last, so it lands after the staggered groups - the same
+      // arrangement the real turn-start sequence produces.
+      this.indicators.enqueue(() => this.turnBanner?.show(), 0);
+    } else if (e.key === "t") {
+      this.turnBanner?.show();
+    }
   }
 
   private handleTileClick(coord: { q: number; r: number }): void {

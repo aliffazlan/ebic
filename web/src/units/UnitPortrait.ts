@@ -7,12 +7,13 @@
 
 import type { Team, UnitType } from "../types/contract";
 import { artId, portraitUrl } from "./UnitArt";
+import { cssRgbTriple, TEAM_COLOR } from "../ui/Colors";
 
 // As rgb triples so the backdrop below can build a translucent gradient from
 // them; the flat hex is still what the fallback badge fills with.
 const TEAM_COLORS: Record<Team, string> = {
-  PLAYER_ONE: "59, 130, 246", // blue
-  PLAYER_TWO: "239, 68, 68", // red
+  PLAYER_ONE: cssRgbTriple(TEAM_COLOR.PLAYER_ONE),
+  PLAYER_TWO: cssRgbTriple(TEAM_COLOR.PLAYER_TWO),
 };
 
 const TYPE_RING_COLORS: Record<UnitType, string> = {

@@ -3,9 +3,13 @@
 
 import { Application, Container, Graphics, Sprite, Ticker } from "pixi.js";
 import { type AxialCoord, axialToPixel, hexDistance, hexPolygonPoints, mapTiles } from "../hex/HexMath";
+import { contentBounds } from "./Camera";
+import { CameraController } from "./CameraController";
 import { UnitIconFactory } from "../units/UnitIconFactory";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
+import { spawnDamageIndicator } from "../vfx/DamageIndicator";
+import type { IndicatorSpec } from "../vfx/VfxIndicators";
 import type {
   PlacementUnitSnapshot,
   TileEffectSnapshot,
@@ -105,8 +109,16 @@ export class Board {
   // like captured chess pieces. Its own layer so a corpse is never mistaken for
   // a board occupant by anything that walks unitsLayer.
   readonly graveyardLayer = new Container();
+  // Floating damage/heal numbers. Topmost of everything: a number that a cast-range
+  // band or a stack picker could paint over would defeat the point of drawing it.
+  // Like vfxLayer it survives refreshHighlights()'s uiLayer wipe.
+  readonly indicatorLayer = new Container();
 
   private iconFactory: UnitIconFactory;
+  // Pan/zoom. Camera state lives here rather than in GameStateStore on
+  // purpose: that store is shared with the DOM Hud, and every setState
+  // rebuilds uiLayer and the whole sidebar - a pan frame must not do that.
+  private cameraController: CameraController;
   private tileGraphics = new Map<string, Graphics>();
   private unitSprites = new Map<string, Container>();
   private mapRadius = -1;
@@ -122,6 +134,11 @@ export class Board {
   // arriving mid-tween can look up and cancel the unit's own in-flight move
   // tween rather than fighting it - see animateUnitMove.
   private activeMoveTicks = new Map<string, () => void>();
+  // Same reasoning as activeStrobeTicks: a number still floating when the board
+  // is torn down would otherwise keep ticking against a destroyed Text.
+  private activeIndicatorTicks = new Set<() => void>();
+  // Watches the canvas host for layout-driven size changes - see the constructor.
+  private hostResizeObserver: ResizeObserver | null = null;
   // The latest full unit list (from a real snapshot or a synthesized
   // placement one) - kept so a unit click handler can resolve the *current*
   // UnitSnapshot for its tile instead of the one captured when its container
@@ -156,7 +173,33 @@ export class Board {
       this.uiLayer,
       this.stackPickerLayer,
       this.graveyardLayer,
+      this.indicatorLayer,
     );
+
+    this.cameraController = new CameraController(app.canvas, {
+      getViewport: () => ({ width: this.app.screen.width, height: this.app.screen.height }),
+      // Before the first snapshot arrives the board is drawn at the placement
+      // defaults, so clamp against those rather than the -1 sentinel.
+      getContentBounds: () => contentBounds(
+        this.mapRadius < 0 ? PLACEMENT_MAP_RADIUS : this.mapRadius,
+        this.mapRowLimit < 0 ? PLACEMENT_MAP_ROW_LIMIT : this.mapRowLimit,
+        HEX_SIZE,
+      ),
+      onChange: (camera) => {
+        this.root.position.set(camera.x, camera.y);
+        this.root.scale.set(camera.zoom);
+      },
+    });
+    this.app.renderer.on("resize", this.handleViewportResize);
+    // Pixi's `resizeTo` only listens to window resize - it installs no
+    // ResizeObserver - so a layout change that resizes the canvas host without
+    // resizing the window (collapsing the log sidebar, say) would leave the
+    // renderer at its old size and every click landing on the wrong hex.
+    const canvasHost = app.canvas.parentElement;
+    if (canvasHost) {
+      this.hostResizeObserver = new ResizeObserver(() => this.app.resize());
+      this.hostResizeObserver.observe(canvasHost);
+    }
     this.recenter();
 
     this.unsubscribe = this.store.subscribe((state) => {
@@ -169,16 +212,37 @@ export class Board {
     });
   }
 
+  /** Resets the camera to the default view: board centred, unzoomed. */
   recenter(): void {
-    this.root.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
+    this.cameraController.reset();
   }
+
+  /**
+   * Re-clamps the camera after the canvas changed size. Deliberately not a
+   * recenter - resizing the window shouldn't throw away where the user had
+   * panned and zoomed to.
+   *
+   * Driven off the renderer's own "resize" rather than a window listener: with
+   * `resizeTo` the renderer resizes on its own schedule, so a window handler
+   * would clamp against a stale app.screen. This also covers the canvas host
+   * changing size without the window doing so.
+   */
+  private handleViewportResize = (): void => {
+    this.cameraController.reclamp();
+  };
 
   destroy(): void {
     this.unsubscribe();
+    this.app.renderer.off("resize", this.handleViewportResize);
+    this.hostResizeObserver?.disconnect();
+    this.hostResizeObserver = null;
+    this.cameraController.destroy();
     for (const tick of this.activeStrobeTicks) Ticker.shared.remove(tick);
     this.activeStrobeTicks.clear();
     for (const tick of this.activeMoveTicks.values()) Ticker.shared.remove(tick);
     this.activeMoveTicks.clear();
+    for (const tick of this.activeIndicatorTicks) Ticker.shared.remove(tick);
+    this.activeIndicatorTicks.clear();
     this.root.destroy({ children: true });
   }
 
@@ -194,6 +258,53 @@ export class Board {
         y: pos.y,
         color: colorForVfxType(event.type),
       });
+    }
+  }
+
+  /**
+   * Floats a batch of damage/heal numbers over their units. Called by
+   * MatchScreen on a stagger (see IndicatorScheduler), not straight off the
+   * wire, so one call is one readable group.
+   *
+   * Position comes from the unit's sprite where there is one, so a number
+   * follows a unit that's mid-move-tween, and falls back to the last snapshot's
+   * hex otherwise (a unit that just died has a sprite parked off-grid in the
+   * graveyard, but is still at its old q,r in the pre-update snapshot - vfx
+   * always arrives before the state it reflects). A unit that resolves to
+   * neither is skipped rather than defaulting to the board origin, which would
+   * drop an unattached number in the middle of the map.
+   */
+  showIndicators(specs: IndicatorSpec[]): void {
+    const snapshot = this.store.getState().snapshot;
+    // Two hits on one unit in the same group would otherwise print on top of
+    // each other, so each gets bumped a line further up.
+    const perUnitCount = new Map<string, number>();
+
+    for (const spec of specs) {
+      const sprite = this.unitSprites.get(spec.unitId);
+      const unit = snapshot?.units.find((u) => u.id === spec.unitId);
+      const pos = sprite
+        ? { x: sprite.position.x, y: sprite.position.y }
+        : unit
+          ? axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE)
+          : null;
+      if (!pos) continue;
+
+      const stackIndex = perUnitCount.get(spec.unitId) ?? 0;
+      perUnitCount.set(spec.unitId, stackIndex + 1);
+
+      const tick = spawnDamageIndicator(this.indicatorLayer, Ticker.shared, {
+        x: pos.x,
+        // Above the token: the HP bar already occupies the space below it.
+        y: pos.y - HEX_SIZE * 0.5,
+        text: spec.text,
+        color: spec.color,
+        kind: spec.kind,
+        stackIndex,
+        getBoardScale: () => this.root.scale.x,
+        onComplete: () => this.activeIndicatorTicks.delete(tick),
+      });
+      this.activeIndicatorTicks.add(tick);
     }
   }
 
@@ -260,6 +371,9 @@ export class Board {
       this.tileGraphics.set(`${coord.q},${coord.r}`, tile);
       this.boardLayer.addChild(tile);
     }
+
+    // The board just changed shape, so the pan clamp's content bounds did too.
+    this.cameraController.reclamp();
   }
 
   private drawTile(coord: AxialCoord): Graphics {
@@ -276,6 +390,7 @@ export class Board {
       g.clear().poly(points).fill({ color: TILE_FILL }).stroke({ width: 1, color: TILE_STROKE });
     });
     g.on("pointertap", () => {
+      if (this.cameraController.shouldSuppressTap()) return;
       this.closeStackPicker();
       this.callbacks.onTileClick(coord);
     });
@@ -443,6 +558,9 @@ export class Board {
       container.cursor = "pointer";
       const unitId = unit.id;
       container.on("pointertap", (e) => {
+        // The tap that ends a pan is not a board action - see
+        // CameraController.shouldSuppressTap.
+        if (this.cameraController.shouldSuppressTap()) return;
         e.stopPropagation();
         // Resolve the *current* unit and its tile-mates fresh from the last
         // snapshot rather than relying on `unit`, which is only ever the
@@ -771,6 +889,7 @@ export class Board {
       sprite.eventMode = "static";
       sprite.cursor = "pointer";
       sprite.on("pointertap", (e) => {
+        if (this.cameraController.shouldSuppressTap()) return;
         e.stopPropagation();
         this.closeStackPicker();
         this.callbacks.onUnitClick(unit);

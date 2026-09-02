@@ -1,4 +1,5 @@
 import { Store } from "./Store";
+import { buildCombatLogLines, type CombatLogEntry, type CombatLogSegment } from "./CombatLog";
 import type {
   DraftRoundSnapshot,
   GameStateSnapshot,
@@ -23,7 +24,7 @@ export interface MatchUiState {
   // see startNewCombatLogPageIfRoundJustCompleted) rather than one flat list.
   // New lines always append to the *last* page regardless of which page is
   // currently being viewed.
-  combatLogPages: string[][];
+  combatLogPages: CombatLogEntry[][];
   // Which page index renderCombatLog currently displays. Auto-follows the
   // latest page whenever a new one is created (a round just completed), but
   // is otherwise free for the user to navigate backward without snapping.
@@ -54,12 +55,6 @@ const MAX_MESSAGES = 50;
 // won't come anywhere near this, it's just a defensive ceiling.
 const MAX_COMBAT_LOG_PAGES = 100;
 
-// causeLabel values that come from the engine's rock-paper-scissors attribute
-// resolution (see CLAUDE.md's "Encounter types" section) - a 0-damage event
-// with one of these labels is a real RPS "miss" (attacker's attribute lost or
-// tied unfavorably), not just an ability tick that happened to roll 0, so it
-// gets the "missed their attack" phrasing instead of "takes 0 damage from X".
-const ENCOUNTER_CAUSE_LABELS = new Set(["Attack", "Counterstrike", "Duel", "Cloak and Dagger"]);
 
 /** Holds the latest known state of one match; Board and Hud both subscribe to it. */
 export class GameStateStore extends Store<MatchUiState> {
@@ -68,6 +63,9 @@ export class GameStateStore extends Store<MatchUiState> {
   // combat-log pagination - see startNewCombatLogPageIfRoundJustCompleted.
   // Not part of MatchUiState since nothing renders off it directly.
   private lastSeenCurrentTeam: Team | null = null;
+  // Lines built from a vfx batch, waiting for the state message that says whose
+  // turn they belong to - see commitCombatLog.
+  private pendingLogLines: CombatLogSegment[][] = [];
 
   constructor(yourTeam: Team) {
     super({
@@ -95,70 +93,56 @@ export class GameStateStore extends Store<MatchUiState> {
   }
 
   /**
-   * Turns a batch of "vfx" events into combat-log lines and appends them to
-   * the *last* page (regardless of which page is currently being viewed).
-   * Must be called before the corresponding "state" message is applied (vfx
-   * always arrives first over the wire) since it resolves unit names against
-   * the *pre-update* snapshot - same assumption Board.playVfx already makes.
+   * Turns a batch of "vfx" events into combat-log lines and buffers them until
+   * the "state" message behind them lands.
+   *
+   * Must be called before that state is applied (vfx always arrives first over
+   * the wire) since it resolves unit names against the *pre-update* snapshot -
+   * the same assumption Board.playVfx makes. It cannot commit them, though:
+   * which turn a line belongs to is only knowable from the state that follows.
+   * See commitCombatLog.
    */
   appendCombatLog(events: VfxEvent[]): void {
-    const lines: string[] = [];
-    for (const event of events) {
-      if (event.type === "damage") {
-        const amount = event.amount ?? 0;
-        const targetName = event.targetUnitId ? (this.findUnit(event.targetUnitId)?.name ?? "Unknown") : "Unknown";
-        const sourceName = event.sourceUnitId ? (this.findUnit(event.sourceUnitId)?.name ?? "Unknown") : "Unknown";
-        if (amount === 0 && event.causeLabel && ENCOUNTER_CAUSE_LABELS.has(event.causeLabel)) {
-          lines.push(`${sourceName} missed their attack on ${targetName}`);
-        } else if (event.causeLabel === "Attack") {
-          lines.push(`${sourceName} attacks ${targetName} for ${amount} damage`);
-        } else if (event.causeLabel) {
-          lines.push(`${targetName} takes ${amount} damage from ${event.causeLabel}`);
-        } else {
-          // Rare/never in practice per API_CONTRACT.md - no cause label at all.
-          lines.push(`${targetName} takes ${amount} damage`);
-        }
-      } else if (event.type === "ability_used") {
-        // "move" isn't interesting for a combat log; "attack" already gets
-        // its own damage-line coverage above (the "Attack" causeLabel
-        // branch) - logging both would be redundant.
-        if (event.abilityId === "move" || event.abilityId === "attack") continue;
-        const sourceUnit = event.sourceUnitId ? this.findUnit(event.sourceUnitId) : null;
-        const sourceName = sourceUnit?.name ?? "Unknown";
-        const abilityName =
-          sourceUnit?.abilities.find((a) => a.id === event.abilityId)?.name ?? event.abilityId ?? "an ability";
-        if (event.targetUnitId) {
-          const targetName = this.findUnit(event.targetUnitId)?.name ?? "Unknown";
-          lines.push(`${sourceName} cast ${abilityName} on ${targetName}`);
-        } else {
-          lines.push(`${sourceName} cast ${abilityName}`);
-        }
-      }
-    }
-    if (lines.length === 0) return;
-
-    const pages = this.getState().combatLogPages;
-    const lastIndex = pages.length - 1;
-    const updatedPages = pages.slice(0, lastIndex).concat([[...pages[lastIndex], ...lines]]);
-    this.setState({ combatLogPages: updatedPages });
+    this.pendingLogLines.push(...buildCombatLogLines(events, (id) => this.findUnit(id)));
   }
 
   /**
-   * Call once per "state" message with its `currentTeam`, before it's applied
-   * to `snapshot` - detects a PLAYER_TWO -> PLAYER_ONE transition (one full
-   * round, Player One's turn through the end of Player Two's turn, just
-   * completed) and pushes a fresh combat-log page, auto-following the view to
-   * it. The very first "state" message a client ever sees just establishes
-   * currentTeam = PLAYER_ONE for round 1 - not evidence a round completed -
-   * so no page is pushed until an actual transition has been observed.
+   * Files every buffered line under `currentTeam` and, if a round just
+   * completed, opens a new page first.
+   *
+   * Why the buffering: a turn's damage-over-time ticks are broadcast in the
+   * same server render as the state that hands the turn over, so at
+   * appendCombatLog time `snapshot.currentTeam` is still the *outgoing*
+   * player. Tagging then would file every turn-start poison and burn under the
+   * player who just finished. The state message that follows names the right
+   * team, so lines wait for it.
+   *
+   * Page rollover happens before the commit on purpose: a PLAYER_TWO ->
+   * PLAYER_ONE flip means a fresh round, and the pending lines are that new
+   * round's turn-start ticks, so they belong on the new page.
    */
-  startNewCombatLogPageIfRoundJustCompleted(currentTeam: Team): void {
+  commitCombatLog(currentTeam: Team): void {
     const previous = this.lastSeenCurrentTeam;
     this.lastSeenCurrentTeam = currentTeam;
-    if (previous !== "PLAYER_TWO" || currentTeam !== "PLAYER_ONE") return;
+    const roundCompleted = previous === "PLAYER_TWO" && currentTeam === "PLAYER_ONE";
 
-    const pages = [...this.getState().combatLogPages, []].slice(-MAX_COMBAT_LOG_PAGES);
-    this.setState({ combatLogPages: pages, viewedLogPage: pages.length - 1 });
+    if (!roundCompleted && this.pendingLogLines.length === 0) return;
+
+    let pages = this.getState().combatLogPages;
+    let viewedLogPage = this.getState().viewedLogPage;
+    if (roundCompleted) {
+      pages = [...pages, []].slice(-MAX_COMBAT_LOG_PAGES);
+      viewedLogPage = pages.length - 1;
+    }
+
+    if (this.pendingLogLines.length > 0) {
+      const entries: CombatLogEntry[] = this.pendingLogLines.map((segments) => ({ segments, team: currentTeam }));
+      this.pendingLogLines = [];
+      const lastIndex = pages.length - 1;
+      pages = pages.slice(0, lastIndex).concat([[...pages[lastIndex], ...entries]]);
+    }
+
+    this.setState({ combatLogPages: pages, viewedLogPage });
   }
 
   /** Moves the currently-viewed combat-log page by `delta`, clamped to valid bounds. */
