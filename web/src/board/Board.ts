@@ -9,8 +9,12 @@ import { UnitIconFactory } from "../units/UnitIconFactory";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
 import { spawnDamageIndicator } from "../vfx/DamageIndicator";
+import { spawnAttackAnimation } from "../vfx/AttackAnimationPlayer";
+import { DisplayedUnitState } from "../vfx/DisplayedUnitState";
 import type { IndicatorSpec } from "../vfx/VfxIndicators";
+import type { AttackAnimationSpec } from "../vfx/AttackAnimations";
 import type {
+  GameStateSnapshot,
   PlacementUnitSnapshot,
   TileEffectSnapshot,
   UnitSnapshot,
@@ -137,6 +141,15 @@ export class Board {
   // Same reasoning as activeStrobeTicks: a number still floating when the board
   // is torn down would otherwise keep ticking against a destroyed Text.
   private activeIndicatorTicks = new Set<() => void>();
+  // Same reasoning again: a slash/arrow/projectile/lightning/beam mid-flight
+  // when the board is torn down would otherwise keep ticking against a
+  // destroyed Graphics.
+  private activeAttackAnimTicks = new Set<() => void>();
+  // Each unit's *displayed* hp/dead, separate from the truth in
+  // this.currentUnits - lets the HP bar and the graveyard transition lag a
+  // lethal hit's own animation/indicator instead of snapping the moment a
+  // "state" message lands. See applySnapshot, spawnIndicatorAt.
+  private displayedState = new DisplayedUnitState();
   // Watches the canvas host for layout-driven size changes - see the constructor.
   private hostResizeObserver: ResizeObserver | null = null;
   // The latest full unit list (from a real snapshot or a synthesized
@@ -243,6 +256,8 @@ export class Board {
     this.activeMoveTicks.clear();
     for (const tick of this.activeIndicatorTicks) Ticker.shared.remove(tick);
     this.activeIndicatorTicks.clear();
+    for (const tick of this.activeAttackAnimTicks) Ticker.shared.remove(tick);
+    this.activeAttackAnimTicks.clear();
     this.root.destroy({ children: true });
   }
 
@@ -281,31 +296,115 @@ export class Board {
     const perUnitCount = new Map<string, number>();
 
     for (const spec of specs) {
-      const sprite = this.unitSprites.get(spec.unitId);
-      const unit = snapshot?.units.find((u) => u.id === spec.unitId);
-      const pos = sprite
-        ? { x: sprite.position.x, y: sprite.position.y }
-        : unit
-          ? axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE)
-          : null;
+      const pos = this.resolveLivePosition(spec.unitId, snapshot);
       if (!pos) continue;
 
       const stackIndex = perUnitCount.get(spec.unitId) ?? 0;
       perUnitCount.set(spec.unitId, stackIndex + 1);
-
-      const tick = spawnDamageIndicator(this.indicatorLayer, Ticker.shared, {
-        x: pos.x,
-        // Above the token: the HP bar already occupies the space below it.
-        y: pos.y - HEX_SIZE * 0.5,
-        text: spec.text,
-        color: spec.color,
-        kind: spec.kind,
-        stackIndex,
-        getBoardScale: () => this.root.scale.x,
-        onComplete: () => this.activeIndicatorTicks.delete(tick),
-      });
-      this.activeIndicatorTicks.add(tick);
+      this.spawnIndicatorAt(pos, spec, stackIndex);
     }
+  }
+
+  /**
+   * Shows one indicator at an already-resolved position - used by
+   * ScheduleVfxBatch's attack-animation completion callback, where the
+   * position was frozen eagerly rather than looked up live (see
+   * resolveUnitPosition).
+   */
+  showIndicatorAt(pos: { x: number; y: number }, spec: IndicatorSpec): void {
+    this.spawnIndicatorAt(pos, spec, 0);
+  }
+
+  /**
+   * Applies the spec's HP delta to the unit's *displayed* state and
+   * re-renders its token (HP bar, or the graveyard transition if this is
+   * the change that kills it) before spawning the floating number - so the
+   * bar/graveyard move and the number that explains it can never land out
+   * of step with each other.
+   */
+  private spawnIndicatorAt(pos: { x: number; y: number }, spec: IndicatorSpec, stackIndex: number): void {
+    this.displayedState.applyChange(spec.unitId, spec.hpDelta);
+    this.refreshUnitDisplay(spec.unitId);
+
+    const tick = spawnDamageIndicator(this.indicatorLayer, Ticker.shared, {
+      x: pos.x,
+      // Above the token: the HP bar already occupies the space below it.
+      y: pos.y - HEX_SIZE * 0.5,
+      text: spec.text,
+      color: spec.color,
+      kind: spec.kind,
+      stackIndex,
+      getBoardScale: () => this.root.scale.x,
+      onComplete: () => this.activeIndicatorTicks.delete(tick),
+    });
+    this.activeIndicatorTicks.add(tick);
+  }
+
+  /** Registers one more event still to be visually applied to this unit - see ScheduleVfxBatch and DisplayedUnitState. */
+  beginPendingHpChange(unitId: string): void {
+    this.displayedState.beginPendingChange(unitId);
+  }
+
+  /** Resolves a unit's current position from Board's own live store state, for an eager (pre-"state") caller. */
+  resolveUnitPosition(unitId: string | null): { x: number; y: number } | null {
+    return this.resolveLivePosition(unitId, this.store.getState().snapshot);
+  }
+
+  /** Re-renders one unit's token from the current truth (position, team, name, ...) but *displayed* hp/dead. */
+  private refreshUnitDisplay(unitId: string): void {
+    const unit = this.currentUnits.find((u) => u.id === unitId);
+    if (!unit) return;
+    void this.upsertUnit({
+      ...unit,
+      currentHp: this.displayedState.hpFor(unitId, unit.currentHp),
+      dead: this.displayedState.isDead(unitId),
+    });
+  }
+
+  /**
+   * Resolves a unit's current on-screen position: its live sprite where there
+   * is one (so a following animation/indicator tracks a unit mid-move-tween),
+   * falling back to the given snapshot's hex otherwise (a unit that just died
+   * has a sprite parked off-grid in the graveyard, but is still at its old
+   * q,r in the pre-update snapshot). Resolved live, at call time - which may
+   * be well after the vfx batch that triggered it arrived, since this is
+   * called from staggered/scheduled callbacks - rather than frozen early.
+   */
+  private resolveLivePosition(
+    unitId: string | null,
+    snapshot: GameStateSnapshot | null | undefined,
+  ): { x: number; y: number } | null {
+    if (!unitId) return null;
+    const sprite = this.unitSprites.get(unitId);
+    if (sprite) return { x: sprite.position.x, y: sprite.position.y };
+    const unit = snapshot?.units.find((u) => u.id === unitId);
+    return unit ? axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE) : null;
+  }
+
+  /**
+   * Plays one attack's travel animation between two already-resolved
+   * points, then calls onComplete once every stroke has finished - only
+   * then should the caller show the attack's damage/MISS indicator.
+   *
+   * Takes `from`/`to` directly rather than resolving them itself: the
+   * caller (ScheduleVfxBatch) resolves both eagerly, synchronously, at the
+   * moment the vfx batch arrives - before this action's "state" message can
+   * possibly be processed - so a lethal hit's animation still travels to
+   * the tile the defender was actually standing on, not the graveyard slot
+   * it gets relocated to the instant "state" lands.
+   */
+  playAttackAnimation(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    spec: AttackAnimationSpec,
+    onComplete: () => void,
+  ): void {
+    let ticks: (() => void)[] = [];
+    ticks = spawnAttackAnimation(this.vfxLayer, Ticker.shared, from, to, spec, () => {
+      for (const tick of ticks) this.activeAttackAnimTicks.delete(tick);
+      onComplete();
+    });
+    for (const tick of ticks) this.activeAttackAnimTicks.add(tick);
   }
 
   /**
@@ -412,7 +511,16 @@ export class Board {
     const seen = new Set<string>();
     for (const unit of snapshot.units) {
       seen.add(unit.id);
-      await this.upsertUnit(unit);
+      // Holds displayed hp/dead at their last-shown value while something is
+      // still pending for this unit, rather than jumping straight to a
+      // lethal hit's post-battle result before its own animation/indicator
+      // has played - see DisplayedUnitState and ScheduleVfxBatch.
+      this.displayedState.syncToTruth(unit.id, unit.currentHp, unit.dead);
+      await this.upsertUnit({
+        ...unit,
+        currentHp: this.displayedState.hpFor(unit.id, unit.currentHp),
+        dead: this.displayedState.isDead(unit.id),
+      });
     }
     for (const [id, sprite] of this.unitSprites) {
       if (!seen.has(id)) {
@@ -423,6 +531,7 @@ export class Board {
         }
         sprite.destroy({ children: true });
         this.unitSprites.delete(id);
+        this.displayedState.forget(id);
       }
     }
     // The stack composition (or its existence at all) may have just changed

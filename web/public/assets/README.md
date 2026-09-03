@@ -92,6 +92,12 @@ here so it's not forgotten. If pursued, natural trigger points already exist ser
 Spec if pursued: short (<2s for one-shots), `.mp3` or `.ogg`, normalized volume across the set so
 nothing's jarringly louder than the rest.
 
+## `music/` — background music (1 file, not yet wired up)
+
+Same story as `sfx/` above (no audio-playback layer exists in the client yet) — `main_menu.mp3`
+is kept here so it isn't lost, awaiting that same future audio feature. Intended for the main
+menu screen once one exists; not attached to anything today.
+
 ## Formats, sizing, and how fallbacks work
 
 Every category above already has a working fallback (procedural badge for portraits, plain text

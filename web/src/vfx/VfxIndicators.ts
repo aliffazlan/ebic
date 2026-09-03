@@ -23,6 +23,8 @@ export interface IndicatorSpec {
   text: string;
   color: number;
   kind: IndicatorKind;
+  /** Signed HP change this indicator represents: negative for damage, positive for heal, 0 for a miss. */
+  hpDelta: number;
 }
 
 // Colours are drawn from hues already on the board rather than invented, so a
@@ -85,18 +87,18 @@ export function indicatorFor(event: VfxEvent): IndicatorSpec | null {
   if (!unitId) return null;
 
   if (isMissEvent(event)) {
-    return { unitId, text: "MISS", color: MISS_COLOR, kind: "miss" };
+    return { unitId, text: "MISS", color: MISS_COLOR, kind: "miss", hpDelta: 0 };
   }
 
   const amount = event.amount ?? 0;
   if (amount <= 0) return null;
 
   if (event.type === "heal") {
-    return { unitId, text: `+${amount}`, color: HEAL_COLOR, kind: "heal" };
+    return { unitId, text: `+${amount}`, color: HEAL_COLOR, kind: "heal", hpDelta: amount };
   }
 
   const kind = damageKind(event.causeLabel);
-  return { unitId, text: `-${amount}`, color: colorForKind(kind), kind };
+  return { unitId, text: `-${amount}`, color: colorForKind(kind), kind, hpDelta: -amount };
 }
 
 /** The indicator kind a damage event's cause label maps to. Shared with the combat log. */

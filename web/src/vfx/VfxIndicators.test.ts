@@ -42,12 +42,12 @@ describe("isMissEvent", () => {
 describe("indicatorFor", () => {
   it("shows MISS in grey rather than a zero", () => {
     const spec = indicatorFor(damage(0, "Attack"));
-    expect(spec).toMatchObject({ text: "MISS", kind: "miss", color: 0x9ca3af });
+    expect(spec).toMatchObject({ text: "MISS", kind: "miss", color: 0x9ca3af, hpDelta: 0 });
   });
 
   it("colours a basic attack red and an ability blue", () => {
-    expect(indicatorFor(damage(34, "Attack"))).toMatchObject({ text: "-34", kind: "attack", color: 0xef4444 });
-    expect(indicatorFor(damage(60, "Sanity's Eclipse"))).toMatchObject({ text: "-60", kind: "ability", color: 0x60a5fa });
+    expect(indicatorFor(damage(34, "Attack"))).toMatchObject({ text: "-34", kind: "attack", color: 0xef4444, hpDelta: -34 });
+    expect(indicatorFor(damage(60, "Sanity's Eclipse"))).toMatchObject({ text: "-60", kind: "ability", color: 0x60a5fa, hpDelta: -60 });
   });
 
   it("treats every other damage-over-time as ability damage", () => {
@@ -68,7 +68,7 @@ describe("indicatorFor", () => {
   });
 
   it("shows a heal as a signed green number", () => {
-    expect(indicatorFor(heal(40))).toMatchObject({ text: "+40", kind: "heal", color: 0x22c55e });
+    expect(indicatorFor(heal(40))).toMatchObject({ text: "+40", kind: "heal", color: 0x22c55e, hpDelta: 40 });
   });
 
   it("falls back to ability damage when the server sends no cause label", () => {

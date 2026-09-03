@@ -12,8 +12,8 @@ import { Board } from "../board/Board";
 import { GameStateStore } from "../state/GameStateStore";
 import { Hud } from "./Hud";
 import { TurnBanner } from "./TurnBanner";
-import { INDICATOR_GROUP_GAP_MS, IndicatorScheduler } from "../vfx/IndicatorScheduler";
-import { groupIndicators } from "../vfx/VfxIndicators";
+import { IndicatorScheduler } from "../vfx/IndicatorScheduler";
+import { scheduleVfxBatch } from "../vfx/ScheduleVfxBatch";
 import sampleState from "../fixtures/sample-state.json";
 import samplePlacement from "../fixtures/sample-placement.json";
 import type { Attribute, GameStateSnapshot, PlacementStateSnapshot, VfxEvent } from "../types/contract";
@@ -29,13 +29,25 @@ export type FixtureMode = "match" | "placement";
  *
  * Deliberately spans all three stagger groups (poison, burn, everything else)
  * and includes a unit taking two hits at once, so the stacking offset shows up.
+ *
+ * Also covers every attack-animation kind (slash/arrow/projectile/lightning/
+ * beam), Wei's multi-stroke, a lightning/beam MISS, and confirms Cloak and
+ * Dagger keeps the old unanimated treatment (attacker and defender share a
+ * tile there, so a travel animation has nowhere to travel).
  */
 const DEMO_VFX: VfxEvent[] = [
   { type: "damage", abilityId: null, sourceUnitId: "u-harbinger", targetUnitId: "u-valor", amount: 12, causeLabel: "Poison" },
   { type: "damage", abilityId: null, sourceUnitId: "u-harbinger", targetUnitId: "u-dirge", amount: 8, causeLabel: "Poison" },
   { type: "damage", abilityId: null, sourceUnitId: "u-evayne", targetUnitId: "u-valor", amount: 15, causeLabel: "Burn" },
-  { type: "damage", abilityId: null, sourceUnitId: "u-basic-3", targetUnitId: "u-basic-1", amount: 34, causeLabel: "Attack" },
-  { type: "damage", abilityId: null, sourceUnitId: "u-basic-3", targetUnitId: "u-basic-2", amount: 0, causeLabel: "Attack" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-basic-3", targetUnitId: "u-basic-1", amount: 34, causeLabel: "Attack" }, // default white slash
+  { type: "damage", abilityId: null, sourceUnitId: "u-basic-3", targetUnitId: "u-basic-2", amount: 0, causeLabel: "Attack" }, // default white slash, MISS
+  { type: "damage", abilityId: null, sourceUnitId: "u-valor", targetUnitId: "u-basic-3", amount: 55, causeLabel: "Attack" }, // silver slash
+  { type: "damage", abilityId: null, sourceUnitId: "u-discharge", targetUnitId: "u-basic-3", amount: 50, causeLabel: "Attack" }, // yellow lightning
+  { type: "damage", abilityId: null, sourceUnitId: "u-zenith", targetUnitId: "u-basic-1", amount: 0, causeLabel: "Attack" }, // dark-blue beam, MISS
+  { type: "damage", abilityId: null, sourceUnitId: "u-artemis", targetUnitId: "u-harbinger", amount: 40, causeLabel: "Counterstrike" }, // white arrow
+  { type: "damage", abilityId: null, sourceUnitId: "u-wei", targetUnitId: "u-valor", amount: 48, causeLabel: "Duel" }, // magenta+dark-blue multi-stroke
+  { type: "damage", abilityId: null, sourceUnitId: "u-ember", targetUnitId: "u-dirge", amount: 30, causeLabel: "Attack" }, // orange projectile + particles
+  { type: "damage", abilityId: null, sourceUnitId: "u-evayne", targetUnitId: "u-dirge", amount: 30, causeLabel: "Cloak and Dagger" }, // must NOT get the new animation
   { type: "damage", abilityId: null, sourceUnitId: "u-evayne", targetUnitId: "u-dirge", amount: 60, causeLabel: "Sanity's Eclipse" },
   { type: "damage", abilityId: null, sourceUnitId: "u-evayne", targetUnitId: "u-dirge", amount: 25, causeLabel: "Acidic Brew" },
   { type: "heal", abilityId: null, sourceUnitId: null, targetUnitId: "u-basic-1", amount: 40, causeLabel: null },
@@ -136,9 +148,20 @@ export class FixtureScreen implements Screen, MatchActions {
       // that follows a vfx batch, which the fixture has no server to send.
       this.store.appendCombatLog(DEMO_VFX);
       this.store.commitCombatLog(this.store.getState().snapshot?.currentTeam ?? "PLAYER_ONE");
-      for (const group of groupIndicators(DEMO_VFX)) {
-        this.indicators.enqueue(() => this.board?.showIndicators(group), INDICATOR_GROUP_GAP_MS);
-      }
+      // Same orchestration MatchScreen uses off a real "vfx" message, so the
+      // fixture exercises the exact sequencing code rather than a hand-rolled
+      // copy that can drift from it.
+      scheduleVfxBatch(DEMO_VFX, {
+        indicators: this.indicators,
+        playVfx: (events) => this.board?.playVfx(events),
+        playAttackAnimation: (from, to, spec, onComplete) => this.board?.playAttackAnimation(from, to, spec, onComplete),
+        showIndicators: (specs) => this.board?.showIndicators(specs),
+        showIndicatorAt: (pos, spec) => this.board?.showIndicatorAt(pos, spec),
+        resolveUnitPosition: (unitId) => this.board?.resolveUnitPosition(unitId) ?? null,
+        beginPendingHpChange: (unitId) => this.board?.beginPendingHpChange(unitId),
+        sourceDefinitionId: (event) =>
+          this.store.getState().snapshot?.units.find((u) => u.id === event.sourceUnitId)?.definitionId ?? null,
+      });
       // Queued last, so it lands after the staggered groups - the same
       // arrangement the real turn-start sequence produces.
       this.indicators.enqueue(() => this.turnBanner?.show(), 0);

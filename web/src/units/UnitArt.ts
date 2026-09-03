@@ -67,6 +67,29 @@ const BASIC_ART: Record<Team, string> = {
 };
 const NEUTRAL_BASIC_ART = "basic0";
 
+const CHAMPIONS = ["chronos", "ember", "harbinger", "joker", "valor", "zenith"];
+const ELITES = [
+  "artemis", "auroth", "branch", "dirge", "discharge", "evayne", "grivath",
+  "lanaya", "lucifer", "maxwell", "mercurial", "shawl", "spitter", "thaddeus",
+  "wei", "yuki",
+];
+const BASICS = ["basic0", "basic1", "basic2", "basic3", "basic4"];
+
+/**
+ * Every art id worth warming the browser cache for before anything needs it
+ * (the loading screen). Can't be derived from the server for this -
+ * /api/units requires a session, and this runs before login - so it's
+ * listed by hand, same as SUMMON_ART/BASIC_ART above; update it when a new
+ * unit ships. Missing/unshipped files (zenith_pylon, basic4's icon) degrade
+ * silently, same as every other art lookup in this file.
+ */
+export const ALL_ART_IDS: readonly string[] = [
+  ...CHAMPIONS,
+  ...ELITES,
+  ...new Set(Object.values(SUMMON_ART)),
+  ...BASICS,
+];
+
 export function artId(definitionId: string, name: string, team?: Team): string {
   if (definitionId !== "basic") return definitionId;
   // A generic basic is named "<player> Basic 3", which matches nothing here and

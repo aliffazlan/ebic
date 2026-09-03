@@ -1,13 +1,16 @@
 import { api } from "../net/api";
+import { audioManager } from "../audio/AudioManager";
 import { AuthScreen } from "../ui/AuthScreen";
+import { ClickToContinueScreen } from "../ui/ClickToContinueScreen";
 import { CodexScreen } from "../ui/CodexScreen";
 import { FixtureScreen } from "../ui/FixtureScreen";
+import { LoadingScreen } from "../ui/LoadingScreen";
 import { LobbyScreen } from "../ui/LobbyScreen";
 import { MatchScreen } from "../ui/MatchScreen";
 import type { Screen } from "../ui/Screen";
 import type { AuthUser, Team } from "../types/contract";
 
-/** Top-level screen router: auth -> lobby -> match. */
+/** Top-level screen router: loading -> click-to-continue -> auth -> lobby -> match. */
 export class App {
   private currentUser: AuthUser | null = null;
   private screen: Screen | null = null;
@@ -32,6 +35,21 @@ export class App {
       return;
     }
 
+    this.setScreen(new LoadingScreen(this.root, () => this.showClickToContinue()));
+  }
+
+  private showClickToContinue(): void {
+    this.setScreen(
+      new ClickToContinueScreen(this.root, () => {
+        // A real user gesture - the earliest point audio is allowed to
+        // autoplay, and exactly where the design wants the music to start.
+        audioManager.playMusic();
+        void this.enterApp();
+      }),
+    );
+  }
+
+  private async enterApp(): Promise<void> {
     try {
       this.currentUser = await api.me();
       this.showLobby();

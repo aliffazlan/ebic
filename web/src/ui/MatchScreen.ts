@@ -4,10 +4,10 @@ import { GameStateStore } from "../state/GameStateStore";
 import { GameSocket } from "../net/GameSocket";
 import { Hud } from "./Hud";
 import { TurnBanner } from "./TurnBanner";
-import { INDICATOR_GROUP_GAP_MS, IndicatorScheduler } from "../vfx/IndicatorScheduler";
-import { groupIndicators } from "../vfx/VfxIndicators";
+import { IndicatorScheduler } from "../vfx/IndicatorScheduler";
+import { scheduleVfxBatch } from "../vfx/ScheduleVfxBatch";
 import type { AxialCoord } from "../hex/HexMath";
-import type { Attribute, ServerMessage, Team, UnitSnapshot, UnitType, VfxEvent } from "../types/contract";
+import type { Attribute, ServerMessage, Team, UnitSnapshot, UnitType } from "../types/contract";
 import type { MatchActions } from "./MatchActions";
 import type { Screen } from "./Screen";
 import { artId, warmPortraits } from "../units/UnitArt";
@@ -154,21 +154,6 @@ export class MatchScreen implements Screen, MatchActions {
   }
 
   /**
-   * Queues one vfx batch's damage numbers onto the shared timeline, split so
-   * poison, then burn, then everything else each get their own beat.
-   *
-   * A batch from an ordinary cast only ever has the third group, so normal
-   * combat still shows its numbers immediately - the stagger only costs time
-   * when there is genuinely more than one damage source to read, which is
-   * exactly the turn-start damage-over-time case it exists for.
-   */
-  private scheduleIndicators(events: VfxEvent[]): void {
-    for (const group of groupIndicators(events)) {
-      this.indicators.enqueue(() => this.board?.showIndicators(group), INDICATOR_GROUP_GAP_MS);
-    }
-  }
-
-  /**
    * Flashes "YOUR TURN" when the turn passes to this client. Queued on the same
    * timeline as the damage numbers rather than shown immediately: a turn starts
    * with its damage-over-time ticks, and the banner should be the last thing
@@ -211,9 +196,18 @@ export class MatchScreen implements Screen, MatchActions {
         break;
       }
       case "vfx":
-        this.board?.playVfx(msg.payload);
         this.store.appendCombatLog(msg.payload);
-        this.scheduleIndicators(msg.payload);
+        scheduleVfxBatch(msg.payload, {
+          indicators: this.indicators,
+          playVfx: (events) => this.board?.playVfx(events),
+          playAttackAnimation: (from, to, spec, onComplete) => this.board?.playAttackAnimation(from, to, spec, onComplete),
+          showIndicators: (specs) => this.board?.showIndicators(specs),
+          showIndicatorAt: (pos, spec) => this.board?.showIndicatorAt(pos, spec),
+          resolveUnitPosition: (unitId) => this.board?.resolveUnitPosition(unitId) ?? null,
+          beginPendingHpChange: (unitId) => this.board?.beginPendingHpChange(unitId),
+          sourceDefinitionId: (event) =>
+            this.store.getState().snapshot?.units.find((u) => u.id === event.sourceUnitId)?.definitionId ?? null,
+        });
         {
           // The "attribute" prompt's own encounter resolving is signaled by
           // the next vfx/state push, not by a fresh prompt necessarily aimed

@@ -1,4 +1,5 @@
 import { api, ApiError } from "../net/api";
+import { SettingsModal } from "./SettingsModal";
 import type { AuthUser, BotLevel, Team, UnitDefinitionSnapshot } from "../types/contract";
 import type { Screen } from "./Screen";
 
@@ -21,6 +22,7 @@ export class LobbyScreen implements Screen {
   private root: HTMLElement;
   private user: AuthUser;
   private callbacks: LobbyCallbacks;
+  private settingsModal = new SettingsModal();
 
   constructor(root: HTMLElement, user: AuthUser, callbacks: LobbyCallbacks) {
     this.root = root;
@@ -34,6 +36,7 @@ export class LobbyScreen implements Screen {
 
   unmount(): void {
     this.stopPolling();
+    this.settingsModal.close();
     this.el?.remove();
     this.el = null;
   }
@@ -65,12 +68,15 @@ export class LobbyScreen implements Screen {
     const codexBtn = document.createElement("button");
     codexBtn.textContent = "Unit info";
     codexBtn.addEventListener("click", () => this.callbacks.onOpenCodex());
+    const settingsBtn = document.createElement("button");
+    settingsBtn.textContent = "Settings";
+    settingsBtn.addEventListener("click", () => this.settingsModal.open());
     const logoutBtn = document.createElement("button");
     logoutBtn.textContent = "Log out";
     logoutBtn.addEventListener("click", () => {
       void api.logout().finally(() => this.callbacks.onLogout());
     });
-    header.append(title, codexBtn, logoutBtn);
+    header.append(title, codexBtn, settingsBtn, logoutBtn);
     card.appendChild(header);
 
     const welcome = document.createElement("div");
