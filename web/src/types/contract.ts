@@ -130,6 +130,9 @@ export interface EffectSnapshot {
   // "Next hit: 12 damage" (Doom), "Barrier: 8 HP remaining" - null when the
   // effect has nothing dynamic to add.
   extraInfo: string | null;
+  // The other unit this effect is paired with - only set for Duel and Static
+  // Link, whose board visuals connect two specific units. Null otherwise.
+  partnerUnitId: string | null;
 }
 
 export interface UnitSnapshot {

@@ -11,6 +11,8 @@ import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
 import { spawnDamageIndicator } from "../vfx/DamageIndicator";
 import { spawnAttackAnimation } from "../vfx/AttackAnimationPlayer";
 import { DisplayedUnitState } from "../vfx/DisplayedUnitState";
+import { statusVisualFor } from "../vfx/StatusEffects";
+import { spawnUnitStatusOverlay, drawCloakTile, spawnDuelBanners, spawnStaticLink } from "../vfx/StatusEffectPlayer";
 import type { IndicatorSpec } from "../vfx/VfxIndicators";
 import type { AttackAnimationSpec } from "../vfx/AttackAnimations";
 import type {
@@ -95,6 +97,12 @@ export class Board {
   // is always the tile its target is standing on, so drawn under unitsLayer the marker
   // would be permanently hidden by the very sprite it is pointing at.
   readonly tileMarkerLayer = new Container();
+  // Duel banners / Static Link lightning - visuals spanning two specific
+  // units rather than belonging to either one's own token container. Sits
+  // above tile markers but below vfx/attack animations, wiped and redrawn
+  // every applySnapshot the same way tileEffectLayer is - see
+  // renderPairEffects.
+  readonly pairEffectLayer = new Container();
   readonly vfxLayer = new Container();
   // Pre-encounter strobe rings live in their own layer, separate from
   // uiLayer, because refreshHighlights() unconditionally clears uiLayer on
@@ -145,6 +153,16 @@ export class Board {
   // when the board is torn down would otherwise keep ticking against a
   // destroyed Graphics.
   private activeAttackAnimTicks = new Set<() => void>();
+  // A unit's currently-running status-effect ticks (stun orbit, smoke
+  // emitter, ...), keyed by unit id so upsertUnit's next rebuild can stop the
+  // previous ones before starting fresh - otherwise every snapshot would
+  // leak one more orphaned ticker callback per active effect. See
+  // renderUnitStatusEffects/clearStatusEffectTicks.
+  private activeStatusEffectTicks = new Map<string, (() => void)[]>();
+  // Static Link's jittering lightning ticks, cleared and rebuilt wholesale
+  // each renderPairEffects call (same reasoning as activeStatusEffectTicks,
+  // just not keyed per-unit since pairEffectLayer itself is wiped every time).
+  private activePairEffectTicks = new Set<() => void>();
   // Each unit's *displayed* hp/dead, separate from the truth in
   // this.currentUnits - lets the HP bar and the graveyard transition lag a
   // lethal hit's own animation/indicator instead of snapping the moment a
@@ -181,6 +199,7 @@ export class Board {
       this.tileEffectLayer,
       this.unitsLayer,
       this.tileMarkerLayer,
+      this.pairEffectLayer,
       this.vfxLayer,
       this.strobeLayer,
       this.uiLayer,
@@ -258,6 +277,12 @@ export class Board {
     this.activeIndicatorTicks.clear();
     for (const tick of this.activeAttackAnimTicks) Ticker.shared.remove(tick);
     this.activeAttackAnimTicks.clear();
+    for (const ticks of this.activeStatusEffectTicks.values()) {
+      for (const tick of ticks) Ticker.shared.remove(tick);
+    }
+    this.activeStatusEffectTicks.clear();
+    for (const tick of this.activePairEffectTicks) Ticker.shared.remove(tick);
+    this.activePairEffectTicks.clear();
     this.root.destroy({ children: true });
   }
 
@@ -348,6 +373,33 @@ export class Board {
   /** Resolves a unit's current position from Board's own live store state, for an eager (pre-"state") caller. */
   resolveUnitPosition(unitId: string | null): { x: number; y: number } | null {
     return this.resolveLivePosition(unitId, this.store.getState().snapshot);
+  }
+
+  /**
+   * Builds a unit's status-effect overlay (stun stars, smoke, ice/shield/snow,
+   * etc.) from its current `effects` list, straight off the truth snapshot -
+   * unlike HP/death these are persistent state, not something that needs to
+   * lag a damage indicator (see DisplayedUnitState). Tile- and pair-level
+   * effects (Cloak and Dagger, Duel, Static Link) are handled separately by
+   * renderCloakTiles/renderPairEffects, not here.
+   */
+  private renderUnitStatusEffects(container: Container, unit: UnitSnapshot): void {
+    const ticks: (() => void)[] = [];
+    const tokenRadiusPx = (HEX_SIZE * UNIT_SPRITE_SCALE) / 2;
+    for (const effect of unit.effects) {
+      const spec = statusVisualFor(effect);
+      if (!spec || spec.mode !== "unit") continue;
+      ticks.push(...spawnUnitStatusOverlay(container, Ticker.shared, spec, tokenRadiusPx));
+    }
+    if (ticks.length > 0) this.activeStatusEffectTicks.set(unit.id, ticks);
+  }
+
+  /** Stops and forgets a unit's currently-running status-effect ticks, e.g. before a token rebuild or once it leaves the snapshot. */
+  private clearStatusEffectTicks(unitId: string): void {
+    const ticks = this.activeStatusEffectTicks.get(unitId);
+    if (!ticks) return;
+    for (const tick of ticks) Ticker.shared.remove(tick);
+    this.activeStatusEffectTicks.delete(unitId);
   }
 
   /** Re-renders one unit's token from the current truth (position, team, name, ...) but *displayed* hp/dead. */
@@ -507,6 +559,7 @@ export class Board {
     this.ensureMap(snapshot.mapRadius, snapshot.mapRowLimit ?? snapshot.mapRadius);
     this.currentUnits = snapshot.units;
     this.renderTileEffects(snapshot.tileEffects ?? []);
+    this.renderCloakTiles(snapshot.units);
 
     const seen = new Set<string>();
     for (const unit of snapshot.units) {
@@ -532,6 +585,7 @@ export class Board {
         sprite.destroy({ children: true });
         this.unitSprites.delete(id);
         this.displayedState.forget(id);
+        this.clearStatusEffectTicks(id);
       }
     }
     // The stack composition (or its existence at all) may have just changed
@@ -539,6 +593,62 @@ export class Board {
     // never lingers, and closes itself automatically once fewer than 2
     // occupants remain.
     this.renderStackPicker();
+    await this.renderPairEffects(snapshot.units);
+  }
+
+  /**
+   * Cloak and Dagger isn't a real TileEffectSnapshot on the wire (CloakEffect
+   * is a unit-attached Effect on its caster, never added to
+   * GameStateSnapshotMapper's tileEffects) - so it's synthesized here from
+   * whichever units currently carry that effect, drawn at their own q,r.
+   * Shares tileEffectLayer's per-snapshot wipe (renderTileEffects clears it
+   * just before this runs), so no separate teardown bookkeeping is needed -
+   * a caster who loses the effect simply stops being drawn next snapshot.
+   */
+  private renderCloakTiles(units: UnitSnapshot[]): void {
+    for (const unit of units) {
+      const hasCloak = unit.effects.some((e) => statusVisualFor(e)?.mode === "tile");
+      if (!hasCloak) continue;
+      drawCloakTile(this.tileEffectLayer, axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE), HEX_SIZE);
+    }
+  }
+
+  /**
+   * Duel banners / Static Link lightning - visuals spanning two specific
+   * units, resolved via the new partnerUnitId field rather than a same-name
+   * pairing guess (see EffectSnapshot). Redrawn from scratch every snapshot,
+   * same as renderTileEffects.
+   *
+   * Duel is symmetric - each duelist holds its own DuelEffect pointing at
+   * the other, so both sides carry a "Duel" entry and this dedupes by only
+   * drawing when the current unit's id sorts before its partner's. Static
+   * Link is not: only the caster's Effect is ever added
+   * (GameStateSnapshotMapper resolves its partnerUnitId from
+   * StaticLinkEffect.getTarget(), the target never gets a "Static Link"
+   * entry of its own) - the same id-order check would wrongly skip it
+   * whenever the caster's id happens to sort after its target's, so
+   * lightning always draws instead.
+   */
+  private async renderPairEffects(units: UnitSnapshot[]): Promise<void> {
+    for (const tick of this.activePairEffectTicks) Ticker.shared.remove(tick);
+    this.activePairEffectTicks.clear();
+    this.pairEffectLayer.removeChildren();
+
+    for (const unit of units) {
+      for (const effect of unit.effects) {
+        const spec = statusVisualFor(effect);
+        if (!spec || spec.mode !== "pair" || !effect.partnerUnitId) continue;
+        if (spec.kind === "banner" && unit.id >= effect.partnerUnitId) continue;
+        const from = this.resolveUnitPosition(unit.id);
+        const to = this.resolveUnitPosition(effect.partnerUnitId);
+        if (!from || !to) continue;
+        if (spec.kind === "banner") {
+          await spawnDuelBanners(this.pairEffectLayer, from, to);
+        } else {
+          this.activePairEffectTicks.add(spawnStaticLink(this.pairEffectLayer, Ticker.shared, from, to, spec.color));
+        }
+      }
+    }
   }
 
   /**
@@ -691,6 +801,7 @@ export class Board {
       this.unitSprites.set(unit.id, container);
     }
     container.removeChildren();
+    this.clearStatusEffectTicks(unit.id);
 
     const texture = await this.iconFactory.getTexture(
       unit.definitionId,
@@ -701,8 +812,11 @@ export class Board {
     );
     const sprite = new Sprite(texture);
     sprite.anchor.set(0.5);
-    sprite.width = HEX_SIZE * UNIT_SPRITE_SCALE;
-    sprite.height = HEX_SIZE * UNIT_SPRITE_SCALE;
+    // Shrink Ray's applied effect ("Shrunk") shrinks the token itself rather
+    // than drawing an overlay - see StatusEffects.ts's "shrink" kind.
+    const shrinkScale = unit.effects.some((e) => statusVisualFor(e)?.kind === "shrink") ? 0.8 : 1;
+    sprite.width = HEX_SIZE * UNIT_SPRITE_SCALE * shrinkScale;
+    sprite.height = HEX_SIZE * UNIT_SPRITE_SCALE * shrinkScale;
     container.addChild(sprite);
 
     if (unit.dead) {
@@ -727,10 +841,8 @@ export class Board {
       new Graphics().rect(-barWidth / 2, barY, barWidth * hpFraction, 5).fill({ color: hpColor }),
     );
 
-    // Active-status display moved entirely into the sidebar effects list (see
-    // Hud.renderUnitPanel) - the board itself no longer renders floating
-    // status-flag text above units, just sprite + HP bar + strobe ring.
     container.alpha = 1;
+    this.renderUnitStatusEffects(container, unit);
 
     const pos = axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE);
     if (isNewUnit) {

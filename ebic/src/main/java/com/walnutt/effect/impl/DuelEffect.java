@@ -50,6 +50,10 @@ public class DuelEffect extends Effect {
         this.partner = partner;
     }
 
+    public Unit getOpponent() {
+        return opponent;
+    }
+
     /**
      * Upgrade wiring, set on the CASTER's half only. Both halves carry the vulnerability - the
      * exchange has to be symmetric - but only Valor's own Duel comes back up on a win.

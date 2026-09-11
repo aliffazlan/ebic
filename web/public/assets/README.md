@@ -65,6 +65,16 @@ in `web/src/ui/Hud.ts`/`web/src/board/Board.ts`). Naming: lowercase the enum val
 Spec: PNG, square, suggest 32×32, transparent background, simple enough to read at chip size
 (~16-20px).
 
+## `effects/` — board-level status-effect art (1 file, wired up)
+
+`banner.webp` is Valor's Duel banner, planted beside each duelist by
+`web/src/vfx/StatusEffectPlayer.ts`'s `spawnDuelBanners`. Unlike `status/`
+above (future sidebar chip icons, one per `StatusFlag`), this folder is for
+board-level status visuals keyed by effect *name* (`EffectSnapshot.name`,
+see `web/src/vfx/StatusEffects.ts`) - most of those effects render with
+generated shapes/particles rather than art, so this folder only grows when
+one specifically needs an image the way Duel's banner does.
+
 ## `ui/` — general UI/branding (not yet wired up, no fixed file list)
 
 Nothing here is required by name yet — this is a catch-all for whatever visual polish comes up:

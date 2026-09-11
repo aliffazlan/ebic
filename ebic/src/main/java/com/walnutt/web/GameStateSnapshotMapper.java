@@ -11,8 +11,10 @@ import com.walnutt.data.UnitDefinition;
 import com.walnutt.effect.Effect;
 import com.walnutt.effect.impl.AcidPoolEffect;
 import com.walnutt.effect.impl.BurningGroundEffect;
+import com.walnutt.effect.impl.DuelEffect;
 import com.walnutt.effect.impl.HomingMissileEffect;
 import com.walnutt.effect.impl.OrbEffect;
+import com.walnutt.effect.impl.StaticLinkEffect;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
@@ -167,6 +169,12 @@ public final class GameStateSnapshotMapper {
 
     private EffectSnapshot toEffectSnapshot(Effect effect) {
         boolean permanent = effect.getRemainingTurns() >= Effect.PERMANENT;
+        String partnerUnitId = null;
+        if (effect instanceof DuelEffect duel && duel.getOpponent() != null) {
+            partnerUnitId = ids.idFor(duel.getOpponent());
+        } else if (effect instanceof StaticLinkEffect link && link.getTarget() != null) {
+            partnerUnitId = ids.idFor(link.getTarget());
+        }
         return new EffectSnapshot(
             effect.getName(),
             effect.getDescription(),
@@ -174,7 +182,8 @@ public final class GameStateSnapshotMapper {
             permanent,
             permanent ? 0 : effect.getRemainingTurns(),
             effect.getStatusFlags().stream().map(Enum::name).toList(),
-            effect.getExtraInfo()
+            effect.getExtraInfo(),
+            partnerUnitId
         );
     }
 

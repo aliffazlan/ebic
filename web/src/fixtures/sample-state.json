@@ -21,7 +21,9 @@
       "dead": false,
       "hasMovedThisTurn": false,
       "hasAttackedThisTurn": false,
-      "statusFlags": [],
+      "statusFlags": [
+        "DUELING"
+      ],
       "abilities": [
         {
           "id": "counterstrike",
@@ -79,7 +81,20 @@
       ],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Duel",
+          "description": "Locked in a forced duel with Harbinger.",
+          "category": "NEUTRAL",
+          "permanent": false,
+          "remainingTurns": 4,
+          "statusFlags": [
+            "DUELING"
+          ],
+          "extraInfo": null,
+          "partnerUnitId": "u-harbinger"
+        }
+      ]
     },
     {
       "id": "u-dirge",
@@ -98,7 +113,8 @@
       "hasMovedThisTurn": true,
       "hasAttackedThisTurn": false,
       "statusFlags": [
-        "HIDDEN"
+        "HIDDEN",
+        "STUNNED"
       ],
       "abilities": [
         {
@@ -136,7 +152,30 @@
       ],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Missile Stun",
+          "description": "Stunned by a homing missile impact.",
+          "category": "DEBUFF",
+          "permanent": false,
+          "remainingTurns": 1,
+          "statusFlags": [
+            "STUNNED"
+          ],
+          "extraInfo": null,
+          "partnerUnitId": null
+        },
+        {
+          "name": "Poison",
+          "description": "Taking poison damage each turn.",
+          "category": "DEBUFF",
+          "permanent": false,
+          "remainingTurns": 3,
+          "statusFlags": [],
+          "extraInfo": "Poison x2 (6 dmg/turn)",
+          "partnerUnitId": null
+        }
+      ]
     },
     {
       "id": "u-basic-1",
@@ -158,7 +197,28 @@
       "abilities": [],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Nanobots",
+          "description": "Will strip the next cleansable debuff.",
+          "category": "BUFF",
+          "permanent": false,
+          "remainingTurns": 3,
+          "statusFlags": [],
+          "extraInfo": null,
+          "partnerUnitId": null
+        },
+        {
+          "name": "Shrunk",
+          "description": "Shrunk by Shrink Ray.",
+          "category": "DEBUFF",
+          "permanent": false,
+          "remainingTurns": 2,
+          "statusFlags": [],
+          "extraInfo": null,
+          "partnerUnitId": null
+        }
+      ]
     },
     {
       "id": "u-basic-2",
@@ -199,7 +259,8 @@
       "hasMovedThisTurn": false,
       "hasAttackedThisTurn": false,
       "statusFlags": [
-        "STUNNED"
+        "STUNNED",
+        "DUELING"
       ],
       "abilities": [
         {
@@ -253,7 +314,33 @@
       ],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Oblivion Confinement",
+          "description": "Imprisoned - stunned and invulnerable.",
+          "category": "DEBUFF",
+          "permanent": false,
+          "remainingTurns": 2,
+          "statusFlags": [
+            "STUNNED",
+            "INVULNERABLE"
+          ],
+          "extraInfo": null,
+          "partnerUnitId": null
+        },
+        {
+          "name": "Duel",
+          "description": "Locked in a forced duel with Valor.",
+          "category": "NEUTRAL",
+          "permanent": false,
+          "remainingTurns": 4,
+          "statusFlags": [
+            "DUELING"
+          ],
+          "extraInfo": null,
+          "partnerUnitId": "u-valor"
+        }
+      ]
     },
     {
       "id": "u-evayne",
@@ -311,7 +398,22 @@
       ],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Cloak and Dagger",
+          "description": "Hidden, waiting to ambush the first enemy to step here.",
+          "category": "NEUTRAL",
+          "permanent": false,
+          "remainingTurns": 2,
+          "statusFlags": [
+            "HIDDEN",
+            "INVULNERABLE",
+            "STUNNED"
+          ],
+          "extraInfo": null,
+          "partnerUnitId": null
+        }
+      ]
     },
     {
       "id": "u-basic-3",
@@ -333,7 +435,30 @@
       "abilities": [],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Feast",
+          "description": "Free attacks and lifesteal against the rooted victim.",
+          "category": "BUFF",
+          "permanent": false,
+          "remainingTurns": 2,
+          "statusFlags": [],
+          "extraInfo": null,
+          "partnerUnitId": null
+        },
+        {
+          "name": "Blizzard",
+          "description": "Caught in the blizzard - rooted.",
+          "category": "DEBUFF",
+          "permanent": false,
+          "remainingTurns": 2,
+          "statusFlags": [
+            "ROOTED"
+          ],
+          "extraInfo": null,
+          "partnerUnitId": null
+        }
+      ]
     },
     {
       "id": "u-discharge",
@@ -355,7 +480,18 @@
       "abilities": [],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Static Link",
+          "description": "Linked to Wei - steals damage and grants a free attack each turn.",
+          "category": "BUFF",
+          "permanent": true,
+          "remainingTurns": 0,
+          "statusFlags": [],
+          "extraInfo": null,
+          "partnerUnitId": "u-wei"
+        }
+      ]
     },
     {
       "id": "u-zenith",
@@ -377,7 +513,30 @@
       "abilities": [],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Doom",
+          "description": "Silenced - the next hit lands with lethal certainty.",
+          "category": "DEBUFF",
+          "permanent": true,
+          "remainingTurns": 0,
+          "statusFlags": [
+            "SILENCED"
+          ],
+          "extraInfo": "Next hit: 999 damage",
+          "partnerUnitId": null
+        },
+        {
+          "name": "Dilation",
+          "description": "Pulses time dilation onto nearby enemies each turn.",
+          "category": "BUFF",
+          "permanent": true,
+          "remainingTurns": 0,
+          "statusFlags": [],
+          "extraInfo": null,
+          "partnerUnitId": null
+        }
+      ]
     },
     {
       "id": "u-artemis",
@@ -395,11 +554,36 @@
       "dead": false,
       "hasMovedThisTurn": false,
       "hasAttackedThisTurn": false,
-      "statusFlags": [],
+      "statusFlags": [
+        "ROOTED"
+      ],
       "abilities": [],
       "attackRange": 3,
       "minAttackRange": 2,
-      "effects": []
+      "effects": [
+        {
+          "name": "Steady Focus",
+          "description": "Rooted in place, attack range extended.",
+          "category": "BUFF",
+          "permanent": false,
+          "remainingTurns": 3,
+          "statusFlags": [
+            "ROOTED"
+          ],
+          "extraInfo": null,
+          "partnerUnitId": null
+        },
+        {
+          "name": "Holy Shield",
+          "description": "Shielded by Thaddeus.",
+          "category": "BUFF",
+          "permanent": false,
+          "remainingTurns": 3,
+          "statusFlags": [],
+          "extraInfo": "Barrier: 40 HP remaining",
+          "partnerUnitId": null
+        }
+      ]
     },
     {
       "id": "u-wei",
@@ -421,7 +605,31 @@
       "abilities": [],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Poison Bloom",
+          "description": "A thick, spreading poison.",
+          "category": "DEBUFF",
+          "permanent": false,
+          "remainingTurns": 3,
+          "statusFlags": [],
+          "extraInfo": "Poison Bloom x3 (12 dmg/turn)",
+          "partnerUnitId": null
+        },
+        {
+          "name": "Cold Embrace",
+          "description": "Frozen solid and invulnerable.",
+          "category": "DEBUFF",
+          "permanent": false,
+          "remainingTurns": 1,
+          "statusFlags": [
+            "FROZEN",
+            "INVULNERABLE"
+          ],
+          "extraInfo": null,
+          "partnerUnitId": null
+        }
+      ]
     },
     {
       "id": "u-ember",
@@ -443,7 +651,28 @@
       "abilities": [],
       "attackRange": 1,
       "minAttackRange": 0,
-      "effects": []
+      "effects": [
+        {
+          "name": "Energy Shield",
+          "description": "Absorbs damage before it reaches this unit's health.",
+          "category": "BUFF",
+          "permanent": false,
+          "remainingTurns": 3,
+          "statusFlags": [],
+          "extraInfo": "Barrier: 60 HP remaining",
+          "partnerUnitId": null
+        },
+        {
+          "name": "Burn",
+          "description": "Taking burn damage each turn.",
+          "category": "DEBUFF",
+          "permanent": false,
+          "remainingTurns": 2,
+          "statusFlags": [],
+          "extraInfo": "Burn x2 (10 dmg/turn)",
+          "partnerUnitId": null
+        }
+      ]
     }
   ],
   "tileEffects": [
