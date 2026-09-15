@@ -5,6 +5,7 @@
 // proven end-to-end even before real per-event-type effects exist.
 
 import { Container, Graphics, Ticker } from "pixi.js";
+import { safeTick } from "./SafeTick";
 
 export interface BurstOptions {
   x: number;
@@ -15,13 +16,20 @@ export interface BurstOptions {
   /** lifetime in ticker frames */
   life?: number;
   radius?: number;
+  /** Degrees, 0 = right, 90 = down, -90 = up (screen convention). Spread is centred on this. Omit for a full 360° burst. */
+  directionDeg?: number;
+  /** Total angular spread in degrees around directionDeg. Default 70. Ignored when directionDeg is unset. */
+  spreadDeg?: number;
 }
 
 export function spawnParticleBurst(parent: Container, ticker: Ticker, opts: BurstOptions): void {
-  const { x, y, color = 0xffffff, count = 14, speed = 2.2, life = 32, radius = 3 } = opts;
+  const { x, y, color = 0xffffff, count = 14, speed = 2.2, life = 32, radius = 3, directionDeg, spreadDeg = 70 } = opts;
 
   for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+    const angle =
+      directionDeg === undefined
+        ? (Math.PI * 2 * i) / count + Math.random() * 0.4
+        : ((directionDeg + (Math.random() - 0.5) * spreadDeg) * Math.PI) / 180;
     const velocity = speed * (0.5 + Math.random() * 0.6);
     const vx = Math.cos(angle) * velocity;
     const vy = Math.sin(angle) * velocity;
@@ -31,7 +39,7 @@ export function spawnParticleBurst(parent: Container, ticker: Ticker, opts: Burs
     parent.addChild(dot);
 
     let elapsed = 0;
-    const tick = () => {
+    const tick = safeTick(() => {
       elapsed += 1;
       dot.position.x += vx;
       dot.position.y += vy;
@@ -40,7 +48,7 @@ export function spawnParticleBurst(parent: Container, ticker: Ticker, opts: Burs
         ticker.remove(tick);
         dot.destroy();
       }
-    };
+    });
     ticker.add(tick);
   }
 }

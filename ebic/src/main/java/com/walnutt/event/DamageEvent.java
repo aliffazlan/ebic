@@ -19,6 +19,7 @@ public final class DamageEvent implements GameEvent, Cancellable {
     private boolean bypassInvulnerability;
     private final List<String> logMessages = new ArrayList<>();
     private String causeLabel;
+    private Unit redirectedFrom;
 
     public DamageEvent(Unit source, Unit target, int damage) {
         this.source = source;
@@ -82,6 +83,15 @@ public final class DamageEvent implements GameEvent, Cancellable {
 
     public void setCauseLabel(String causeLabel) {
         this.causeLabel = causeLabel;
+    }
+
+    /** Set by a redirect mechanic (Refraction, ...) on the new DamageEvent it fires, naming who redirected it. Null otherwise. */
+    public Unit getRedirectedFrom() {
+        return redirectedFrom;
+    }
+
+    public void setRedirectedFrom(Unit redirectedFrom) {
+        this.redirectedFrom = redirectedFrom;
     }
 
     public List<String> getLogMessages() {

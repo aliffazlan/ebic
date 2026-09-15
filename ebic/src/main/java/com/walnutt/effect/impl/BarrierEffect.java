@@ -67,7 +67,9 @@ public class BarrierEffect extends Effect {
         event.modifyDamage(-absorbed);
 
         if (remainingBarrierHp <= 0) {
-            setRemainingTurns(0);
+            // Remove now rather than leaving this visible to the frontend until the owner's
+            // next scheduled sweep - a barrier can be depleted on either team's turn.
+            expireNow(state);
             onBarrierBroken(state);
         }
     }

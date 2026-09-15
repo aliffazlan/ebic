@@ -80,7 +80,9 @@ public class DoomEffect extends Effect {
     @Override
     public void onKill(GameState state, KillEvent event) {
         if (getOwner() != null && event.killer() == getOwner()) {
-            setRemainingTurns(0);
+            // Remove now rather than leaving this visible to the frontend until the owner's
+            // next scheduled sweep - a kill can land on either team's turn.
+            expireNow(state);
         }
     }
 }

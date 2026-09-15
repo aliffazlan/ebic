@@ -15,6 +15,7 @@ import {
   type IndicatorKind,
 } from "./VfxIndicators";
 import { cssHex } from "../ui/Colors";
+import { safeTick } from "./SafeTick";
 
 // Frame counts assume Ticker.shared's default ~60fps, matching the
 // frame-counting style used by ParticleBurst and Board's own animations.
@@ -167,7 +168,7 @@ export function spawnDamageIndicator(
   parent.addChild(group);
 
   let elapsed = 0;
-  const tick = () => {
+  const tick = safeTick(() => {
     elapsed += 1;
     const t = Math.min(1, elapsed / LIFE_FRAMES);
 
@@ -187,7 +188,7 @@ export function spawnDamageIndicator(
       group.destroy({ children: true });
       onComplete?.();
     }
-  };
+  });
   ticker.add(tick);
   return tick;
 }

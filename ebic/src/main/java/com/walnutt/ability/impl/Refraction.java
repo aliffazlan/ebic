@@ -4,6 +4,7 @@ import java.util.Optional;
 
 import com.walnutt.ability.PassiveAbility;
 import com.walnutt.data.AbilityDefinition;
+import com.walnutt.effect.impl.RefractionReadyEffect;
 import com.walnutt.event.DamageEvent;
 import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
@@ -25,6 +26,9 @@ public class Refraction extends PassiveAbility {
     public void onTurnStart(GameState state, TurnStartEvent event) {
         if (getOwner() != null && event.team() == getOwner().getTeam()) {
             usesRemainingThisTurn = maxCount;
+            if (usesRemainingThisTurn > 0 && getOwner().getActiveEffect(RefractionReadyEffect.class).isEmpty()) {
+                getOwner().addEffect(new RefractionReadyEffect());
+            }
         }
     }
 
@@ -44,6 +48,9 @@ public class Refraction extends PassiveAbility {
         boolean isFirst = usesRemainingThisTurn == maxCount;
         double efficiency = isFirst ? 1.0 : secondEfficiency;
         usesRemainingThisTurn--;
+        if (usesRemainingThisTurn <= 0) {
+            getOwner().getActiveEffect(RefractionReadyEffect.class).ifPresent(ready -> ready.spend(state));
+        }
 
         Unit newTarget = redirectTarget.get();
         int amount = event.getDamage();
@@ -58,6 +65,7 @@ public class Refraction extends PassiveAbility {
         }
         DamageEvent redirected = new DamageEvent(event.getSource(), newTarget, passedOn);
         redirected.setCauseLabel("Refraction");
+        redirected.setRedirectedFrom(getOwner());
         newTarget.takeDamage(state, redirected);
     }
 
@@ -68,5 +76,9 @@ public class Refraction extends PassiveAbility {
         // Mid-turn upgrades are possible (Shawl casts on his own turn), so top the allowance up
         // rather than leaving Lanaya on last turn's count until the next turn start.
         this.usesRemainingThisTurn = Math.max(usesRemainingThisTurn, maxCount);
+        if (usesRemainingThisTurn > 0 && getOwner() != null
+            && getOwner().getActiveEffect(RefractionReadyEffect.class).isEmpty()) {
+            getOwner().addEffect(new RefractionReadyEffect());
+        }
     }
 }

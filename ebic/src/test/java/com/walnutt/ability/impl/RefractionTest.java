@@ -1,6 +1,8 @@
 package com.walnutt.ability.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
@@ -9,6 +11,7 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 import com.walnutt.data.AbilityDefinition;
+import com.walnutt.effect.impl.RefractionReadyEffect;
 import com.walnutt.event.DamageEvent;
 import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
@@ -42,10 +45,16 @@ class RefractionTest {
         map.moveUnit(ally, map.getTile(new Position(0, 1))); // lanaya's only adjacent unit
 
         state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE)); // resets uses to 1
+        assertTrue(lanaya.getActiveEffect(RefractionReadyEffect.class).isPresent(),
+            "a charge is available, so the ready-to-refract marker should be present");
 
         lanaya.takeDamage(state, new DamageEvent(attacker, lanaya, 40));
         assertEquals(100, lanaya.getHealth(), "damage should have been redirected away from Lanaya");
         assertEquals(60, ally.getHealth(), "the adjacent ally should have taken it instead");
+        assertFalse(lanaya.getActiveEffect(RefractionReadyEffect.class).isPresent(),
+            "the single charge was just spent, so the marker should be gone immediately, not linger until endTurn");
+        assertTrue(lanaya.getEffects().stream().noneMatch(e -> e instanceof RefractionReadyEffect),
+            "removed from the raw effects list right away, not merely marked expired until the next sweep");
 
         // Second hit this turn: no uses left, so it applies normally.
         lanaya.takeDamage(state, new DamageEvent(attacker, lanaya, 25));

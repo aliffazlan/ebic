@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.data.AbilityDefinition;
+import com.walnutt.effect.impl.DuelEffect;
 import com.walnutt.event.TurnEndEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
@@ -62,6 +63,11 @@ class DuelTest {
         // Winner reward: +10 to all stats (non-basic multiplier doesn't apply, victim is BASIC) and 50% max HP heal.
         assertEquals(90, caster.getAttributeValue(com.walnutt.combat.Attribute.STRENGTH));
         assertFalse(caster.hasStatus(StatusFlag.DUELING)); // duel resolved, no longer locked
+        // The frontend serializes effects straight off getEffects(), unfiltered - so this has
+        // to actually be gone from the raw list right away, not merely expired-but-present
+        // until the winner's next scheduled sweep (see Effect.expireNow).
+        assertTrue(caster.getEffects().stream().noneMatch(e -> e instanceof DuelEffect),
+            "removed the instant the duel is won, not left lingering");
     }
 
     @Test
@@ -92,5 +98,9 @@ class DuelTest {
         assertFalse(victim.isDead());
         assertFalse(caster.hasStatus(StatusFlag.DUELING));
         assertFalse(victim.hasStatus(StatusFlag.DUELING));
+        assertTrue(caster.getEffects().stream().noneMatch(e -> e instanceof DuelEffect),
+            "removed the instant separation breaks it, not left lingering on the caster");
+        assertTrue(victim.getEffects().stream().noneMatch(e -> e instanceof DuelEffect),
+            "removed on the partner's side too, symmetrically");
     }
 }

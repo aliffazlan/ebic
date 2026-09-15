@@ -40,7 +40,16 @@ public class InfernalBladeEffect extends Effect {
         boolean pausedBySource = source != null && !source.isDead()
             && state.getMap().areAdjacent(owner.getPosition(), source.getPosition());
         if (!pausedBySource) {
-            setRemainingTurns(Math.max(0, getRemainingTurns() - 1));
+            int remaining = Math.max(0, getRemainingTurns() - 1);
+            setRemainingTurns(remaining);
+            if (remaining <= 0) {
+                // tick() is a no-op here (see class comment) - this onTurnEnd hook is the only
+                // place the duration ever actually decrements, and it's dispatched via
+                // TurnEndEvent, published AFTER Unit.endTurn's own sweep has already run for
+                // this turn - so without this, the curse would linger until the owner's next
+                // scheduled sweep, a full opponent turn away.
+                expireNow(state);
+            }
         }
     }
 

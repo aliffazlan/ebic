@@ -202,6 +202,13 @@ export interface VfxEvent {
   // Only set on "damage" events - human-readable damage source for the
   // combat log, e.g. "Attack", "Poison", "Counterstrike".
   causeLabel: string | null;
+  // Only set on a "damage" event whose damage was passed on by a redirect mechanic
+  // (Refraction) - names the unit that redirected it, distinct from sourceUnitId (the
+  // original attacker) and targetUnitId (who it landed on). Optional/undefined on
+  // every other event, rather than a required null like causeLabel, so the many
+  // existing VfxEvent literals across fixtures/tests don't all need updating for a
+  // field that's genuinely rare rather than always-applicable.
+  redirectedFromUnitId?: string | null;
 }
 
 export interface UnitDefinitionSnapshot {

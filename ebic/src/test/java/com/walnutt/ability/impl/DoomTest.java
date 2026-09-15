@@ -2,7 +2,7 @@ package com.walnutt.ability.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -59,11 +59,11 @@ class DoomTest {
         state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_TWO));
         assertEquals(500 - 20 - 40, victim.getHealth(), "second tick escalates by dmg_increase");
 
-        // Victim lands a kill (on the bystander) - Doom should end immediately, silence lifted.
+        // Victim lands a kill (on the bystander) - Doom should end immediately, silence lifted,
+        // and the effect actually removed rather than left present-but-expired until the next
+        // scheduled sweep (see Effect.expireNow).
         state.getEventBus().publish(state, new KillEvent(victim, bystander));
-        DoomEffect effect = findDoom(victim);
-        assertNotNull(effect);
-        assertTrue(effect.isExpired());
+        assertNull(findDoom(victim), "the curse is removed the instant it expires");
         assertFalse(victim.hasStatus(StatusFlag.SILENCED), "curse lifted the instant the victim gets a kill");
 
         int healthAfterKill = victim.getHealth();

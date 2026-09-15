@@ -52,6 +52,29 @@ class HarbingerUpgradeTest {
         assertEquals(2, blastsFrom(true));
     }
 
+    /**
+     * The frontend serializes a unit's effects list straight off unit.getEffects(), with no
+     * expired/resolved filtering - so "pending" lingering in that raw list even after
+     * detonation reads as a still-charging orb overlapping the actual blast (see
+     * Effect.expireNow and OrbEffect.onTurnStart).
+     */
+    @Test
+    void thePendingEffectIsRemovedImmediatelyOnDetonation_notLeftLingeringUntilEndTurn() {
+        UpgradeFixture f = UpgradeFixture.create();
+        Unit harbinger = f.heroWith("Harbinger", Team.PLAYER_ONE, new UnitStats(30, 30, 100, 2000),
+            0, 0, false, "sanity_eclipse");
+        f.basic("Victim", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 5000), 0, 2);
+
+        on(harbinger, "sanity_eclipse").onUse(f.state(), new TileTarget(f.map().getTile(new Position(0, 2))));
+        OrbEffect orb = harbinger.getActiveEffect(OrbEffect.class).orElseThrow();
+        assertTrue(harbinger.getEffects().contains(orb), "charging - still present");
+
+        orb.onTurnStart(f.state(), new TurnStartEvent(Team.PLAYER_ONE));
+
+        assertFalse(harbinger.getEffects().contains(orb),
+            "removed the instant it detonates, not left present-but-expired until endTurn's sweep");
+    }
+
     @Test
     void upgradedObjurgationBurnsEveryPointOfIntelligenceToSurviveAKillingBlow() {
         UpgradeFixture f = UpgradeFixture.create();
@@ -67,6 +90,11 @@ class HarbingerUpgradeTest {
         assertEquals(0, harbinger.getAttributeValue(Attribute.INTELLIGENCE), "and there is none left");
     }
 
+    /**
+     * Base kit is a conditional barrier, not a guarantee - it mitigates a survivable hit but
+     * does not save him from one that is genuinely fatal (that guarantee is the upgrade's own
+     * perk, see upgradedObjurgationBurnsEveryPointOfIntelligenceToSurviveAKillingBlow).
+     */
     @Test
     void theBaseObjurgationBurnsOnlyItsUsualShare() {
         UpgradeFixture f = UpgradeFixture.create();
@@ -75,11 +103,29 @@ class HarbingerUpgradeTest {
         Unit enemy = f.basic("Enemy", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 1000), 0, 1);
         harbinger.getHealthPool().setCurrent(50);
 
-        harbinger.takeDamage(f.state(), new DamageEvent(enemy, harbinger, 500));
+        // 20% of 100 intelligence, at 1 hp per point, is a 20 hp barrier - big enough to
+        // fully absorb a 15-damage hit while leaving 5 hp of it standing afterwards.
+        harbinger.takeDamage(f.state(), new DamageEvent(enemy, harbinger, 15));
 
         assertFalse(harbinger.isDead());
-        assertEquals(20, harbinger.getHealth(), "20% of 100 intelligence");
-        assertEquals(80, harbinger.getAttributeValue(Attribute.INTELLIGENCE));
+        assertEquals(50, harbinger.getHealth(), "the barrier ate the whole hit");
+        assertEquals(80, harbinger.getAttributeValue(Attribute.INTELLIGENCE), "20% burned regardless of how much of the barrier was spent");
+        assertEquals(5, harbinger.getActiveEffect(com.walnutt.effect.impl.BarrierEffect.class)
+            .orElseThrow().getRemainingBarrierHp(), "5 hp of the 20 hp barrier survived the hit");
+    }
+
+    /** A hit too big for the barrier alone still gets partial mitigation, but is not survived. */
+    @Test
+    void theBaseObjurgationDoesNotGuaranteeSurvivingAGenuinelyFatalBlow() {
+        UpgradeFixture f = UpgradeFixture.create();
+        Unit harbinger = f.heroWith("Harbinger", Team.PLAYER_ONE, new UnitStats(30, 30, 100, 2000),
+            0, 0, false, "objurgation");
+        Unit enemy = f.basic("Enemy", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 1000), 0, 1);
+        harbinger.getHealthPool().setCurrent(50);
+
+        harbinger.takeDamage(f.state(), new DamageEvent(enemy, harbinger, 500));
+
+        assertTrue(harbinger.isDead(), "the 20 hp barrier is nowhere near enough to stop this");
     }
 
     @Test

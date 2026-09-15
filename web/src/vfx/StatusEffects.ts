@@ -17,6 +17,7 @@ export type UnitStatusVisualKind =
   | "ice"
   | "shield"
   | "snow"
+  | "snowflakes"
   | "energy-bars"
   | "doom"
   | "shrink";
@@ -27,6 +28,8 @@ export interface UnitStatusVisual {
   color: number;
   /** Poison Bloom only - thicker/denser smoke than the plain smoke kinds. */
   thick?: boolean;
+  /** translucent-circle only - Objurgation Barrier renders slightly larger than the token. Default 1. */
+  radiusMultiplier?: number;
 }
 
 export interface TileStatusVisual {
@@ -55,21 +58,24 @@ const ENERGY_BLUE = 0x60a5fa;
 const NANOBOTS_BLUE = 0xa5f3fc;
 const POISON_GREEN = 0xbef264;
 const POISON_BLOOM_GREEN = 0x166534;
+const OBJURGATION_BLUE = 0x93c5fd;
+const FROSTBITE_BLUE = 0xbfe7ff;
+const REFRACTION_PINK = 0xf9a8d4;
 
 /**
  * One entry per effect name (see EffectSnapshot.name, sourced from the
  * backend's `super("Name", ...)` calls in effect/impl/*.java) with a listed
  * visual in temp/abilities.txt. "Energy Shield" covers both Maxwell's cast
- * and its passive regen form - both use that exact name. "Dilation Field" is
- * the 1-turn debuff DilationEffect pulses onto nearby enemies each of the
- * caster's turns; "Dilation" is the caster's own passive - both get the same
- * pulse visual since either can be the one actually visible in a snapshot.
+ * and its passive regen form - both use that exact name. "Dilation Field"
+ * (the 1-turn debuff DilationEffect pulses onto nearby enemies) deliberately
+ * has no entry of its own - the caster's own enlarged aura circle already
+ * covers every affected tile, so a second pulse per enemy would be redundant.
  */
 export const STATUS_VISUAL_BY_EFFECT_NAME: Record<string, StatusVisualSpec> = {
   Dilation: { mode: "unit", kind: "pulse", color: DARK_PURPLE },
-  "Dilation Field": { mode: "unit", kind: "pulse", color: DARK_PURPLE },
   Burn: { mode: "unit", kind: "ember", color: EMBER_ORANGE },
   "Oblivion Confinement": { mode: "unit", kind: "translucent-circle", color: OBLIVION_BLUE },
+  "Objurgation Barrier": { mode: "unit", kind: "translucent-circle", color: OBJURGATION_BLUE, radiusMultiplier: 1.15 },
   Duel: { mode: "pair", kind: "banner", color: WHITE },
   "Steady Focus": { mode: "unit", kind: "smoke", color: LIGHT_GRAY },
   "Cold Embrace": { mode: "unit", kind: "ice", color: BRIGHT_ICE_BLUE },
@@ -84,6 +90,10 @@ export const STATUS_VISUAL_BY_EFFECT_NAME: Record<string, StatusVisualSpec> = {
   "Poison Bloom": { mode: "unit", kind: "smoke", color: POISON_BLOOM_GREEN, thick: true },
   "Holy Shield": { mode: "unit", kind: "shield", color: WHITE },
   Blizzard: { mode: "unit", kind: "snow", color: WHITE },
+  Frostbite: { mode: "unit", kind: "snowflakes", color: FROSTBITE_BLUE },
+  // Cosmetic-only marker (see RefractionReadyEffect.java) - present exactly while
+  // Lanaya has an unspent Refraction charge this turn.
+  "Refraction Ready": { mode: "unit", kind: "translucent-circle", color: REFRACTION_PINK },
 };
 
 /**

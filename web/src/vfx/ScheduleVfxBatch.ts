@@ -4,7 +4,14 @@
 // this exact orchestration rather than each hand-rolling their own stagger
 // loop that can silently drift apart.
 
-import { attackAnimationDurationMs, attackAnimationFor, partitionVfxBatch, type AttackAnimationSpec } from "./AttackAnimations";
+import {
+  abilityDamageAnimationFor,
+  attackAnimationDurationMs,
+  attackAnimationFor,
+  partitionVfxBatch,
+  perplexingShotSpecForChainIndex,
+  type AttackAnimationSpec,
+} from "./AttackAnimations";
 import { groupIndicators, indicatorFor, type IndicatorSpec } from "./VfxIndicators";
 import { INDICATOR_GROUP_GAP_MS, type IndicatorScheduler } from "./IndicatorScheduler";
 import type { VfxEvent } from "../types/contract";
@@ -50,8 +57,28 @@ export interface VfxBatchDeps {
  * long this batch's queue takes to actually drain - see Board.playAttackAnimation
  * and DisplayedUnitState for why this matters.
  */
+/**
+ * Sky-drop origin for Orbital Beam's per-hit beam - offset far enough above
+ * the target that it reads as "from above the map" at any zoom/pan, per
+ * temp/abilities2.txt. Plain pixel math, not a real map position - nothing
+ * downstream needs it to correspond to an actual tile.
+ */
+const ORBITAL_BEAM_SKY_OFFSET_PX = 600;
+/**
+ * Orbital Beam's stagger between successive beams in one cast (the upgrade's
+ * global volley) - shorter than the beam's own 800ms duration so the next
+ * one spawns in just before the previous finishes, per temp/abilities2.txt.
+ */
+const ORBITAL_BEAM_GAP_MS = 600;
+/**
+ * Eye of the Storm's bolts originate near the caster's own portrait, not its
+ * centre - plain pixel offset upward, same "not a real map position" idiom as
+ * ORBITAL_BEAM_SKY_OFFSET_PX above, tuned to roughly the top of a unit's icon.
+ */
+const EYE_OF_THE_STORM_ORIGIN_OFFSET_PX = 22;
+
 export function scheduleVfxBatch(events: VfxEvent[], deps: VfxBatchDeps): void {
-  const { attackEvents, otherEvents } = partitionVfxBatch(events);
+  const { attackEvents, abilityDamageEvents, otherEvents } = partitionVfxBatch(events);
   deps.playVfx(otherEvents);
 
   const attackSteps = attackEvents.map((event) => {
@@ -70,6 +97,98 @@ export function scheduleVfxBatch(events: VfxEvent[], deps: VfxBatchDeps): void {
         if (indicatorSpec) deps.showIndicatorAt(to, indicatorSpec);
       });
     }, durationMs);
+  }
+
+  // Ability damage that gets its own animation (Fireblast, Perplexing Shot's chain,
+  // Orbital Beam's sky beam) - same enqueue/onComplete-gated-indicator shape as a
+  // basic attack, but keyed by causeLabel rather than the attacker's unit type, and
+  // each cause label gets its own position/gap override below. Perplexing Shot's
+  // chain index is tracked per source unit across this one batch, since a bounce's
+  // damage event carries no "which link in the chain is this" field of its own -
+  // resetting per batch is correct because one cast's whole chain always arrives
+  // together (PerplexingShot.java fires every jump's DamageEvent in the same turn).
+  const perplexingChainIndexBySource = new Map<string, number>();
+  const perplexingPrevTargetBySource = new Map<string, { x: number; y: number }>();
+
+  // Eye of the Storm resolves every target in one synchronous backend hook (see
+  // EyeOfTheStormEffect), so all its damage events already arrive together in this
+  // one batch - handled as its own group below so every bolt fires in the same
+  // enqueue() step instead of the staggered one-event-per-step treatment every
+  // other ability damage cause label gets.
+  const eyeOfTheStormEvents = abilityDamageEvents.filter((e) => e.causeLabel === "Eye of the Storm");
+  const staggeredAbilityDamageEvents = abilityDamageEvents.filter((e) => e.causeLabel !== "Eye of the Storm");
+
+  const abilityDamageSteps = staggeredAbilityDamageEvents.map((event) => {
+    const to = deps.resolveUnitPosition(event.targetUnitId);
+    let from = deps.resolveUnitPosition(event.sourceUnitId);
+    let spec = abilityDamageAnimationFor(event.causeLabel);
+    let gapMs = spec ? attackAnimationDurationMs(spec) : 0;
+
+    if (event.causeLabel === "Perplexing Shot" && event.sourceUnitId) {
+      const chainIndex = perplexingChainIndexBySource.get(event.sourceUnitId) ?? 0;
+      spec = perplexingShotSpecForChainIndex(chainIndex);
+      const prevTarget = perplexingPrevTargetBySource.get(event.sourceUnitId);
+      if (chainIndex > 0 && prevTarget) from = prevTarget;
+      perplexingChainIndexBySource.set(event.sourceUnitId, chainIndex + 1);
+      if (to) perplexingPrevTargetBySource.set(event.sourceUnitId, to);
+      gapMs = attackAnimationDurationMs(spec);
+    } else if ((event.causeLabel === "Orbital Beam" || event.causeLabel === "Pylon Orbital Beam") && to) {
+      // A pylon's own volley (PylonOrbitalBeam.java) fires under this distinct causeLabel,
+      // not "Orbital Beam" (see ABILITY_DAMAGE_ANIMATION_BY_CAUSE_LABEL) - same sky-beam
+      // origin either way. Previously only "Orbital Beam" was matched here, so a pylon's
+      // beam fell through to the default `from` (its own position) instead of the sky.
+      from = { x: to.x, y: to.y - ORBITAL_BEAM_SKY_OFFSET_PX };
+      gapMs = ORBITAL_BEAM_GAP_MS;
+    } else if (event.causeLabel === "Refraction" && event.redirectedFromUnitId) {
+      // The beam should run from whoever redirected the blow (Lanaya), not the
+      // original attacker (sourceUnitId) - see VfxEvent.redirectedFromUnitId.
+      from = deps.resolveUnitPosition(event.redirectedFromUnitId);
+    }
+
+    const indicatorSpec = indicatorFor(event);
+    if (indicatorSpec) deps.beginPendingHpChange(indicatorSpec.unitId);
+    return { spec, gapMs, from, to, indicatorSpec };
+  });
+  for (const { spec, gapMs, from, to, indicatorSpec } of abilityDamageSteps) {
+    if (!spec) continue; // defensive - shouldn't happen, causeLabel was already checked to qualify
+    deps.indicators.enqueue(() => {
+      if (!from || !to) return;
+      deps.playAttackAnimation(from, to, spec, () => {
+        if (indicatorSpec) deps.showIndicatorAt(to, indicatorSpec);
+      });
+    }, gapMs);
+  }
+
+  const eyeOfTheStormBySource = new Map<string, VfxEvent[]>();
+  for (const event of eyeOfTheStormEvents) {
+    const key = event.sourceUnitId ?? "";
+    const list = eyeOfTheStormBySource.get(key) ?? [];
+    list.push(event);
+    eyeOfTheStormBySource.set(key, list);
+  }
+  for (const groupEvents of eyeOfTheStormBySource.values()) {
+    const spec = abilityDamageAnimationFor("Eye of the Storm");
+    if (!spec) continue; // defensive - shouldn't happen, the table entry was just added above
+    const gapMs = attackAnimationDurationMs(spec);
+    const strikes = groupEvents.map((event) => {
+      const casterPos = deps.resolveUnitPosition(event.sourceUnitId);
+      const from = casterPos ? { x: casterPos.x, y: casterPos.y - EYE_OF_THE_STORM_ORIGIN_OFFSET_PX } : null;
+      const to = deps.resolveUnitPosition(event.targetUnitId);
+      const indicatorSpec = indicatorFor(event);
+      if (indicatorSpec) deps.beginPendingHpChange(indicatorSpec.unitId);
+      return { from, to, indicatorSpec };
+    });
+    // One enqueue() step for the whole group - every strike's playAttackAnimation call
+    // starts within the same synchronous callback, so all bolts flash together rather
+    // than one-after-another like every other ability damage cause label.
+    deps.indicators.enqueue(() => {
+      for (const { from, to, indicatorSpec } of strikes) {
+        if (!from || !to) continue;
+        deps.playAttackAnimation(from, to, spec, () => {
+          if (indicatorSpec) deps.showIndicatorAt(to, indicatorSpec);
+        });
+      }
+    }, gapMs);
   }
 
   const groups = groupIndicators(otherEvents);

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { scheduleVfxBatch, type VfxBatchDeps } from "./ScheduleVfxBatch";
 import { IndicatorScheduler } from "./IndicatorScheduler";
-import { SLASH_DURATION_MS } from "./AttackAnimations";
+import { LIGHTNING_DURATION_MS, SLASH_DURATION_MS } from "./AttackAnimations";
 import type { VfxEvent } from "../types/contract";
 
 function damage(
@@ -123,5 +123,60 @@ describe("scheduleVfxBatch", () => {
     positionY = 999;
     vi.advanceTimersByTime(0);
     expect(calls.find((c) => c.startsWith("anim:"))).toBe("anim:0,0->0,0");
+  });
+
+  it("routes Fireblast/Perplexing Shot/Orbital Beam damage through playAttackAnimation, not the generic burst", () => {
+    const { deps, calls } = makeDeps();
+    scheduleVfxBatch(
+      [damage("Fireblast", 24, "u9", "u1"), damage("Poison", 5, "u9", "u1")],
+      deps,
+    );
+    expect(calls[0]).toBe("playVfx:1"); // only the Poison event
+    vi.advanceTimersByTime(0);
+    expect(calls.some((c) => c.startsWith("anim:"))).toBe(true);
+  });
+
+  it("chains Perplexing Shot's bounces from hit to hit, widening the bolt each time", () => {
+    const specs: number[] = [];
+    const { deps, calls } = makeDeps({
+      playAttackAnimation: (from, to, spec, onComplete) => {
+        calls.push(`anim:${from.x},${from.y}->${to.x},${to.y}`);
+        specs.push(spec.strokes[0].width!);
+        onComplete();
+      },
+    });
+    // u9 (caster) -> u1 -> u22 -> u333, three hits in one chain.
+    scheduleVfxBatch(
+      [
+        damage("Perplexing Shot", 30, "u9", "u1"),
+        damage("Perplexing Shot", 50, "u9", "u22"),
+        damage("Perplexing Shot", 70, "u9", "u333"),
+      ],
+      deps,
+    );
+    vi.advanceTimersByTime(0);
+    let anims = calls.filter((c) => c.startsWith("anim:"));
+    expect(anims[0]).toBe("anim:2,0->2,0"); // caster ("u9".length=2) -> u1 ("u1".length=2)
+    vi.advanceTimersByTime(LIGHTNING_DURATION_MS);
+    anims = calls.filter((c) => c.startsWith("anim:"));
+    expect(anims[1]).toBe("anim:2,0->3,0"); // previous target (u1) -> u22 ("u22".length=3)
+    vi.advanceTimersByTime(LIGHTNING_DURATION_MS);
+    anims = calls.filter((c) => c.startsWith("anim:"));
+    expect(anims[2]).toBe("anim:3,0->4,0"); // previous target (u22) -> u333
+    expect(specs).toEqual([2, 3, 4]);
+  });
+
+  it("spawns Orbital Beam from above its target and staggers repeated beams by their own 600ms gap", () => {
+    const { deps, calls } = makeDeps();
+    scheduleVfxBatch(
+      [damage("Orbital Beam", 60, "u9", "u1"), damage("Orbital Beam", 60, "u9", "u1")],
+      deps,
+    );
+    vi.advanceTimersByTime(0);
+    expect(calls.filter((c) => c.startsWith("anim:"))).toEqual(["anim:2,-600->2,0"]);
+    vi.advanceTimersByTime(599);
+    expect(calls.filter((c) => c.startsWith("anim:"))).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(calls.filter((c) => c.startsWith("anim:"))).toEqual(["anim:2,-600->2,0", "anim:2,-600->2,0"]);
   });
 });

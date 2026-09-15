@@ -19,6 +19,7 @@
 import { Assets, Container, Graphics, GraphicsContext, Sprite, Texture, Ticker } from "pixi.js";
 import { hexCorner, hexPolygonPoints, type PixelCoord } from "../hex/HexMath";
 import { cssHex } from "../ui/Colors";
+import { safeTick } from "./SafeTick";
 import type { UnitStatusVisual } from "./StatusEffects";
 import iceSvg from "./icons/ice.svg?raw";
 import shieldSvg from "./icons/shield.svg?raw";
@@ -49,8 +50,10 @@ export function spawnUnitStatusOverlay(
       return spawnPulseCircle(parent, ticker, spec.color);
     case "ember":
       return spawnEmberEmitter(parent, ticker, spec.color);
+    case "snowflakes":
+      return spawnSnowflakeEmitter(parent, ticker, spec.color);
     case "translucent-circle":
-      return spawnTranslucentCircle(parent, spec.color, tokenRadiusPx);
+      return spawnTranslucentCircle(parent, spec.color, tokenRadiusPx * (spec.radiusMultiplier ?? 1));
     case "smoke":
       return spawnSmokeEmitter(parent, ticker, spec.color, spec.thick ?? false, tokenRadiusPx);
     case "ice":
@@ -58,7 +61,8 @@ export function spawnUnitStatusOverlay(
     case "shield":
       return spawnIconOverlay(parent, "shield", spec.color, tokenRadiusPx * 1.8, 0.5);
     case "snow":
-      return spawnIconOverlay(parent, "snow", spec.color, tokenRadiusPx * 2.0, 0.7);
+      // Was drawn far too big - trimmed 60% narrower, 20% shorter per temp/abilities2.txt.
+      return spawnIconOverlay(parent, "snow", spec.color, tokenRadiusPx * 2.0, 0.7, 0.4, 0.8);
     case "energy-bars":
       return spawnEnergyBars(parent, ticker, spec.color, tokenRadiusPx);
     case "doom":
@@ -84,7 +88,7 @@ function spawnStunStars(parent: Container, ticker: Ticker, color: number): (() =
     parent.addChild(g);
     return g;
   });
-  const tick = () => {
+  const tick = safeTick(() => {
     const t = now();
     for (let i = 0; i < stars.length; i++) {
       const phase = (t / STUN_ORBIT_PERIOD_MS) * Math.PI * 2 + (i * Math.PI * 2) / STUN_STAR_COUNT;
@@ -98,7 +102,7 @@ function spawnStunStars(parent: Container, ticker: Ticker, color: number): (() =
       star.clear();
       drawSparkle(star, STUN_STAR_SIZE, color);
     }
-  };
+  });
   ticker.add(tick);
   return [tick];
 }
@@ -117,19 +121,22 @@ function drawSparkle(g: Graphics, size: number, color: number): void {
 }
 
 // --- pulse: expanding translucent ring, repeats for the effect's duration ---
+// Dilation only - radius doubled to cover every surrounding tile the buff
+// actually affects, opacity trimmed 10% per temp/abilities2.txt.
 
 const PULSE_PERIOD_MS = 2000;
-const PULSE_MIN_RADIUS_PX = 10;
-const PULSE_MAX_RADIUS_PX = 30;
+const PULSE_MIN_RADIUS_PX = 20;
+const PULSE_MAX_RADIUS_PX = 60;
+const PULSE_ALPHA_SCALE = 0.9;
 
 function spawnPulseCircle(parent: Container, ticker: Ticker, color: number): (() => void)[] {
   const g = new Graphics();
   parent.addChild(g);
-  const tick = () => {
+  const tick = safeTick(() => {
     const progress = (now() % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
     const radius = PULSE_MIN_RADIUS_PX + (PULSE_MAX_RADIUS_PX - PULSE_MIN_RADIUS_PX) * progress;
-    g.clear().circle(0, 0, radius).stroke({ width: 2, color, alpha: 1 - progress });
-  };
+    g.clear().circle(0, 0, radius).stroke({ width: 2, color, alpha: (1 - progress) * PULSE_ALPHA_SCALE });
+  });
   ticker.add(tick);
   return [tick];
 }
@@ -143,13 +150,13 @@ const EMBER_GRAVITY = 0.09;
 
 function spawnEmberEmitter(parent: Container, ticker: Ticker, color: number): (() => void)[] {
   let nextSpawn = now();
-  const tick = () => {
+  const tick = safeTick(() => {
     const t = now();
     if (t >= nextSpawn) {
       nextSpawn = t + EMBER_INTERVAL_MS;
       spawnEmberParticle(parent, ticker, color);
     }
-  };
+  });
   ticker.add(tick);
   return [tick];
 }
@@ -162,7 +169,7 @@ function spawnEmberParticle(parent: Container, ticker: Ticker, color: number): v
   const vx = (Math.random() < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.3);
   let vy = -1.6 - Math.random() * 0.5;
   let elapsed = 0;
-  const tick = () => {
+  const tick = safeTick(() => {
     elapsed += 1;
     vy += EMBER_GRAVITY;
     dot.position.x += vx;
@@ -172,8 +179,65 @@ function spawnEmberParticle(parent: Container, ticker: Ticker, color: number): v
       ticker.remove(tick);
       dot.destroy();
     }
-  };
+  });
   ticker.add(tick);
+}
+
+// --- snowflakes: small drifting flakes fall past the unit, one every 0.4s ---
+// Frostbite only - deliberately distinct from Blizzard's static "snow" SVG icon
+// overlay (see StatusEffects.ts) so the two effects don't read as the same thing.
+
+const SNOWFLAKE_INTERVAL_MS = 400;
+const SNOWFLAKE_LIFE_FRAMES = 60;
+const SNOWFLAKE_SIZE_PX = 3;
+const SNOWFLAKE_FALL_SPEED = 0.6;
+const SNOWFLAKE_DRIFT_AMPLITUDE = 6;
+
+function spawnSnowflakeEmitter(parent: Container, ticker: Ticker, color: number): (() => void)[] {
+  let nextSpawn = now();
+  const tick = safeTick(() => {
+    const t = now();
+    if (t >= nextSpawn) {
+      nextSpawn = t + SNOWFLAKE_INTERVAL_MS;
+      spawnSnowflakeParticle(parent, ticker, color);
+    }
+  });
+  ticker.add(tick);
+  return [tick];
+}
+
+/** Self-contained and self-cleaning, same as spawnEmberParticle - not tracked by Board's own teardown set. */
+function spawnSnowflakeParticle(parent: Container, ticker: Ticker, color: number): void {
+  const flake = new Graphics();
+  drawSnowflake(flake, SNOWFLAKE_SIZE_PX, color);
+  const startX = (Math.random() - 0.5) * 28;
+  flake.position.set(startX, -18);
+  parent.addChild(flake);
+  const driftPhase = Math.random() * Math.PI * 2;
+  let elapsed = 0;
+  const tick = safeTick(() => {
+    elapsed += 1;
+    flake.position.y += SNOWFLAKE_FALL_SPEED;
+    flake.position.x = startX + Math.sin(driftPhase + elapsed * 0.15) * SNOWFLAKE_DRIFT_AMPLITUDE;
+    flake.rotation += 0.03;
+    flake.alpha = Math.max(0, 1 - elapsed / SNOWFLAKE_LIFE_FRAMES);
+    if (elapsed >= SNOWFLAKE_LIFE_FRAMES) {
+      ticker.remove(tick);
+      flake.destroy();
+    }
+  });
+  ticker.add(tick);
+}
+
+/** A simple 6-point asterisk, cheaper than parsing an SVG for a shape this small. */
+function drawSnowflake(g: Graphics, size: number, color: number): void {
+  for (let i = 0; i < 3; i++) {
+    const angle = (i * Math.PI) / 3;
+    const dx = Math.cos(angle) * size;
+    const dy = Math.sin(angle) * size;
+    g.moveTo(-dx, -dy).lineTo(dx, dy);
+  }
+  g.stroke({ width: 1, color });
 }
 
 // --- translucent circle: a static overlay shape (not a filter - see StatusEffects.ts) ---
@@ -195,13 +259,13 @@ const SMOKE_LIFE_FRAMES = 45;
 
 function spawnSmokeEmitter(parent: Container, ticker: Ticker, color: number, thick: boolean, radiusPx: number): (() => void)[] {
   let nextSpawn = now();
-  const tick = () => {
+  const tick = safeTick(() => {
     const t = now();
     if (t >= nextSpawn) {
       nextSpawn = t + SMOKE_INTERVAL_MS;
       spawnSmokeWisp(parent, ticker, color, thick, radiusPx);
     }
-  };
+  });
   ticker.add(tick);
   return [tick];
 }
@@ -214,7 +278,7 @@ function spawnSmokeWisp(parent: Container, ticker: Ticker, color: number, thick:
   parent.addChild(wisp);
   const drift = (Math.random() - 0.5) * 0.3;
   let elapsed = 0;
-  const tick = () => {
+  const tick = safeTick(() => {
     elapsed += 1;
     wisp.position.x += drift;
     wisp.position.y -= 0.5;
@@ -223,7 +287,7 @@ function spawnSmokeWisp(parent: Container, ticker: Ticker, color: number, thick:
       ticker.remove(tick);
       wisp.destroy();
     }
-  };
+  });
   ticker.add(tick);
 }
 
@@ -244,11 +308,19 @@ function overlayIconContextFor(kind: "ice" | "shield" | "snow", color: number): 
   return context;
 }
 
-function spawnIconOverlay(parent: Container, kind: "ice" | "shield" | "snow", color: number, heightPx: number, alpha: number): (() => void)[] {
+function spawnIconOverlay(
+  parent: Container,
+  kind: "ice" | "shield" | "snow",
+  color: number,
+  heightPx: number,
+  alpha: number,
+  scaleXMultiplier = 1,
+  scaleYMultiplier = 1,
+): (() => void)[] {
   const view = new Graphics({ context: overlayIconContextFor(kind, color) });
   const bounds = view.getLocalBounds();
   const scale = bounds.height > 0 ? heightPx / bounds.height : 1;
-  view.scale.set(scale);
+  view.scale.set(scale * scaleXMultiplier, scale * scaleYMultiplier);
   view.pivot.set(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   view.alpha = alpha;
   parent.addChild(view);
@@ -264,9 +336,9 @@ function spawnDoom(parent: Container, ticker: Ticker, color: number): (() => voi
   const g = new Graphics();
   drawPentagram(g, DOOM_RADIUS_PX, color);
   parent.addChild(g);
-  const tick = () => {
+  const tick = safeTick(() => {
     g.rotation = ((now() % DOOM_ROTATE_PERIOD_MS) / DOOM_ROTATE_PERIOD_MS) * Math.PI * 2;
-  };
+  });
   ticker.add(tick);
   return [tick];
 }
@@ -309,10 +381,10 @@ function spawnEnergyBars(parent: Container, ticker: Ticker, color: number, radiu
   };
   const jitter = () => (Math.random() - 0.5) * 2 * ENERGY_JITTER_PX;
   draw();
-  const tick = () => {
+  const tick = safeTick(() => {
     frame += 1;
     if (frame % ENERGY_JITTER_INTERVAL_FRAMES === 0) draw();
-  };
+  });
   ticker.add(tick);
   return [tick];
 }
@@ -407,10 +479,10 @@ export function spawnStaticLink(parent: Container, ticker: Ticker, a: PixelCoord
   let frame = 0;
   const draw = () => drawJitterLine(g, a, b, STATIC_LINK_SEGMENTS, STATIC_LINK_JITTER_PX, STATIC_LINK_WIDTH_PX, color);
   draw();
-  const tick = () => {
+  const tick = safeTick(() => {
     frame += 1;
     if (frame % STATIC_LINK_JITTER_INTERVAL_FRAMES === 0) draw();
-  };
+  });
   ticker.add(tick);
   return tick;
 }

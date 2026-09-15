@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  ABILITY_DAMAGE_ANIMATION_BY_CAUSE_LABEL,
   ATTACK_ANIMATION_CAUSE_LABELS,
   BEAM_DURATION_MS,
   DEFAULT_ATTACK_ANIMATION,
   LIGHTNING_DURATION_MS,
   SLASH_DURATION_MS,
+  abilityDamageAnimationFor,
   attackAnimationDurationMs,
   attackAnimationFor,
   partitionVfxBatch,
+  perplexingShotSpecForChainIndex,
+  qualifiesForAbilityDamageAnimation,
   qualifiesForAttackAnimation,
 } from "./AttackAnimations";
 import type { VfxEvent } from "../types/contract";
@@ -112,12 +116,66 @@ describe("partitionVfxBatch", () => {
       damage("Counterstrike", 6, "u2", "u9"),
       damage("Burn", 3, null, "u1"),
     ];
-    const { attackEvents, otherEvents } = partitionVfxBatch(events);
+    const { attackEvents, abilityDamageEvents, otherEvents } = partitionVfxBatch(events);
     expect(attackEvents).toEqual([events[1], events[3]]);
+    expect(abilityDamageEvents).toEqual([]);
     expect(otherEvents).toEqual([events[0], events[2], events[4]]);
   });
 
-  it("routes an empty batch to two empty buckets", () => {
-    expect(partitionVfxBatch([])).toEqual({ attackEvents: [], otherEvents: [] });
+  it("routes ability damage (Fireblast, Perplexing Shot, Orbital Beam) to its own bucket", () => {
+    const events = [
+      damage("Fireblast", 24, "u1", "u2"),
+      damage("Attack", 10, "u1", "u2"),
+      damage("Perplexing Shot", 30, "u3", "u4"),
+      damage("Orbital Beam", 60, "u5", "u6"),
+    ];
+    const { attackEvents, abilityDamageEvents, otherEvents } = partitionVfxBatch(events);
+    expect(attackEvents).toEqual([events[1]]);
+    expect(abilityDamageEvents).toEqual([events[0], events[2], events[3]]);
+    expect(otherEvents).toEqual([]);
+  });
+
+  it("routes an empty batch to three empty buckets", () => {
+    expect(partitionVfxBatch([])).toEqual({ attackEvents: [], abilityDamageEvents: [], otherEvents: [] });
+  });
+});
+
+describe("qualifiesForAbilityDamageAnimation", () => {
+  it("qualifies Fireblast, Perplexing Shot, and Orbital Beam damage with both unit ids present", () => {
+    expect(qualifiesForAbilityDamageAnimation(damage("Fireblast"))).toBe(true);
+    expect(qualifiesForAbilityDamageAnimation(damage("Perplexing Shot"))).toBe(true);
+    expect(qualifiesForAbilityDamageAnimation(damage("Orbital Beam"))).toBe(true);
+    expect(qualifiesForAbilityDamageAnimation(damage("Pylon Orbital Beam"))).toBe(true);
+  });
+
+  it("excludes basic attacks, other ability damage, and missing unit ids", () => {
+    expect(qualifiesForAbilityDamageAnimation(damage("Attack"))).toBe(false);
+    expect(qualifiesForAbilityDamageAnimation(damage("Poison"))).toBe(false);
+    expect(qualifiesForAbilityDamageAnimation(damage("Fireblast", 24, null, "u1"))).toBe(false);
+    expect(qualifiesForAbilityDamageAnimation(damage("Fireblast", 24, "u9", null))).toBe(false);
+  });
+});
+
+describe("abilityDamageAnimationFor", () => {
+  it("resolves each configured cause label to its own spec", () => {
+    expect(abilityDamageAnimationFor("Fireblast")).toBe(ABILITY_DAMAGE_ANIMATION_BY_CAUSE_LABEL.Fireblast);
+    expect(abilityDamageAnimationFor("Orbital Beam")?.strokes[0]).toMatchObject({ kind: "beam", toColor: expect.any(Number) });
+  });
+
+  it("returns null for an unconfigured or missing cause label", () => {
+    expect(abilityDamageAnimationFor("Poison")).toBeNull();
+    expect(abilityDamageAnimationFor(null)).toBeNull();
+  });
+});
+
+describe("perplexingShotSpecForChainIndex", () => {
+  it("starts at 2px and adds 1px per chain index", () => {
+    expect(perplexingShotSpecForChainIndex(0).strokes[0]).toMatchObject({ width: 2 });
+    expect(perplexingShotSpecForChainIndex(1).strokes[0]).toMatchObject({ width: 3 });
+    expect(perplexingShotSpecForChainIndex(3).strokes[0]).toMatchObject({ width: 5 });
+  });
+
+  it("caps width at 6px as a safeguard", () => {
+    expect(perplexingShotSpecForChainIndex(10).strokes[0]).toMatchObject({ width: 6 });
   });
 });

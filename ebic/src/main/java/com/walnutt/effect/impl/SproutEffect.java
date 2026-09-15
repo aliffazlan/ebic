@@ -64,6 +64,9 @@ public class SproutEffect extends Effect {
         setRemainingTurns(getRemainingTurns() - 1);
         if (getRemainingTurns() <= 0) {
             resolve(state);
+            // Remove now rather than leaving this visible (still "pending") to the frontend
+            // until the ordinary endTurn sweep - the teleport already happened this instant.
+            expireNow(state);
         }
     }
 

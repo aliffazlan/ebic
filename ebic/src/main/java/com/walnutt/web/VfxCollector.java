@@ -47,6 +47,7 @@ public final class VfxCollector extends TriggerHandler {
             event.user() == null ? null : ids.idFor(event.user()),
             targetId,
             null,
+            null,
             null
         ));
     }
@@ -54,25 +55,27 @@ public final class VfxCollector extends TriggerHandler {
     @Override
     public void onDamageTaken(GameState state, PostDamageEvent event) {
         Unit source = event.damageEvent().getSource();
+        Unit redirectedFrom = event.damageEvent().getRedirectedFrom();
         buffered.add(new VfxEvent(
             "damage",
             null,
             source == null ? null : ids.idFor(source),
             ids.idFor(event.target()),
             event.damageEvent().getDamage(),
-            event.damageEvent().getCauseLabel()
+            event.damageEvent().getCauseLabel(),
+            redirectedFrom == null ? null : ids.idFor(redirectedFrom)
         ));
     }
 
     @Override
     public void onDeath(GameState state, DeathEvent event) {
-        buffered.add(new VfxEvent("death", null, null, ids.idFor(event.unit()), null, null));
+        buffered.add(new VfxEvent("death", null, null, ids.idFor(event.unit()), null, null, null));
     }
 
     @Override
     public void onStatusApplied(GameState state, StatusAppliedEvent event) {
         String sourceId = event.source() instanceof Unit sourceUnit ? ids.idFor(sourceUnit) : null;
-        buffered.add(new VfxEvent("status_applied", null, sourceId, ids.idFor(event.unit()), null, null));
+        buffered.add(new VfxEvent("status_applied", null, sourceId, ids.idFor(event.unit()), null, null, null));
     }
 
     @Override
@@ -83,6 +86,7 @@ public final class VfxCollector extends TriggerHandler {
             event.getSource() == null ? null : ids.idFor(event.getSource()),
             ids.idFor(event.getTarget()),
             event.getAmount(),
+            null,
             null
         ));
     }

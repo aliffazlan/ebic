@@ -88,7 +88,7 @@ public class DuelEffect extends Effect {
             return;
         }
         if (!state.getMap().areAdjacent(getOwner().getPosition(), opponent.getPosition())) {
-            endEarly();
+            endEarly(state);
             return;
         }
         // No human choosing an attribute for a forced attack - weight the roll by each unit's own stats.
@@ -116,13 +116,18 @@ public class DuelEffect extends Effect {
         if (refreshOnWin != null) {
             refreshOnWin.decreaseCooldown(refreshOnWin.getMaxCooldown());
         }
-        setRemainingTurns(0);
+        // Remove now, on both halves, rather than leaving either visible to the frontend
+        // until the winner's own next scheduled sweep - a full opponent turn away.
+        expireNow(state);
+        if (partner != null) {
+            partner.expireNow(state);
+        }
     }
 
-    private void endEarly() {
-        setRemainingTurns(0);
+    private void endEarly(GameState state) {
+        expireNow(state);
         if (partner != null) {
-            partner.setRemainingTurns(0);
+            partner.expireNow(state);
         }
     }
 }

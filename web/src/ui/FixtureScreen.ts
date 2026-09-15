@@ -53,6 +53,21 @@ const DEMO_VFX: VfxEvent[] = [
   { type: "heal", abilityId: null, sourceUnitId: null, targetUnitId: "u-basic-1", amount: 40, causeLabel: null },
   // Gets no number at all - only damage and heals do.
   { type: "ability_used", abilityId: "fireblast", sourceUnitId: "u-evayne", targetUnitId: "u-valor", amount: null, causeLabel: null },
+  // Cast VFX added for temp/abilities2.txt (2026-09-15): Fireblast's growing
+  // fireball, Perplexing Shot's widening chain, Orbital Beam's sky-beam
+  // stagger, Mimic's converging particles, Overwhelming Odds' cast pulse, and
+  // a stand-in Pylon Collapse burst (no real pylon unit in this fixture, so
+  // u-zenith plays the dying pylon's role for the collapse pulse only).
+  { type: "damage", abilityId: null, sourceUnitId: "u-ember", targetUnitId: "u-dirge", amount: 24, causeLabel: "Fireblast" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-harbinger", targetUnitId: "u-valor", amount: 30, causeLabel: "Perplexing Shot" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-harbinger", targetUnitId: "u-dirge", amount: 50, causeLabel: "Perplexing Shot" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-harbinger", targetUnitId: "u-wei", amount: 70, causeLabel: "Perplexing Shot" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-zenith", targetUnitId: "u-basic-1", amount: 60, causeLabel: "Orbital Beam" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-zenith", targetUnitId: "u-basic-2", amount: 60, causeLabel: "Orbital Beam" },
+  { type: "ability_used", abilityId: "mimic", sourceUnitId: "u-harbinger", targetUnitId: "u-valor", amount: null, causeLabel: null },
+  { type: "ability_used", abilityId: "overwhelming_odds", sourceUnitId: "u-valor", targetUnitId: null, amount: null, causeLabel: null },
+  { type: "damage", abilityId: null, sourceUnitId: "u-zenith", targetUnitId: "u-basic-1", amount: 15, causeLabel: "Pylon Collapse" },
+  { type: "damage", abilityId: null, sourceUnitId: "u-zenith", targetUnitId: "u-basic-2", amount: 15, causeLabel: "Pylon Collapse" },
 ];
 
 export class FixtureScreen implements Screen, MatchActions {

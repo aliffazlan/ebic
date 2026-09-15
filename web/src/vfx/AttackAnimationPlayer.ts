@@ -12,6 +12,8 @@ import { Container, Graphics, GraphicsContext, Ticker } from "pixi.js";
 import type { PixelCoord } from "../hex/HexMath";
 import { cssHex } from "../ui/Colors";
 import { strokeDurationMs, type AttackAnimationSpec, type AttackAnimationStroke } from "./AttackAnimations";
+import { spawnParticleBurst } from "./ParticleBurst";
+import { safeTick } from "./SafeTick";
 import slashSvg from "./icons/slash.svg?raw";
 import arrowSvg from "./icons/arrow.svg?raw";
 
@@ -110,7 +112,7 @@ function spawnStroke(
   let view: Graphics | null = null;
   let particleCursor = 0;
 
-  const tick = () => {
+  const tick = safeTick(() => {
     elapsed += 1;
     if (elapsed <= delayFrames) return;
     const localElapsed = elapsed - delayFrames;
@@ -131,11 +133,14 @@ function spawnStroke(
       case "projectile":
         particleCursor = updateProjectile(view, from, to, t, stroke, parent, ticker, particleCursor, localElapsed);
         break;
+      case "growing-projectile":
+        updateGrowingProjectile(view, from, to, t, parent, ticker);
+        break;
       case "lightning":
-        updateLightning(view, from, to, localElapsed, t);
+        updateLightning(view, from, to, localElapsed, t, stroke.width ?? LIGHTNING_WIDTH_PX);
         break;
       case "beam":
-        updateBeam(view, from, to, localElapsed, t);
+        updateBeam(view, from, to, localElapsed, t, stroke.toColor);
         break;
     }
 
@@ -144,7 +149,7 @@ function spawnStroke(
       view.destroy();
       onDone();
     }
-  };
+  });
   ticker.add(tick);
   return tick;
 }
@@ -163,6 +168,11 @@ function createStrokeView(stroke: AttackAnimationStroke): Graphics {
     }
     case "projectile":
       return new Graphics().circle(0, 0, PROJECTILE_RADIUS_PX).fill({ color: stroke.color });
+    case "growing-projectile": {
+      const view = new Graphics();
+      strokeColors.set(view, stroke.color);
+      return view;
+    }
     case "lightning":
     case "beam": {
       const view = new Graphics();
@@ -268,23 +278,54 @@ function updateProjectile(
 /**
  * A single fading trail dot. Self-contained and self-cleaning - not part of
  * the stroke's own tracked tick, so Board's teardown set never needs to know
- * about it. Same acceptable tiny leak-on-teardown risk spawnParticleBurst's
- * own dots already carry today (Board doesn't track those either).
+ * about it. Wrapped in safeTick like every other ticker in this codebase, so
+ * an untracked one outliving a destroyed parent/Board can't take down
+ * Ticker.shared - see SafeTick.ts.
  */
 function spawnTrailParticle(parent: Container, ticker: Ticker, x: number, y: number, color: number): void {
   const dot = new Graphics().circle(0, 0, TRAIL_PARTICLE_RADIUS_PX).fill({ color });
   dot.position.set(x, y);
   parent.addChild(dot);
   let elapsed = 0;
-  const tick = () => {
+  const tick = safeTick(() => {
     elapsed += 1;
     dot.alpha = Math.max(0, 1 - elapsed / TRAIL_PARTICLE_LIFE_FRAMES);
     if (elapsed >= TRAIL_PARTICLE_LIFE_FRAMES) {
       ticker.remove(tick);
       dot.destroy();
     }
-  };
+  });
   ticker.add(tick);
+}
+
+// --- growing-projectile: Fireblast's ball - grows in place, then travels, then bursts ---
+
+const GROWING_PROJECTILE_RADIUS_PX = 10;
+const GROWING_PROJECTILE_GROW_FRACTION = 0.25; // first 25% of the duration is the grow-in-place phase
+
+function updateGrowingProjectile(
+  view: Graphics,
+  from: PixelCoord,
+  to: PixelCoord,
+  t: number,
+  parent: Container,
+  ticker: Ticker,
+): void {
+  const color = strokeColorOf(view) ?? 0xffffff;
+  if (t < GROWING_PROJECTILE_GROW_FRACTION) {
+    const growT = t / GROWING_PROJECTILE_GROW_FRACTION;
+    const radius = GROWING_PROJECTILE_RADIUS_PX * easeOutCubic(growT);
+    view.position.set(from.x, from.y);
+    view.clear().circle(0, 0, radius).fill({ color });
+    return;
+  }
+  const travelT = (t - GROWING_PROJECTILE_GROW_FRACTION) / (1 - GROWING_PROJECTILE_GROW_FRACTION);
+  const eased = easeOutCubic(travelT);
+  view.position.set(lerp(from.x, to.x, eased), lerp(from.y, to.y, eased));
+  view.clear().circle(0, 0, GROWING_PROJECTILE_RADIUS_PX).fill({ color });
+  if (travelT >= 1) {
+    spawnParticleBurst(parent, ticker, { x: to.x, y: to.y, color, count: 18, speed: 2.6, life: 26, radius: 3 });
+  }
 }
 
 // --- lightning: procedural jittering bolt, full-length instantly, no travel ---
@@ -295,14 +336,14 @@ const LIGHTNING_JITTER_INTERVAL_FRAMES = 4;
 const LIGHTNING_WIDTH_PX = 3;
 const LIGHTNING_FADE_FRACTION = 0.85; // fades over the final 15% (~150ms of 1000ms)
 
-function updateLightning(view: Graphics, from: PixelCoord, to: PixelCoord, localElapsed: number, t: number): void {
+function updateLightning(view: Graphics, from: PixelCoord, to: PixelCoord, localElapsed: number, t: number, width: number): void {
   if (localElapsed % LIGHTNING_JITTER_INTERVAL_FRAMES === 1) {
-    drawLightningBolt(view, from, to);
+    drawLightningBolt(view, from, to, width);
   }
   view.alpha = t < LIGHTNING_FADE_FRACTION ? 1 : 1 - (t - LIGHTNING_FADE_FRACTION) / (1 - LIGHTNING_FADE_FRACTION);
 }
 
-function drawLightningBolt(view: Graphics, from: PixelCoord, to: PixelCoord): void {
+function drawLightningBolt(view: Graphics, from: PixelCoord, to: PixelCoord, width: number): void {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len = Math.hypot(dx, dy) || 1;
@@ -320,7 +361,7 @@ function drawLightningBolt(view: Graphics, from: PixelCoord, to: PixelCoord): vo
   view.clear();
   view.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length; i++) view.lineTo(points[i].x, points[i].y);
-  view.stroke({ width: LIGHTNING_WIDTH_PX, color: strokeColorOf(view) ?? 0xffffff, cap: "round", join: "round" });
+  view.stroke({ width, color: strokeColorOf(view) ?? 0xffffff, cap: "round", join: "round" });
 }
 
 // Graphics has no built-in "remembered fill colour" accessor, so lightning
@@ -340,12 +381,14 @@ const BEAM_PULSE_PERIOD_FRAMES = 10;
 const BEAM_FADE_IN_FRACTION = 0.1; // first 10% (~100ms)
 const BEAM_FADE_OUT_START = 0.85; // final 15% (~150ms)
 
-function updateBeam(view: Graphics, from: PixelCoord, to: PixelCoord, localElapsed: number, t: number): void {
+function updateBeam(view: Graphics, from: PixelCoord, to: PixelCoord, localElapsed: number, t: number, toColor?: number): void {
   const width = BEAM_BASE_WIDTH_PX + BEAM_PULSE_AMPLITUDE_PX * Math.sin((localElapsed / BEAM_PULSE_PERIOD_FRAMES) * Math.PI * 2);
+  const baseColor = strokeColorOf(view) ?? 0xffffff;
+  const color = toColor === undefined ? baseColor : lerpColor(baseColor, toColor, t);
   view.clear();
   view.moveTo(from.x, from.y);
   view.lineTo(to.x, to.y);
-  view.stroke({ width: Math.max(1, width), color: strokeColorOf(view) ?? 0xffffff, cap: "round" });
+  view.stroke({ width: Math.max(1, width), color, cap: "round" });
 
   if (t < BEAM_FADE_IN_FRACTION) {
     view.alpha = t / BEAM_FADE_IN_FRACTION;
@@ -354,4 +397,12 @@ function updateBeam(view: Graphics, from: PixelCoord, to: PixelCoord, localElaps
   } else {
     view.alpha = 1;
   }
+}
+
+/** Channel-wise lerp between two 0xRRGGBB colours - Orbital Beam's white-to-dark-blue sweep. */
+function lerpColor(from: number, to: number, t: number): number {
+  const r = Math.round(lerp((from >> 16) & 0xff, (to >> 16) & 0xff, t));
+  const g = Math.round(lerp((from >> 8) & 0xff, (to >> 8) & 0xff, t));
+  const b = Math.round(lerp(from & 0xff, to & 0xff, t));
+  return (r << 16) | (g << 8) | b;
 }

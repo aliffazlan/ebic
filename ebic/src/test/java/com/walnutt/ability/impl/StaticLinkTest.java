@@ -73,6 +73,11 @@ class StaticLinkTest {
         state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));
         state.getEventBus().publish(state, new TurnEndEvent(Team.PLAYER_ONE));
         assertEquals(healthBeforeBreak, target.getHealth(), "no free attack once the link has broken");
+        // The frontend serializes effects straight off getEffects(), unfiltered - so this has to
+        // actually be gone from the raw list right away, not merely expired-but-present until
+        // Discharge's next scheduled sweep (see Effect.expireNow).
+        assertTrue(discharge.getEffects().stream().noneMatch(e -> e instanceof StaticLinkEffect),
+            "removed the instant the link breaks, not left lingering into the opponent's turn");
 
         // The link itself is now inactive - a further turn should not attempt anything (no exception, no more attacks).
         state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_ONE));

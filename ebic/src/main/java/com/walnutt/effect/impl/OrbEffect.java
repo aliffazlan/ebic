@@ -106,6 +106,11 @@ public class OrbEffect extends Effect {
                 recastsRemaining--;
                 resolved = false;
                 setRemainingTurns(delay);
+            } else {
+                // Otherwise this orb is actually done - remove it now rather than leaving it
+                // visible (still "pending") to the frontend until the ordinary endTurn sweep,
+                // which would make the detonation and the still-charging orb visual overlap.
+                expireNow(state);
             }
         }
     }

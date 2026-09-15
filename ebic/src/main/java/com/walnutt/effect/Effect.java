@@ -107,6 +107,24 @@ public abstract class Effect extends TriggerHandler {
     }
 
     /**
+     * Forces this effect to expire and removes it from its owner's list right away, instead
+     * of waiting for the next scheduled sweep (Unit.startTurn/endTurn - see
+     * Unit.removeExpiredEffects). For any effect whose real end condition isn't a plain
+     * duration countdown (adjacency broken, a kill landed, a barrier depleted, a delayed
+     * payload fired) - without this, the object sits in the list, still visible to the
+     * frontend, until the owner's own next scheduled sweep, which can be a full opponent
+     * turn away. Safe to call from inside an event dispatch: EventBus copies each unit's
+     * handler list before dispatching to it (see NanobotsEffect, the first effect to use
+     * this exact idiom, just inlined rather than through this shared method).
+     */
+    protected void expireNow(GameState state) {
+        setRemainingTurns(0);
+        if (owner != null) {
+            owner.removeExpiredEffects(state);
+        }
+    }
+
+    /**
      * Engine-owned bookkeeping, called once per owner's turn end - not final, since a
      * handful of effects (Poison Bloom) tick UP instead of down for a window.
      */

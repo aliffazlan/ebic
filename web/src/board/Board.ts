@@ -10,6 +10,7 @@ import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
 import { spawnDamageIndicator } from "../vfx/DamageIndicator";
 import { spawnAttackAnimation } from "../vfx/AttackAnimationPlayer";
+import { safeTick } from "../vfx/SafeTick";
 import { DisplayedUnitState } from "../vfx/DisplayedUnitState";
 import { statusVisualFor } from "../vfx/StatusEffects";
 import { spawnUnitStatusOverlay, drawCloakTile, spawnDuelBanners, spawnStaticLink } from "../vfx/StatusEffectPlayer";
@@ -48,6 +49,71 @@ const CAST_RANGE_COLOR = 0x38bdf8;
 const STROBE_TOGGLE_FRAMES = 9; // ~150ms per on/off half-cycle
 const STROBE_TOTAL_FRAMES = 108; // ~1.8s total, within the ~1.5-2s target
 const MOVE_TWEEN_FRAMES = 20; // ~330ms at 60fps - short slide, not a full animation set piece
+// Backtrack's afterimage trail: dark-purple translucent circles, same size as
+// the unit's own token border, dropped every few frames along the slide.
+const BACKTRACK_TRAIL_INTERVAL_FRAMES = 4;
+const BACKTRACK_TRAIL_LIFE_FRAMES = 18;
+const BACKTRACK_TRAIL_COLOR = 0x5b21b6;
+const BACKTRACK_TRAIL_ALPHA = 0.35;
+// Dislocation's teleport: shrink to nothing at the old tile, jump, grow back
+// from nothing at the new one - 0.6s each way, per temp/abilities2.txt.
+const TELEPORT_PHASE_FRAMES = 36;
+// Eruption's cast burst: red particles bursting upward off a newly-ignited tile.
+const ERUPTION_BURST_COLOR = 0xff5722;
+// Overheat's proc burst, on the unit that just overheated.
+const OVERHEAT_BURST_COLOR = 0xfb923c;
+// Pylon's cast: a small dark-blue orb drops from above the map onto the target
+// tile before the pylon itself is revealed. Offset is plain pixel math, not a
+// real map position - see the sky-drop origin comment in ScheduleVfxBatch.ts.
+const PYLON_SKY_OFFSET_PX = 600;
+const PYLON_ORB_RADIUS_PX = 7;
+const PYLON_ORB_COLOR = 0x1e3a8a;
+const PYLON_DROP_FRAMES = 30; // ~0.5s
+// Mimic's cast: particles travel from the copied unit to Joker.
+const MIMIC_PARTICLE_COUNT = 16;
+const MIMIC_PARTICLE_LIFE_FRAMES = 30;
+const MIMIC_PARTICLE_COLORS = [0x166534, 0xd8b4fe];
+// Soul Rip/Decay: same converging-particle shape as Mimic, brown/red, drained
+// toward whichever unit is doing the draining - see spawnConvergingParticles.
+// Brighter/bigger/slightly longer-lived than Mimic's own particles (rather than
+// reusing its exact look) so this reads clearly against a dark board instead of
+// blending into the similarly-coloured generic damage burst that plays alongside it.
+const SOUL_RIP_PARTICLE_COLORS = [0xd97706, 0xf87171];
+const SOUL_RIP_PARTICLE_COUNT = 16;
+const DECAY_PARTICLE_COUNT = 8; // ~50% of Soul Rip's, per temp/abilities.txt
+const SOUL_RIP_PARTICLE_LIFE_FRAMES = 40; // ~0.65s - a touch longer than Mimic's 30
+const SOUL_RIP_PARTICLE_RADIUS_PX = 4;
+// Overwhelming Odds' cast and Pylon Collapse's death burst are both a single
+// hollow pulse growing from 0 to a fixed radius - see spawnOneShotPulse.
+const OVERWHELMING_ODDS_PULSE_RADIUS_PX = HEX_SIZE * 3; // matches the ability's cast radius closely enough - hardcoded per temp/abilities2.txt
+const OVERWHELMING_ODDS_PULSE_FRAMES = 24; // ~0.4s
+const OVERWHELMING_ODDS_COLOR = 0xf97316;
+const PYLON_COLLAPSE_PULSE_RADIUS_PX = HEX_SIZE; // 1 tile radius
+const PYLON_COLLAPSE_PULSE_FRAMES = 24; // ~0.4s
+const PYLON_COLLAPSE_COLOR = 0x1e3a8a;
+// Sanity's Eclipse: a charging orb hooked to the caster, then a detonation
+// flight + pulses at the (centroid of the) affected tile(s).
+const SANITY_ECLIPSE_COLOR = 0x7dd3fc;
+const SANITY_ECLIPSE_ORB_RADIUS_PX = 8;
+const SANITY_ECLIPSE_ORB_Y_OFFSET_PX = HEX_SIZE * 0.65; // just below the top of the portrait circle
+const SANITY_ECLIPSE_PARTICLE_INTERVAL_FRAMES = 6;
+const SANITY_ECLIPSE_PARTICLE_SPAWN_RADIUS_PX = 40;
+const SANITY_ECLIPSE_PARTICLE_LIFE_FRAMES = 24;
+const SANITY_ECLIPSE_DETONATE_RADIUS_PX = HEX_SIZE * 1.5;
+const SANITY_ECLIPSE_FLY_FRAMES = 24; // ~0.4s
+const SANITY_ECLIPSE_PULSE_COUNT = 3;
+const SANITY_ECLIPSE_PULSE_TOTAL_FRAMES = 42; // ~0.7s
+// Sprout/Overgrowth's cast: a filled circle growing from nothing to a fixed
+// radius/full opacity together (same progress value drives both, not
+// independently eased) over ~1.5s, then the Branchling(s) appear - see
+// spawnGrowingFilledCircle and applySnapshot's held-back-summon handling.
+const BRANCH_SUMMON_CIRCLE_COLOR = 0x86efac;
+const BRANCH_SUMMON_CIRCLE_FRAMES = 90; // ~1.5s per temp/abilities.txt
+// 70% of a tile's area: area scales with radius^2, so sqrt(0.7) of HEX_SIZE.
+const SPROUT_CIRCLE_RADIUS_PX = HEX_SIZE * Math.sqrt(0.7);
+// "Much larger... centered around the center tile" - sized to roughly cover the
+// centre tile plus the ring of 6 tiles Overgrowth actually plants on.
+const OVERGROWTH_CIRCLE_RADIUS_PX = HEX_SIZE * 2.4;
 
 // PlacementStateSnapshot carries no map radius (see API_CONTRACT.md) -
 // placement always happens before the first real GameStateSnapshot, which is
@@ -163,6 +229,16 @@ export class Board {
   // each renderPairEffects call (same reasoning as activeStatusEffectTicks,
   // just not keyed per-unit since pairEffectLayer itself is wiped every time).
   private activePairEffectTicks = new Set<() => void>();
+  // One-shot vfx tickers not otherwise owned by a unit id (Pylon's sky-drop,
+  // Backtrack's trail ghosts, Mimic's particles, Overwhelming Odds'/Pylon
+  // Collapse's pulses, ...) - every one is also wrapped in safeTick, but this
+  // set is what lets destroy() actually cancel them at match end rather than
+  // leaving them to fire against a torn-down vfxLayer.
+  private activeVfxOneShotTicks = new Set<() => void>();
+  // Sanity's Eclipse's charging orb, one per caster currently charging - keyed
+  // so a recast (or a defensive re-check against the caster's own effects
+  // list) can find and replace/stop the right one. See startSanityEclipseCharge.
+  private sanityEclipseCharges = new Map<string, { orb: Graphics; tick: () => void }>();
   // Each unit's *displayed* hp/dead, separate from the truth in
   // this.currentUnits - lets the HP bar and the graveyard transition lag a
   // lethal hit's own animation/indicator instead of snapping the moment a
@@ -188,6 +264,28 @@ export class Board {
   // Death order per team. A corpse keeps the slot it first got, so a later
   // casualty is appended below rather than reshuffling the whole column.
   private graveyard = new Map<string, string[]>();
+  // Set by playVfx when an ability_used event needs its own move-animation
+  // treatment (Backtrack's trail, Dislocation's shrink/grow) instead of the
+  // plain slide. Consumed - and cleared, whether or not a move actually
+  // follows - by the very next upsertUnit call for that unit, so a later
+  // unrelated Move can never reuse a stale flag.
+  private pendingMoveAnimationByUnit = new Map<string, "backtrack-trail" | "teleport">();
+  // Set by playVfx on a sprout/overgrowth ability_used event, consumed by the very
+  // next applySnapshot that sees new Branchling unit(s) appear - see the FIFO
+  // matching in applySnapshot. Neither ability's cast event carries a tile
+  // position (they target an empty tile), so the circle's position and the
+  // decision of which new Branchling(s) belong to which cast can only be
+  // resolved once the summon(s) actually land in the following snapshot.
+  private pendingBranchSummonReveals: Array<"sprout" | "overgrowth"> = [];
+  // Branchling ids currently held back from the normal instant-appear path pending their
+  // growing-circle cast VFX (see applySnapshot) - persistent across calls, since further
+  // "state" pushes commonly arrive mid-circle (Branch's own turn often isn't over yet).
+  private branchlingsAwaitingReveal = new Set<string>();
+  // The previous applySnapshot's tile effects, kept only to diff against the
+  // new ones - a newly-appearing "burning" entry is what triggers Eruption's
+  // cast burst, since neither its ability_used event nor any damage event
+  // carries the tile it was cast on (see ScheduleVfxBatch.ts's contract notes).
+  private previousTileEffects: TileEffectSnapshot[] = [];
 
   constructor(app: Application, store: GameStateStore, callbacks: BoardCallbacks) {
     this.app = app;
@@ -283,13 +381,79 @@ export class Board {
     this.activeStatusEffectTicks.clear();
     for (const tick of this.activePairEffectTicks) Ticker.shared.remove(tick);
     this.activePairEffectTicks.clear();
+    for (const tick of this.activeVfxOneShotTicks) Ticker.shared.remove(tick);
+    this.activeVfxOneShotTicks.clear();
+    for (const charge of this.sanityEclipseCharges.values()) Ticker.shared.remove(charge.tick);
+    this.sanityEclipseCharges.clear();
     this.root.destroy({ children: true });
   }
 
   /** Plays a generic burst at the position of a unit from the *pre-update* snapshot (vfx arrives before state). */
   playVfx(events: VfxEvent[]): void {
     const snapshot = this.store.getState().snapshot;
+    // Pylon Collapse fires one damage event per adjacent enemy hit, all sharing
+    // the same dying pylon as sourceUnitId - the collapse pulse itself plays
+    // once per pylon, not once per victim.
+    const pylonCollapseBurstFor = new Set<string>();
+    // Sanity's Eclipse's detonation likewise fans out to one damage event per
+    // victim, all sharing the detonating caster as sourceUnitId - collected
+    // here and resolved once, after the loop, into a single flight+pulse at
+    // the centroid of every victim hit (see detonateSanityEclipse).
+    const sanityEclipseTargetsBySource = new Map<string, { x: number; y: number }[]>();
     for (const event of events) {
+      if (event.type === "ability_used" && event.sourceUnitId) {
+        if (event.abilityId === "backtrack") {
+          this.pendingMoveAnimationByUnit.set(event.sourceUnitId, "backtrack-trail");
+        } else if (event.abilityId === "dislocation") {
+          this.pendingMoveAnimationByUnit.set(event.sourceUnitId, "teleport");
+        } else if (event.abilityId === "mimic" && event.targetUnitId) {
+          this.spawnMimicParticles(event.targetUnitId, event.sourceUnitId);
+        } else if (event.abilityId === "overwhelming_odds") {
+          const pos = this.resolveUnitPosition(event.sourceUnitId);
+          if (pos) this.spawnOneShotPulse(pos, OVERWHELMING_ODDS_PULSE_RADIUS_PX, OVERWHELMING_ODDS_COLOR, OVERWHELMING_ODDS_PULSE_FRAMES);
+        } else if (event.abilityId === "sanity_s_eclipse") {
+          // Identifiers.normalize("Sanity's Eclipse") drops the apostrophe as a
+          // separator rather than treating it as a word boundary on its own -
+          // "sanity_s_eclipse", not "sanity_eclipse".
+          this.startSanityEclipseCharge(event.sourceUnitId);
+        } else if (event.abilityId === "soul_rip" && event.targetUnitId) {
+          this.spawnSoulRip(event.sourceUnitId, event.targetUnitId);
+        } else if (event.abilityId === "sprout") {
+          this.pendingBranchSummonReveals.push("sprout");
+        } else if (event.abilityId === "overgrowth") {
+          this.pendingBranchSummonReveals.push("overgrowth");
+        }
+      }
+      if (event.type === "damage" && event.causeLabel === "Decay" && event.sourceUnitId && event.targetUnitId) {
+        // Decay is a passive AoE (no ability_used event of its own, see Decay.java) -
+        // always drains victim toward the caster, never reversed (unlike Soul Rip).
+        this.spawnConvergingParticles(
+          event.targetUnitId,
+          event.sourceUnitId,
+          SOUL_RIP_PARTICLE_COLORS,
+          DECAY_PARTICLE_COUNT,
+          SOUL_RIP_PARTICLE_LIFE_FRAMES,
+          SOUL_RIP_PARTICLE_RADIUS_PX,
+        );
+      }
+      if (
+        event.type === "damage" &&
+        event.causeLabel === "Pylon Collapse" &&
+        event.sourceUnitId &&
+        !pylonCollapseBurstFor.has(event.sourceUnitId)
+      ) {
+        pylonCollapseBurstFor.add(event.sourceUnitId);
+        const pos = this.resolveUnitPosition(event.sourceUnitId);
+        if (pos) this.spawnOneShotPulse(pos, PYLON_COLLAPSE_PULSE_RADIUS_PX, PYLON_COLLAPSE_COLOR, PYLON_COLLAPSE_PULSE_FRAMES);
+      }
+      if (event.type === "damage" && event.causeLabel === "Sanity's Eclipse" && event.sourceUnitId && event.targetUnitId) {
+        const pos = this.resolveUnitPosition(event.targetUnitId);
+        if (pos) {
+          const list = sanityEclipseTargetsBySource.get(event.sourceUnitId) ?? [];
+          list.push(pos);
+          sanityEclipseTargetsBySource.set(event.sourceUnitId, list);
+        }
+      }
       const unitId = event.targetUnitId ?? event.sourceUnitId;
       const unit = unitId ? snapshot?.units.find((u) => u.id === unitId) : null;
       const pos = unit ? axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE) : { x: 0, y: 0 };
@@ -298,6 +462,9 @@ export class Board {
         y: pos.y,
         color: colorForVfxType(event.type),
       });
+    }
+    for (const [sourceUnitId, positions] of sanityEclipseTargetsBySource) {
+      this.detonateSanityEclipse(sourceUnitId, positions);
     }
   }
 
@@ -406,11 +573,17 @@ export class Board {
   private refreshUnitDisplay(unitId: string): void {
     const unit = this.currentUnits.find((u) => u.id === unitId);
     if (!unit) return;
-    void this.upsertUnit({
-      ...unit,
-      currentHp: this.displayedState.hpFor(unitId, unit.currentHp),
-      dead: this.displayedState.isDead(unitId),
-    });
+    // applyMoveAnimation: false - see upsertUnit's doc comment. This call is only ever
+    // meant to refresh HP-bar/graveyard/status-overlay visuals, never position.
+    void this.upsertUnit(
+      {
+        ...unit,
+        currentHp: this.displayedState.hpFor(unitId, unit.currentHp),
+        dead: this.displayedState.isDead(unitId),
+      },
+      undefined,
+      false,
+    );
   }
 
   /**
@@ -493,7 +666,7 @@ export class Board {
     this.strobeLayer.addChild(ring);
 
     let elapsed = 0;
-    const tick = () => {
+    const tick = safeTick(() => {
       elapsed += 1;
       ring.visible = Math.floor(elapsed / STROBE_TOGGLE_FRAMES) % 2 === 0;
       if (elapsed >= STROBE_TOTAL_FRAMES) {
@@ -501,7 +674,7 @@ export class Board {
         this.activeStrobeTicks.delete(tick);
         ring.destroy();
       }
-    };
+    });
     this.activeStrobeTicks.add(tick);
     Ticker.shared.add(tick);
   }
@@ -557,23 +730,135 @@ export class Board {
     },
   ): Promise<void> {
     this.ensureMap(snapshot.mapRadius, snapshot.mapRowLimit ?? snapshot.mapRadius);
+    // Captured before this.currentUnits is overwritten below - Overheat's
+    // proc has no vfx event of its own (see spawnOverheatBursts), so the only
+    // way to detect it is diffing each unit's own "Overheating" effect
+    // against its value from the snapshot before this one.
+    const previousOverheatByUnit = this.overheatAccumulatedByUnit(this.currentUnits);
     this.currentUnits = snapshot.units;
+
+    const previousUnitIds = new Set(this.unitSprites.keys());
+    const previousBurningTiles = new Set(
+      this.previousTileEffects.filter((e) => e.kind === "burning").map((e) => `${e.q},${e.r}`),
+    );
+
+    // Sprout/Overgrowth: neither cast's ability_used event carries a tile position (an
+    // empty tile has no unit to name - see VfxEvent), so which new Branchling(s) belong
+    // to a pending cast, and where their growing-circle VFX should center, can only be
+    // resolved here, once the summon(s) actually land in this snapshot. Claimed units
+    // are added to this.branchlingsAwaitingReveal (a persistent field, not a local -
+    // Branch's own turn often has more than one action, so further "state" pushes can
+    // easily arrive before the ~1.5s circle finishes, and a unit held back only for the
+    // one applySnapshot call where it first appeared would fall through to the normal
+    // instant-appear path on the very next call) and stay held back from that path below
+    // on every call until their circle actually finishes - see spawnGrowingFilledCircle.
+    // Matched in cast order (FIFO), which is correct as long as Branchling is never
+    // spawned by anything else.
+    if (this.pendingBranchSummonReveals.length > 0) {
+      const availableBranchlings = snapshot.units.filter(
+        (u) => u.name === "Branchling" && !previousUnitIds.has(u.id) && !this.branchlingsAwaitingReveal.has(u.id),
+      );
+      while (this.pendingBranchSummonReveals.length > 0 && availableBranchlings.length > 0) {
+        const kind = this.pendingBranchSummonReveals.shift()!;
+        const claimed = kind === "sprout" ? availableBranchlings.splice(0, 1) : availableBranchlings.splice(0);
+        const positions = claimed.map((u) => axialToPixel({ q: u.q, r: u.r }, HEX_SIZE));
+        const centroid = {
+          x: positions.reduce((sum, p) => sum + p.x, 0) / positions.length,
+          y: positions.reduce((sum, p) => sum + p.y, 0) / positions.length,
+        };
+        const claimedIds = claimed.map((u) => u.id);
+        for (const id of claimedIds) this.branchlingsAwaitingReveal.add(id);
+        const radius = kind === "sprout" ? SPROUT_CIRCLE_RADIUS_PX : OVERGROWTH_CIRCLE_RADIUS_PX;
+        this.spawnGrowingFilledCircle(centroid, radius, BRANCH_SUMMON_CIRCLE_COLOR, BRANCH_SUMMON_CIRCLE_FRAMES, () => {
+          for (const id of claimedIds) {
+            this.branchlingsAwaitingReveal.delete(id);
+            // Looked up fresh rather than reusing `claimed`'s snapshot - by the time the
+            // circle finishes, possibly several snapshots later, this.currentUnits (kept
+            // current every applySnapshot call regardless of hold-back) is the only copy
+            // still guaranteed up to date.
+            const current = this.currentUnits.find((u) => u.id === id);
+            if (!current) continue; // died or was otherwise removed while awaiting reveal
+            void this.upsertUnit({
+              ...current,
+              currentHp: this.displayedState.hpFor(id, current.currentHp),
+              dead: this.displayedState.isDead(id),
+            });
+          }
+        });
+      }
+    }
+
     this.renderTileEffects(snapshot.tileEffects ?? []);
     this.renderCloakTiles(snapshot.units);
+
+    for (const effect of snapshot.tileEffects ?? []) {
+      if (effect.kind === "burning" && !previousBurningTiles.has(`${effect.q},${effect.r}`)) {
+        this.spawnEruptionBurst(effect.q, effect.r);
+      }
+    }
+    this.previousTileEffects = snapshot.tileEffects ?? [];
+    this.spawnOverheatBursts(previousOverheatByUnit, snapshot.units);
 
     const seen = new Set<string>();
     for (const unit of snapshot.units) {
       seen.add(unit.id);
+      // Not unit.definitionId: a Pylon's unitType is BASIC, and
+      // GameStateSnapshotMapper.definitionId() returns the literal string
+      // "basic" for every BASIC unit (not a normalized name) - "zenith_pylon"
+      // is only the internal definitions-map key PylonAbility.java looks
+      // itself up by, it never reaches the wire. The unit's own name field,
+      // however, is reliably "Pylon" (new SummonedUnit(pylonDefinition.name(), ...)).
+      const isNewPylon = unit.name === "Pylon" && !previousUnitIds.has(unit.id);
       // Holds displayed hp/dead at their last-shown value while something is
       // still pending for this unit, rather than jumping straight to a
       // lethal hit's post-battle result before its own animation/indicator
       // has played - see DisplayedUnitState and ScheduleVfxBatch.
       this.displayedState.syncToTruth(unit.id, unit.currentHp, unit.dead);
-      await this.upsertUnit({
-        ...unit,
-        currentHp: this.displayedState.hpFor(unit.id, unit.currentHp),
-        dead: this.displayedState.isDead(unit.id),
-      });
+      if (this.branchlingsAwaitingReveal.has(unit.id)) {
+        // Not materialized yet - its growing-circle cast VFX is still playing, and the
+        // completion callback above will call upsertUnit for it once that finishes.
+        continue;
+      }
+      // Consumed here, unconditionally, whether or not this unit's position
+      // actually changed - and ONLY here. upsertUnit itself no longer reads
+      // this map: refreshUnitDisplay also calls upsertUnit (whenever a
+      // damage/heal indicator is shown for a unit), and if that incidental
+      // call were allowed to consume the flag too, a staggered indicator
+      // firing before this loop reaches the unit (Backtrack's own heal,
+      // shown via IndicatorScheduler's setTimeout, is a real example) could
+      // silently discard it on a premature, position-already-current no-op
+      // call - see temp/abilities.txt's Backtrack/Dislocation bug reports.
+      const pendingMoveKind = this.pendingMoveAnimationByUnit.get(unit.id);
+      this.pendingMoveAnimationByUnit.delete(unit.id);
+      await this.upsertUnit(
+        {
+          ...unit,
+          currentHp: this.displayedState.hpFor(unit.id, unit.currentHp),
+          dead: this.displayedState.isDead(unit.id),
+        },
+        pendingMoveKind,
+      );
+      if (isNewPylon) {
+        const container = this.unitSprites.get(unit.id);
+        if (container) {
+          // Held back until the sky-drop orb lands - see spawnPylonSkyDrop.
+          container.visible = false;
+          this.spawnPylonSkyDrop(unit.q, unit.r, container);
+        }
+      }
+      // Upgraded Sanity's Eclipse re-arms the same OrbEffect for a second
+      // fall on the same tile after detonating once, with no vfx event of
+      // its own announcing the recast - detonateSanityEclipse already stops
+      // the charge on detonation, so if the pending effect is still here on
+      // the very next snapshot, that's a recast and the charge should resume.
+      // Harmless (a no-op via the .has() guard) for every unit not currently
+      // charging at all.
+      const stillPendingEclipse = unit.effects.some((e) => e.name === "Sanity's Eclipse (pending)");
+      if (stillPendingEclipse && !this.sanityEclipseCharges.has(unit.id)) {
+        this.startSanityEclipseCharge(unit.id);
+      } else if (!stillPendingEclipse) {
+        this.stopSanityEclipseCharge(unit.id);
+      }
     }
     for (const [id, sprite] of this.unitSprites) {
       if (!seen.has(id)) {
@@ -763,7 +1048,36 @@ export class Board {
     }
   }
 
-  private async upsertUnit(unit: UnitSnapshot): Promise<void> {
+  /**
+   * `pendingMoveKind` should only ever be passed by applySnapshot's own loop,
+   * which is the sole place allowed to consume pendingMoveAnimationByUnit -
+   * see the comment at that call site. refreshUnitDisplay's incidental calls
+   * (an HP/dead-only refresh, never a real position change) must always omit
+   * it, so they can never apply - or accidentally discard - a pending kind.
+   */
+  /**
+   * `applyMoveAnimation` (default true) gates the entire position-change/
+   * animate branch below - false for refreshUnitDisplay's incidental calls
+   * (an HP/dead-only refresh, never a real position change), so that call
+   * site can never retrigger or override an in-flight move animation.
+   *
+   * It isn't enough to just stop refreshUnitDisplay from *consuming*
+   * pendingMoveAnimationByUnit (a prior fix did only that): this.currentUnits
+   * is updated to the new snapshot's positions before applySnapshot's own
+   * per-unit loop even starts, so any *other* caller of upsertUnit for the
+   * same unit - even with no pendingMoveKind of its own - sees a "position
+   * changed" and would restart animateUnitMove as a plain "slide", cancelling
+   * whatever bespoke animation is already mid-flight. Backtrack's own heal
+   * indicator is a real, reproducible trigger for exactly this: it fires via
+   * IndicatorScheduler on the next JS task tick (its cursor is stale between
+   * turns), almost always before the just-started "backtrack-trail" tween
+   * has spawned a single ghost.
+   */
+  private async upsertUnit(
+    unit: UnitSnapshot,
+    pendingMoveKind?: "backtrack-trail" | "teleport",
+    applyMoveAnimation = true,
+  ): Promise<void> {
     // Knowable before the lookup/creation branch below - covers both a
     // unit's very first appearance and a fog-of-war reveal (the opponent's
     // roster only ever appearing once the match actually starts). A reveal
@@ -848,15 +1162,18 @@ export class Board {
     if (isNewUnit) {
       // First appearance / fog-of-war reveal - place immediately, no slide.
       container.position.set(pos.x, pos.y);
-    } else if (container.position.x !== pos.x || container.position.y !== pos.y) {
+    } else if (applyMoveAnimation && (container.position.x !== pos.x || container.position.y !== pos.y)) {
       // Generic "did this unit's position change" check - covers the plain
       // Move ability, Backtrack, Dislocation, Cloak and Dagger's teleport,
       // anything, since they all just result in a different q,r in the next
-      // snapshot. No ability-specific special-casing needed.
-      this.animateUnitMove(unit.id, container, pos);
+      // snapshot. pendingMoveKind (set by playVfx from the preceding vfx
+      // batch) is the only per-ability special-casing needed, for the two
+      // moves with their own bespoke animation.
+      this.animateUnitMove(unit.id, container, pos, pendingMoveKind ?? "slide");
     }
-    // else: position is unchanged, leave it exactly where it is (including
-    // mid-tween, if a tween somehow lands on the same target - nothing to do).
+    // else: position is unchanged (or applyMoveAnimation is false, e.g. an
+    // incidental HP/dead-only refresh) - leave it exactly where it is
+    // (including mid-tween - nothing to do).
   }
 
   /**
@@ -867,8 +1184,19 @@ export class Board {
    * finished), it's cancelled first and the new tween starts from the
    * sprite's current (mid-tween) position rather than the old target, so the
    * motion reads as continuous instead of snapping or fighting itself.
+   *
+   * `kind` swaps in a bespoke animation for the two casts that need one -
+   * "teleport" (Dislocation) is different enough (no travel phase at all,
+   * scale rather than position tweened) that it's a separate method entirely;
+   * "backtrack-trail" is the same slide with afterimage circles dropped
+   * alongside it.
    */
-  private animateUnitMove(unitId: string, container: Container, target: { x: number; y: number }): void {
+  private animateUnitMove(
+    unitId: string,
+    container: Container,
+    target: { x: number; y: number },
+    kind: "slide" | "backtrack-trail" | "teleport" = "slide",
+  ): void {
     const existingTick = this.activeMoveTicks.get(unitId);
     if (existingTick) {
       Ticker.shared.remove(existingTick);
@@ -876,20 +1204,453 @@ export class Board {
     }
 
     const start = { x: container.position.x, y: container.position.y };
+    if (kind === "teleport") {
+      this.animateTeleportMove(unitId, container, start, target);
+      return;
+    }
+
     const dx = target.x - start.x;
     const dy = target.y - start.y;
     let elapsed = 0;
+    let trailCursor = 0;
 
-    const tick = () => {
+    const tick = safeTick(() => {
       elapsed += 1;
       const t = Math.min(1, elapsed / MOVE_TWEEN_FRAMES);
       const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
       container.position.set(start.x + dx * eased, start.y + dy * eased);
+      if (kind === "backtrack-trail" && elapsed - trailCursor >= BACKTRACK_TRAIL_INTERVAL_FRAMES) {
+        trailCursor = elapsed;
+        this.spawnBacktrackTrailGhost(container.position.x, container.position.y);
+      }
       if (t >= 1) {
         Ticker.shared.remove(tick);
         this.activeMoveTicks.delete(unitId);
       }
+    });
+    this.activeMoveTicks.set(unitId, tick);
+    Ticker.shared.add(tick);
+  }
+
+  /** A single fading afterimage circle for Backtrack's trail - self-contained/self-cleaning, same pattern as ParticleBurst's own dots. */
+  private spawnBacktrackTrailGhost(x: number, y: number): void {
+    const radius = (HEX_SIZE * UNIT_SPRITE_SCALE) / 2;
+    const ghost = new Graphics().circle(0, 0, radius).fill({ color: BACKTRACK_TRAIL_COLOR, alpha: BACKTRACK_TRAIL_ALPHA });
+    ghost.position.set(x, y);
+    this.vfxLayer.addChild(ghost);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      ghost.alpha = BACKTRACK_TRAIL_ALPHA * Math.max(0, 1 - elapsed / BACKTRACK_TRAIL_LIFE_FRAMES);
+      if (elapsed >= BACKTRACK_TRAIL_LIFE_FRAMES) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        ghost.destroy();
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /** Every unit's current Overheat heat gauge, by id - see spawnOverheatBursts. */
+  private overheatAccumulatedByUnit(units: UnitSnapshot[]): Map<string, number> {
+    const map = new Map<string, number>();
+    for (const unit of units) {
+      const effect = unit.effects.find((e) => e.name === "Overheating");
+      const accumulated = effect ? this.parseOverheatAccumulated(effect.extraInfo) : null;
+      if (accumulated !== null) map.set(unit.id, accumulated);
+    }
+    return map;
+  }
+
+  /** OverheatTrackerEffect.java's extraInfo is "Heat: <accumulated> / <threshold>". */
+  private parseOverheatAccumulated(extraInfo: string | null): number | null {
+    if (!extraInfo) return null;
+    const match = /^Heat:\s*(\d+)\s*\/\s*\d+$/.exec(extraInfo);
+    return match ? Number(match[1]) : null;
+  }
+
+  /**
+   * Overheat (Ember) has no vfx event of its own to hook - the only trace of
+   * a proc is that the victim's own "Overheating" tracker effect resets
+   * (OverheatTrackerEffect.consumeProc() is the only thing that ever lowers
+   * `accumulated` - it otherwise only grows), so a drop between two
+   * consecutive snapshots is the proc. The burst plays on the overheating
+   * unit itself - the epicenter of the neighbour-ignite effect ("makes it
+   * overheat and set its neighbours alight"), not on Ember.
+   */
+  private spawnOverheatBursts(previous: Map<string, number>, units: UnitSnapshot[]): void {
+    for (const unit of units) {
+      const effect = unit.effects.find((e) => e.name === "Overheating");
+      if (!effect) continue;
+      const now = this.parseOverheatAccumulated(effect.extraInfo);
+      const before = previous.get(unit.id);
+      if (now === null || before === undefined || now >= before) continue;
+      const pos = axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE);
+      spawnParticleBurst(this.vfxLayer, Ticker.shared, { x: pos.x, y: pos.y, color: OVERHEAT_BURST_COLOR, count: 16, speed: 2.2, life: 26, radius: 3 });
+    }
+  }
+
+  /** Eruption's cast burst - red particles bursting upward off a newly-ignited tile. */
+  private spawnEruptionBurst(q: number, r: number): void {
+    const { x, y } = axialToPixel({ q, r }, HEX_SIZE);
+    spawnParticleBurst(this.vfxLayer, Ticker.shared, {
+      x,
+      y,
+      color: ERUPTION_BURST_COLOR,
+      count: 22,
+      speed: 2.4,
+      life: 30,
+      radius: 3,
+      directionDeg: -90,
+      spreadDeg: 70,
+    });
+  }
+
+  /**
+   * Pylon's cast: a small orb drops from a synthetic point above the map onto
+   * the target tile, then reveals the pylon's already-placed (but hidden)
+   * sprite. Self-contained/self-cleaning, same pattern as the attack
+   * animation trail particles - not tracked in a teardown set.
+   */
+  private spawnPylonSkyDrop(q: number, r: number, container: Container): void {
+    const target = axialToPixel({ q, r }, HEX_SIZE);
+    const from = { x: target.x, y: target.y - PYLON_SKY_OFFSET_PX };
+    const orb = new Graphics().circle(0, 0, PYLON_ORB_RADIUS_PX).fill({ color: PYLON_ORB_COLOR });
+    orb.position.set(from.x, from.y);
+    this.vfxLayer.addChild(orb);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const t = Math.min(1, elapsed / PYLON_DROP_FRAMES);
+      const eased = 1 - Math.pow(1 - t, 3);
+      orb.position.set(from.x + (target.x - from.x) * eased, from.y + (target.y - from.y) * eased);
+      if (t >= 1) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        orb.destroy();
+        // The pylon may already have died (and had its container destroyed by
+        // applySnapshot's cleanup) before this ~0.5s drop finished.
+        if (!container.destroyed) container.visible = true;
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /**
+   * Mimic's cast: particles spawn at randomised points within the copied
+   * unit's own icon radius (not just its centre) and travel to Joker,
+   * per temp/abilities2.txt. Positions are resolved once, at cast time - a
+   * ~0.5s flight is short enough that either unit moving mid-flight is an
+   * acceptable, rarely-visible edge case, the same tradeoff Duel's banners
+   * and Static Link's endpoints already make.
+   */
+  private spawnMimicParticles(targetUnitId: string, casterUnitId: string): void {
+    this.spawnConvergingParticles(targetUnitId, casterUnitId, MIMIC_PARTICLE_COLORS, MIMIC_PARTICLE_COUNT);
+  }
+
+  /**
+   * Soul Rip can target an ally or an enemy (see SoulRip.java) - against an enemy,
+   * particles are drained from them to the caster same as Mimic's shape; against an
+   * ally, the direction reverses and particles start on the caster instead, per
+   * temp/abilities.txt.
+   */
+  private spawnSoulRip(casterUnitId: string, targetUnitId: string): void {
+    const snapshot = this.store.getState().snapshot;
+    const caster = snapshot?.units.find((u) => u.id === casterUnitId);
+    const target = snapshot?.units.find((u) => u.id === targetUnitId);
+    const isAlly = !!caster && !!target && caster.team === target.team;
+    const [from, to] = isAlly ? [casterUnitId, targetUnitId] : [targetUnitId, casterUnitId];
+    this.spawnConvergingParticles(
+      from,
+      to,
+      SOUL_RIP_PARTICLE_COLORS,
+      SOUL_RIP_PARTICLE_COUNT,
+      SOUL_RIP_PARTICLE_LIFE_FRAMES,
+      SOUL_RIP_PARTICLE_RADIUS_PX,
+    );
+  }
+
+  /**
+   * Particles spawn at a uniform point inside `fromUnitId`'s own icon radius and
+   * converge (ease-in) on `toUnitId` - Mimic's original shape, generalized so Soul
+   * Rip/Decay (and anything else with this "drain" look) can reuse it with their
+   * own colors/count/lifetime rather than duplicating the animation.
+   */
+  private spawnConvergingParticles(
+    fromUnitId: string,
+    toUnitId: string,
+    colors: number[],
+    count: number,
+    lifeFrames: number = MIMIC_PARTICLE_LIFE_FRAMES,
+    dotRadius: number = 2.5,
+  ): void {
+    const fromPos = this.resolveUnitPosition(fromUnitId);
+    const toPos = this.resolveUnitPosition(toUnitId);
+    if (!fromPos || !toPos) return;
+    const radius = (HEX_SIZE * UNIT_SPRITE_SCALE) / 2;
+    for (let i = 0; i < count; i++) {
+      // sqrt(random) for the radius avoids the centre-bunching a plain uniform draw would cause.
+      const angle = Math.random() * Math.PI * 2;
+      const r = radius * Math.sqrt(Math.random());
+      const startX = fromPos.x + Math.cos(angle) * r;
+      const startY = fromPos.y + Math.sin(angle) * r;
+      const color = colors[i % colors.length];
+      const dot = new Graphics().circle(0, 0, dotRadius).fill({ color });
+      dot.position.set(startX, startY);
+      this.vfxLayer.addChild(dot);
+      let elapsed = 0;
+      const tick = safeTick(() => {
+        elapsed += 1;
+        const t = Math.min(1, elapsed / lifeFrames);
+        const eased = t * t; // ease-in - starts slow, accelerates toward the destination
+        dot.position.set(startX + (toPos.x - startX) * eased, startY + (toPos.y - startY) * eased);
+        dot.alpha = 1 - t;
+        if (t >= 1) {
+          Ticker.shared.remove(tick);
+          this.activeVfxOneShotTicks.delete(tick);
+          dot.destroy();
+        }
+      });
+      this.activeVfxOneShotTicks.add(tick);
+      Ticker.shared.add(tick);
+    }
+  }
+
+  /**
+   * A single hollow ring growing from nothing to `radiusPx`, fading slightly
+   * as it grows - Overwhelming Odds' cast and Pylon Collapse's death burst
+   * share this exact shape, differing only in colour/radius/duration.
+   */
+  private spawnOneShotPulse(pos: { x: number; y: number }, radiusPx: number, color: number, frames: number): void {
+    const ring = new Graphics();
+    ring.position.set(pos.x, pos.y);
+    this.vfxLayer.addChild(ring);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const t = Math.min(1, elapsed / frames);
+      const eased = 1 - Math.pow(1 - t, 3);
+      ring.clear().circle(0, 0, radiusPx * eased).stroke({ width: 3, color, alpha: 1 - t * 0.3 });
+      if (t >= 1) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        ring.destroy();
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /**
+   * A filled circle growing from radius 0/alpha 0 to `radiusPx`/full opacity over
+   * `frames`, both driven by the same progress value rather than independently
+   * eased - Sprout/Overgrowth's cast per temp/abilities.txt ("opacity should also
+   * start at 0%, and scale up to 100% the same rate as the circle growth").
+   * Overgrowth reuses this at a larger radius rather than a separate shape.
+   * `onComplete` fires once, after the circle has destroyed itself - the caller
+   * uses it to reveal the Branchling(s) only once the circle has finished (see
+   * applySnapshot's held-back-summon handling).
+   */
+  private spawnGrowingFilledCircle(
+    pos: { x: number; y: number },
+    radiusPx: number,
+    color: number,
+    frames: number,
+    onComplete: () => void,
+  ): void {
+    const circle = new Graphics();
+    circle.position.set(pos.x, pos.y);
+    this.vfxLayer.addChild(circle);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const t = Math.min(1, elapsed / frames);
+      circle.clear().circle(0, 0, radiusPx * t).fill({ color, alpha: t });
+      if (t >= 1) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        circle.destroy();
+        onComplete();
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /**
+   * Sanity's Eclipse's charge phase: a small orb hooked to the caster's own
+   * *live* position (re-resolved every frame, so it correctly follows him if
+   * he moves while it charges), with particles continuously spawning around
+   * it and converging in. Replaces any existing charge for this caster first,
+   * so a fresh cast (or the upgrade's recast, see applySnapshot) never leaks
+   * a duplicate.
+   */
+  private startSanityEclipseCharge(casterUnitId: string): void {
+    this.stopSanityEclipseCharge(casterUnitId);
+    const orb = new Graphics().circle(0, 0, SANITY_ECLIPSE_ORB_RADIUS_PX).fill({ color: SANITY_ECLIPSE_COLOR, alpha: 0.85 });
+    this.vfxLayer.addChild(orb);
+    let particleCursor = 0;
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const pos = this.resolveUnitPosition(casterUnitId);
+      if (pos) orb.position.set(pos.x, pos.y - SANITY_ECLIPSE_ORB_Y_OFFSET_PX);
+      if (elapsed - particleCursor >= SANITY_ECLIPSE_PARTICLE_INTERVAL_FRAMES) {
+        particleCursor = elapsed;
+        this.spawnSanityEclipseChargeParticle(orb);
+      }
+    });
+    Ticker.shared.add(tick);
+    this.sanityEclipseCharges.set(casterUnitId, { orb, tick });
+  }
+
+  private stopSanityEclipseCharge(casterUnitId: string): void {
+    const charge = this.sanityEclipseCharges.get(casterUnitId);
+    if (!charge) return;
+    Ticker.shared.remove(charge.tick);
+    charge.orb.destroy();
+    this.sanityEclipseCharges.delete(casterUnitId);
+  }
+
+  /** One converging particle - reads `orb`'s position live every frame, so it tracks a moving/growing orb for free. */
+  private spawnSanityEclipseChargeParticle(orb: Graphics): void {
+    const angle = Math.random() * Math.PI * 2;
+    const startX = orb.position.x + Math.cos(angle) * SANITY_ECLIPSE_PARTICLE_SPAWN_RADIUS_PX;
+    const startY = orb.position.y + Math.sin(angle) * SANITY_ECLIPSE_PARTICLE_SPAWN_RADIUS_PX;
+    const dot = new Graphics().circle(0, 0, 2).fill({ color: SANITY_ECLIPSE_COLOR });
+    dot.position.set(startX, startY);
+    this.vfxLayer.addChild(dot);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      // The orb can be destroyed (stopSanityEclipseCharge, e.g. on detonation or a fresh
+      // recast) while this particle is still mid-flight, chasing it - reading `.position` on
+      // a destroyed Graphics throws (Pixi nulls it out), which safeTick would catch, but only
+      // after removing the ticker, never destroying `dot` itself, leaving it stuck on screen
+      // forever. Checked and handled explicitly here instead of relying on that throw.
+      if (orb.destroyed) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        dot.destroy();
+        return;
+      }
+      elapsed += 1;
+      const t = Math.min(1, elapsed / SANITY_ECLIPSE_PARTICLE_LIFE_FRAMES);
+      dot.position.set(
+        dot.position.x + (orb.position.x - dot.position.x) * 0.15,
+        dot.position.y + (orb.position.y - dot.position.y) * 0.15,
+      );
+      dot.alpha = 1 - t;
+      if (t >= 1) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        dot.destroy();
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /**
+   * Sanity's Eclipse's detonation: grows the charging orb to 1.5 tiles wide
+   * and flies it to the centroid of every victim actually hit (there's no
+   * tile position anywhere on the wire - see API_CONTRACT.md/EffectSnapshot -
+   * so the victims' own resolved positions are the only usable signal, and
+   * conveniently work identically for the local player's own casts and the
+   * opponent's), then hands off to spawnSanityEclipsePulses.
+   */
+  private detonateSanityEclipse(casterUnitId: string, targetPositions: { x: number; y: number }[]): void {
+    if (targetPositions.length === 0) return;
+    const centroid = {
+      x: targetPositions.reduce((sum, p) => sum + p.x, 0) / targetPositions.length,
+      y: targetPositions.reduce((sum, p) => sum + p.y, 0) / targetPositions.length,
     };
+    const charge = this.sanityEclipseCharges.get(casterUnitId);
+    const from = charge ? { x: charge.orb.position.x, y: charge.orb.position.y } : centroid;
+    this.stopSanityEclipseCharge(casterUnitId);
+
+    const orb = new Graphics();
+    orb.position.set(from.x, from.y);
+    this.vfxLayer.addChild(orb);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const t = Math.min(1, elapsed / SANITY_ECLIPSE_FLY_FRAMES);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const radius = SANITY_ECLIPSE_ORB_RADIUS_PX + (SANITY_ECLIPSE_DETONATE_RADIUS_PX - SANITY_ECLIPSE_ORB_RADIUS_PX) * eased;
+      orb.position.set(from.x + (centroid.x - from.x) * eased, from.y + (centroid.y - from.y) * eased);
+      orb.clear().circle(0, 0, radius).fill({ color: SANITY_ECLIPSE_COLOR, alpha: 0.85 });
+      if (t >= 1) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        orb.destroy();
+        this.spawnSanityEclipsePulses(centroid);
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /** ~3 fast pulses over ~0.7s at the impact point - one ticker cycling through them, rather than 3 staggered calls. */
+  private spawnSanityEclipsePulses(pos: { x: number; y: number }): void {
+    const framesPerPulse = Math.round(SANITY_ECLIPSE_PULSE_TOTAL_FRAMES / SANITY_ECLIPSE_PULSE_COUNT);
+    const ring = new Graphics();
+    ring.position.set(pos.x, pos.y);
+    this.vfxLayer.addChild(ring);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const pulseElapsed = elapsed % framesPerPulse;
+      const t = pulseElapsed / framesPerPulse;
+      const eased = 1 - Math.pow(1 - t, 3);
+      ring.clear().circle(0, 0, SANITY_ECLIPSE_DETONATE_RADIUS_PX * eased).stroke({ width: 3, color: SANITY_ECLIPSE_COLOR, alpha: 1 - t * 0.5 });
+      if (elapsed >= SANITY_ECLIPSE_PULSE_TOTAL_FRAMES) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        ring.destroy();
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /**
+   * Dislocation's teleport: shrinks to nothing at the old tile, jumps
+   * straight to the new one (no travel phase - it's gone, then it's there),
+   * then grows back from nothing. Tweens `container.scale` rather than
+   * position for the two phases, unlike the plain slide.
+   */
+  private animateTeleportMove(
+    unitId: string,
+    container: Container,
+    start: { x: number; y: number },
+    target: { x: number; y: number },
+  ): void {
+    container.position.set(start.x, start.y);
+    let phase: "shrink" | "grow" = "shrink";
+    let elapsed = 0;
+
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const t = Math.min(1, elapsed / TELEPORT_PHASE_FRAMES);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      if (phase === "shrink") {
+        container.scale.set(1 - eased);
+        if (t >= 1) {
+          phase = "grow";
+          elapsed = 0;
+          container.position.set(target.x, target.y);
+        }
+        return;
+      }
+      container.scale.set(eased);
+      if (t >= 1) {
+        container.scale.set(1);
+        Ticker.shared.remove(tick);
+        this.activeMoveTicks.delete(unitId);
+      }
+    });
     this.activeMoveTicks.set(unitId, tick);
     Ticker.shared.add(tick);
   }

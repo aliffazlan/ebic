@@ -69,7 +69,7 @@ public class StaticLinkEffect extends Effect {
     @Override
     public void onDeath(GameState state, DeathEvent event) {
         if (event.unit() == getOwner() || event.unit() == target) {
-            breakLink();
+            breakLink(state);
         }
     }
 
@@ -100,7 +100,7 @@ public class StaticLinkEffect extends Effect {
             return;
         }
         if (state.getMap().getDistance(getOwner().getPosition(), target.getPosition()) > linkRange) {
-            breakLink();
+            breakLink(state);
             return;
         }
         // The free attack goes straight through CombatEngine, which has no range check of its
@@ -109,13 +109,15 @@ public class StaticLinkEffect extends Effect {
         CombatEngine.performAttack(state, new WeightedEncounter(getOwner(), target));
     }
 
-    private void breakLink() {
+    private void breakLink(GameState state) {
         if (casterBuff != null) {
             casterBuff.setRemainingTurns(lingerDuration);
         }
         if (targetDebuff != null) {
             targetDebuff.setRemainingTurns(lingerDuration);
         }
-        setRemainingTurns(0);
+        // Remove now rather than leaving this visible to the frontend until the owner's next
+        // scheduled sweep (startTurn/endTurn), which could be a full opponent turn away.
+        expireNow(state);
     }
 }
