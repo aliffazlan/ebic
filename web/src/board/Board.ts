@@ -2247,8 +2247,8 @@ export class Board {
     panel.addChild(
       new Graphics()
         .roundRect(startX - iconSize / 2 - 8, y - iconSize / 2 - 8, spacing * (units.length - 1) + iconSize + 16, iconSize + 16, 8)
-        .fill({ color: 0x0f172a, alpha: 0.92 })
-        .stroke({ width: 1, color: 0x334155 }),
+        .fill({ color: 0x0e0b0b, alpha: 0.92 })
+        .stroke({ width: 1, color: 0x3a1414 }),
     );
     this.stackPickerLayer.addChild(panel);
 

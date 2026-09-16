@@ -1,6 +1,37 @@
 :root {
   color-scheme: dark;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* surfaces - warm near-blacks, not pure #000, so glow/borders read */
+  --void: #050404; /* page + canvas backdrop - keep in sync with index.html:11 */
+  --panel-sunken: #080606; /* inset wells: unit/choice/encounter cards, hp track */
+  --panel: #0e0b0b; /* cards, modals, settings panel */
+  --panel-raised: #141010; /* hud-host, log-host, footer, chips, inputs */
+
+  /* borders - blood red, brightening on hover */
+  --border: #3a1414;
+  --border-strong: #5e1f1f;
+  --border-dim: #241010;
+
+  /* accents */
+  --ember: #b91c1c;
+  --ember-bright: #ef4444;
+  --flame: #f97316;
+
+  /* static glow (no keyframes) */
+  --glow-panel: 0 0 0 1px rgba(239, 68, 68, 0.08), 0 0 26px rgba(239, 68, 68, 0.16), 0 10px 40px rgba(0, 0, 0, 0.75);
+  --glow-modal: 0 0 0 1px rgba(239, 68, 68, 0.12), 0 0 44px rgba(239, 68, 68, 0.24), 0 18px 60px rgba(0, 0, 0, 0.85);
+  --glow-card: 0 0 14px rgba(239, 68, 68, 0.1);
+  --glow-hover: 0 0 18px rgba(239, 68, 68, 0.32);
+  --glow-primary: 0 0 16px rgba(239, 68, 68, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* text ramp - warm off-white, contrast-checked against --panel (#0e0b0b) */
+  --text: #f3e9e7;
+  --text-soft: #d8cbc9;
+  --text-muted: #ab9d9b;
+  --text-dim: #867775;
+
+  --scrim: rgba(0, 0, 0, 0.78);
 }
 
 * {
@@ -13,23 +44,33 @@ html, body, #app {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--void);
+  color: var(--text);
+}
+
+/* Containing block for .centered-screen's position: absolute, so an outgoing
+   and incoming screen can overlap during an animated hand-off. */
+#app {
+  position: relative;
 }
 
 button {
   font-family: inherit;
   cursor: pointer;
-  background: #334155;
-  color: #e2e8f0;
-  border: 1px solid #475569;
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 14px;
   font-size: 14px;
+  box-shadow: var(--glow-card);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 button:hover:not(:disabled) {
-  background: #475569;
+  background: #1c1414;
+  border-color: var(--border-strong);
+  box-shadow: var(--glow-hover);
 }
 
 button:disabled {
@@ -38,25 +79,38 @@ button:disabled {
 }
 
 button.primary {
-  background: #2563eb;
-  border-color: #3b82f6;
+  background: var(--ember);
+  border-color: var(--ember-bright);
+  box-shadow: var(--glow-primary);
 }
 button.primary:hover:not(:disabled) {
-  background: #3b82f6;
+  background: var(--ember-bright);
 }
 
-input {
+input, select {
   font-family: inherit;
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 1px solid #475569;
+  background: var(--panel-sunken);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 14px;
 }
 
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--ember-bright);
+  box-shadow: var(--glow-hover);
+}
+
+option, optgroup {
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
 .error-text {
-  color: #f87171;
+  color: #ff8a8a;
+  font-weight: 600;
   font-size: 13px;
   min-height: 18px;
 }
@@ -64,22 +118,27 @@ input {
 /* ---- centered-card screens (auth / lobby) ---- */
 
 .centered-screen {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 20px;
 }
 
 .card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 28px 32px;
   width: 340px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: var(--glow-panel);
 }
 
 .card h1 {
@@ -90,8 +149,125 @@ input {
 .card h2 {
   font-size: 15px;
   margin: 8px 0 4px;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
+
+/* ---- app logo + first-entry reveal ---- */
+
+.app-logo {
+  position: relative;
+  width: 384px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Small lava glow behind the wordmark. A blurred radial gradient rather than
+   box-shadow, since box-shadow traces the image's rectangle, not its shape. */
+.app-logo::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 130%;
+  height: 150%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(249, 115, 22, 0.22) 0%,
+    rgba(185, 28, 28, 0.14) 45%,
+    rgba(185, 28, 28, 0) 72%
+  );
+  filter: blur(8px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app-logo img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.app-logo.intro-reveal { animation: logo-reveal 3s ease-out both; }
+.card.intro-reveal     { animation: menu-reveal 1s ease-out 3s both; }
+
+@keyframes logo-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* visibility:hidden keeps the card unclickable during the 3s delay; `both`
+   holds the from-state through it so the card's layout space (and the
+   logo's final position) is reserved from frame one - no jump when it fades in. */
+@keyframes menu-reveal {
+  from { opacity: 0; visibility: hidden; }
+  to { opacity: 1; visibility: visible; }
+}
+
+/* ---- screen transitions (opt-in per navigation; skipped when Fast
+   Transitions is on). Direction names the direction of movement: "up" means
+   the outgoing screen leaves through the top. ---- */
+
+@keyframes slide-out-up    { from { transform: translateY(0); }  to { transform: translateY(-100%); } }
+@keyframes slide-out-down  { from { transform: translateY(0); }  to { transform: translateY(100%); } }
+@keyframes slide-out-left  { from { transform: translateX(0); }  to { transform: translateX(-100%); } }
+@keyframes slide-out-right { from { transform: translateX(0); }  to { transform: translateX(100%); } }
+
+@keyframes slide-in-from-bottom { from { transform: translateY(100%); }  to { transform: translateY(0); } }
+@keyframes slide-in-from-top    { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+@keyframes slide-in-from-right  { from { transform: translateX(100%); }  to { transform: translateX(0); } }
+@keyframes slide-in-from-left   { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+
+/* pointer-events: none for the full animation - guards against clicking
+   something on the screen sliding away, or on the incoming one before it's
+   actually in place. ScreenTransition.ts removes both classes on
+   animationend; the outgoing element is usually removed at that same moment
+   anyway. Duration/easing must stay in sync with SLIDE_MS in
+   ScreenTransition.ts. */
+.screen-slide-out-up,
+.screen-slide-out-down,
+.screen-slide-out-left,
+.screen-slide-out-right,
+.screen-slide-in-from-bottom,
+.screen-slide-in-from-top,
+.screen-slide-in-from-right,
+.screen-slide-in-from-left {
+  animation-duration: 800ms;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+  pointer-events: none;
+}
+
+.screen-slide-out-up    { animation-name: slide-out-up; }
+.screen-slide-out-down  { animation-name: slide-out-down; }
+.screen-slide-out-left  { animation-name: slide-out-left; }
+.screen-slide-out-right { animation-name: slide-out-right; }
+.screen-slide-in-from-bottom { animation-name: slide-in-from-bottom; }
+.screen-slide-in-from-top    { animation-name: slide-in-from-top; }
+.screen-slide-in-from-right  { animation-name: slide-in-from-right; }
+.screen-slide-in-from-left   { animation-name: slide-in-from-left; }
+
+/* ---- game-start / match-end fade to black ----
+   Above .hover-tooltip (z-index 1000, also on document.body) and everything
+   in #app. Match-end hands straight over to the logo intro-reveal, so its
+   clear-out is quick rather than a full 2s performance. */
+.fade-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  z-index: 2000;
+}
+
+.fade-overlay-in        { animation: fade-overlay-in 2000ms ease-in-out forwards; }
+.fade-overlay-out       { animation: fade-overlay-out 2000ms ease-in-out forwards; }
+.fade-overlay-out-quick { animation: fade-overlay-out 500ms linear forwards; }
+
+@keyframes fade-overlay-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-overlay-out { from { opacity: 1; } to { opacity: 0; } }
 
 .field {
   display: flex;
@@ -101,20 +277,20 @@ input {
 
 .field label {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .link-btn {
   background: none;
   border: none;
-  color: #60a5fa;
+  color: var(--flame);
   padding: 2px;
   font-size: 13px;
   text-decoration: underline;
 }
 .link-btn:hover {
   background: none;
-  color: #93c5fd;
+  color: #fdba74;
 }
 
 .row {
@@ -127,8 +303,8 @@ input {
   letter-spacing: 4px;
   font-weight: 700;
   text-align: center;
-  background: #0f172a;
-  border: 1px dashed #475569;
+  background: var(--panel-sunken);
+  border: 1px dashed var(--border-strong);
   border-radius: 8px;
   padding: 10px;
   color: #facc15;
@@ -136,7 +312,7 @@ input {
 
 .hint {
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-dim);
 }
 
 /* ---- match screen layout ---- */
@@ -163,8 +339,8 @@ input {
   /* Width comes from the children now: the panel is fixed, and collapsing it
      leaves only the tab rail, which the board then expands into. */
   flex: 0 0 auto;
-  background: #111827;
-  border-right: 1px solid #334155;
+  background: var(--panel-raised);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: row;
   overflow: hidden;
@@ -187,8 +363,8 @@ input {
   flex-direction: column;
   gap: 6px;
   padding: 8px 4px;
-  background: #0f172a;
-  border-right: 1px solid #334155;
+  background: var(--void);
+  border-right: 1px solid var(--border);
 }
 
 .log-tab {
@@ -208,13 +384,13 @@ input {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #f87171;
+  background: var(--ember-bright);
 }
 
 .hud-host {
   flex: 0 0 320px;
-  background: #111827;
-  border-left: 1px solid #334155;
+  background: var(--panel-raised);
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -232,20 +408,20 @@ input {
 .hud-footer {
   flex: 0 0 auto;
   padding: 12px 14px;
-  border-top: 1px solid #334155;
-  background: #111827;
+  border-top: 1px solid var(--border);
+  background: var(--panel-raised);
 }
 
 .hud-section {
   padding: 12px 14px;
-  border-bottom: 1px solid #1f2937;
+  border-bottom: 1px solid var(--border-dim);
 }
 
 .hud-section h3 {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #64748b;
+  color: var(--text-dim);
   margin: 0 0 8px;
 }
 
@@ -289,7 +465,7 @@ input {
   min-height: 0;
   overflow-y: auto;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-muted);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -312,14 +488,14 @@ input {
 }
 .unit-panel-sub {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-bottom: 8px;
 }
 
 .hp-bar-outer {
   width: 100%;
   height: 8px;
-  background: #0f172a;
+  background: var(--panel-sunken);
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -352,7 +528,7 @@ input {
  */
 .ability-btn.upgraded {
   border-color: #d4a72c;
-  background: linear-gradient(180deg, #2a2110 0%, #1e293b 100%);
+  background: linear-gradient(180deg, #2a2110 0%, var(--panel-raised) 100%);
 }
 .ability-btn.upgraded > span:first-child {
   color: #fcd34d;
@@ -406,9 +582,9 @@ input {
   border-color: #991b1b;
 }
 .effect-chip.effect-neutral {
-  background: #1e293b;
-  color: #94a3b8;
-  border-color: #334155;
+  background: var(--panel-raised);
+  color: var(--text-muted);
+  border-color: var(--border);
 }
 
 /* ---- shared hover tooltip (replaces native `title`) - effect chips, ---- */
@@ -418,14 +594,14 @@ input {
   position: fixed;
   z-index: 1000;
   max-width: 260px;
-  background: #0f172a;
-  border: 1px solid #475569;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 12px;
   line-height: 1.4;
-  color: #e2e8f0;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  box-shadow: var(--glow-panel);
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
@@ -443,7 +619,7 @@ input {
 }
 
 .hover-tooltip-meta {
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
@@ -458,7 +634,7 @@ input {
 }
 
 .hover-tooltip-hint {
-  color: #64748b;
+  color: var(--text-dim);
   font-style: italic;
   margin-top: 6px;
 }
@@ -466,7 +642,7 @@ input {
 .hover-tooltip-details {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: #cbd5e1;
+  color: var(--text-soft);
 }
 
 .hover-tooltip-details li {
@@ -479,11 +655,11 @@ input {
   gap: 2px 12px;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--border-dim);
 }
 
 .hover-tooltip-stat-key {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .hover-tooltip-stat-value {
@@ -554,7 +730,7 @@ input {
   min-height: 0;
   overflow-y: auto;
   font-size: 12px;
-  color: #cbd5e1;
+  color: var(--text-soft);
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -581,13 +757,15 @@ input {
   align-items: center;
   padding: 6px 10px;
   border-radius: 6px;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
   cursor: pointer;
   font-size: 12px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .placement-unit-row:hover {
-  border-color: #60a5fa;
+  border-color: var(--ember-bright);
+  box-shadow: var(--glow-hover);
 }
 .placement-unit-row.selected {
   outline: 2px solid #facc15;
@@ -625,8 +803,8 @@ input {
 .loading-progress-track {
   width: 100%;
   height: 8px;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--panel-sunken);
+  border: 1px solid var(--border);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -634,7 +812,8 @@ input {
 .loading-progress-fill {
   height: 100%;
   width: 0%;
-  background: #3b82f6;
+  background: linear-gradient(90deg, var(--ember) 0%, var(--flame) 100%);
+  box-shadow: var(--glow-hover);
   transition: width 0.15s ease-out;
 }
 
@@ -647,7 +826,7 @@ input {
   cursor: pointer;
   font-size: 24px;
   letter-spacing: 3px;
-  color: #e2e8f0;
+  color: var(--text);
   animation: click-to-continue-pulse 1.8s ease-in-out infinite;
 }
 
@@ -656,27 +835,20 @@ input {
   50% { opacity: 1; }
 }
 
-/* ---- settings modal ---- */
+/* ---- settings screen ---- */
 
-.settings-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(2, 6, 23, 0.75);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 20;
-}
-
+/* The settings screen's single centered card - same visual language as
+   .card, wider because its rows are label + control + value. */
 .settings-panel {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 24px;
   width: 360px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  box-shadow: var(--glow-panel);
 }
 
 .settings-row {
@@ -688,7 +860,7 @@ input {
 .settings-row label {
   flex: 1;
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .settings-row input[type="range"] {
@@ -699,15 +871,29 @@ input {
   width: 40px;
   text-align: right;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-muted);
+}
+
+/* The global `input, select` rule gives every input a panel background,
+   border and 8px 10px padding - all wrong for a native checkbox. */
+.settings-row input[type="checkbox"] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  accent-color: var(--ember-bright);
+  cursor: pointer;
 }
 
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   height: 4px;
-  background: #334155;
-  border: 1px solid #475569;
+  background: var(--panel-sunken);
+  border: 1px solid var(--border);
   border-radius: 999px;
   cursor: pointer;
 }
@@ -718,7 +904,8 @@ input[type="range"]::-webkit-slider-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--ember-bright);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
   cursor: pointer;
 }
 
@@ -727,7 +914,8 @@ input[type="range"]::-moz-range-thumb {
   height: 14px;
   border: none;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--ember-bright);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
   cursor: pointer;
 }
 
@@ -736,7 +924,7 @@ input[type="range"]::-moz-range-thumb {
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(2, 6, 23, 0.75);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -744,13 +932,14 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .modal-panel {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 24px;
   max-width: 90%;
   max-height: 90%;
   overflow-y: auto;
+  box-shadow: var(--glow-modal);
 }
 
 .draft-columns {
@@ -767,7 +956,7 @@ input[type="range"]::-moz-range-thumb {
 .draft-column h4 {
   margin: 0 0 10px;
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -779,19 +968,21 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .unit-card {
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--panel-sunken);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
   width: 180px;
   text-align: left;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .unit-card.clickable {
   cursor: pointer;
 }
 .unit-card.clickable:hover {
-  border-color: #60a5fa;
+  border-color: var(--ember-bright);
+  box-shadow: var(--glow-hover);
 }
 
 /* A fixed box, unlike the encounter's - a wrapping grid of every draftable hero
@@ -815,7 +1006,7 @@ input[type="range"]::-moz-range-thumb {
 
 .unit-card .stats {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin: 6px 0;
   text-align: center;
 }
@@ -845,16 +1036,19 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .choice-card {
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--panel-sunken);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
   cursor: pointer;
   text-align: left;
+  box-shadow: var(--glow-card);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .choice-card:hover {
-  border-color: #60a5fa;
+  border-color: var(--ember-bright);
+  box-shadow: var(--glow-hover);
 }
 
 /*
@@ -867,7 +1061,8 @@ input[type="range"]::-moz-range-thumb {
   cursor: not-allowed;
 }
 .choice-card-disabled:hover {
-  border-color: #334155;
+  border-color: var(--border);
+  box-shadow: none;
 }
 
 .choice-cancel {
@@ -881,16 +1076,16 @@ input[type="range"]::-moz-range-thumb {
 
 .choice-card-description {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-top: 6px;
   line-height: 1.45;
 }
 
 .ability-chip {
   display: inline-block;
-  background: #1e293b;
-  color: #cbd5e1;
-  border: 1px solid #334155;
+  background: var(--panel-raised);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 2px 7px;
   font-size: 11px;
@@ -914,11 +1109,12 @@ input[type="range"]::-moz-range-thumb {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--panel-sunken);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px 10px;
   text-align: center;
+  box-shadow: var(--glow-card);
 }
 
 /* No fixed height here, unlike a draft card: the taller fighter simply extends
@@ -941,7 +1137,7 @@ input[type="range"]::-moz-range-thumb {
   flex-shrink: 0;
   font-size: 13px;
   font-weight: 700;
-  color: #f97316;
+  color: var(--flame);
 }
 
 /* ---- full-body unit art (encounter cards, draft/codex cards) ---- */
@@ -1024,14 +1220,32 @@ input[type="range"]::-moz-range-thumb {
 
 /* ---- unit info (codex) ---- */
 
-/* Full-window rather than the lobby's fixed-width .card - the whole point is seeing many
-   heroes side by side. The toolbar stays put while the grid below it scrolls. */
+/* A window of its own rather than the lobby's fixed-width .card - the whole
+   point is seeing many heroes side by side. The outer element is the
+   full-bleed, absolutely positioned sliding root (so it can overlap the
+   lobby mid-transition, the way .centered-screen does); the inner one is the
+   panel. The toolbar stays put while the grid below it scrolls. */
 .codex-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.codex-window {
+  width: min(1180px, 92vw);
+  height: min(820px, 88vh);
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: var(--glow-modal);
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding: 20px 24px;
   gap: 16px;
+  overflow: hidden;
 }
 
 .codex-toolbar {
@@ -1083,7 +1297,7 @@ input[type="range"]::-moz-range-thumb {
   font-size: 56px;
   font-weight: 800;
   letter-spacing: 8px;
-  text-shadow: 0 2px 16px rgba(2, 6, 23, 0.9);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
   /* Never eat a board click - the banner sits directly over the play area. */
   pointer-events: none;
   opacity: 0;

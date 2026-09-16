@@ -19,6 +19,7 @@ import samplePlacement from "../fixtures/sample-placement.json";
 import type { Attribute, GameStateSnapshot, PlacementStateSnapshot, VfxEvent } from "../types/contract";
 import type { MatchActions } from "./MatchActions";
 import type { Screen } from "./Screen";
+import { CHROME_VOID_HEX } from "./Colors";
 
 export type FixtureMode = "match" | "placement";
 
@@ -141,7 +142,7 @@ export class FixtureScreen implements Screen, MatchActions {
 
   private async initPixi(canvasHost: HTMLDivElement): Promise<void> {
     const app = new Application();
-    await app.init({ background: "#0f172a", resizeTo: canvasHost, antialias: true });
+    await app.init({ background: CHROME_VOID_HEX, resizeTo: canvasHost, antialias: true });
     canvasHost.appendChild(app.canvas);
     this.app = app;
     this.board = new Board(app, this.store, {

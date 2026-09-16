@@ -13,6 +13,7 @@
 import { audioManager } from "../audio/AudioManager";
 import { ALL_ART_IDS, faceUrl, portraitUrl } from "../units/UnitArt";
 import type { Screen } from "./Screen";
+import { LOGO_URL } from "./Logo";
 
 function preloadImage(url: string): Promise<void> {
   return new Promise((resolve) => {
@@ -80,7 +81,7 @@ export class LoadingScreen implements Screen {
 
   private async runPreload(): Promise<void> {
     const ids = ALL_ART_IDS;
-    const total = ids.length * 2 + 1; // icon + portrait per id, + music
+    const total = ids.length * 2 + 2; // icon + portrait per id, + music + logo
     let done = 0;
     const tick = () => {
       done += 1;
@@ -92,6 +93,7 @@ export class LoadingScreen implements Screen {
       preloadImage(portraitUrl(id)).then(tick),
     ]);
     tasks.push(audioManager.preloadMusic().then(tick));
+    tasks.push(preloadImage(LOGO_URL).then(tick));
 
     await Promise.all(tasks);
     this.onDone();

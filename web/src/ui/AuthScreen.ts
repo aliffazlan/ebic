@@ -1,6 +1,7 @@
 import { api, ApiError } from "../net/api";
 import type { AuthUser } from "../types/contract";
 import type { Screen } from "./Screen";
+import { renderLogo } from "./Logo";
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 
@@ -9,10 +10,12 @@ export class AuthScreen implements Screen {
   private mode: "login" | "register" = "login";
   private root: HTMLElement;
   private onAuthed: (user: AuthUser) => void;
+  private playIntro: boolean;
 
-  constructor(root: HTMLElement, onAuthed: (user: AuthUser) => void) {
+  constructor(root: HTMLElement, onAuthed: (user: AuthUser) => void, playIntro = false) {
     this.root = root;
     this.onAuthed = onAuthed;
+    this.playIntro = playIntro;
   }
 
   mount(): void {
@@ -24,19 +27,20 @@ export class AuthScreen implements Screen {
     this.el = null;
   }
 
+  getElement(): HTMLElement | null {
+    return this.el;
+  }
+
   private render(): void {
     this.el?.remove();
 
     const wrap = document.createElement("div");
     wrap.className = "centered-screen";
+    wrap.appendChild(renderLogo(this.playIntro));
 
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = this.playIntro ? "card intro-reveal" : "card";
     wrap.appendChild(card);
-
-    const title = document.createElement("h1");
-    title.textContent = "EBIC";
-    card.appendChild(title);
 
     const subtitle = document.createElement("div");
     subtitle.className = "hint";
@@ -108,6 +112,9 @@ export class AuthScreen implements Screen {
 
     this.root.appendChild(wrap);
     this.el = wrap;
+    // Consumed after one render - the mode-switch button above calls
+    // render() again, and that re-render must never replay the intro.
+    this.playIntro = false;
   }
 
   private buildField(name: string, type: string): { field: HTMLElement; input: HTMLInputElement } {

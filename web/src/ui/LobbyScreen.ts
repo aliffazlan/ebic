@@ -1,7 +1,9 @@
 import { api, ApiError } from "../net/api";
-import { SettingsModal } from "./SettingsModal";
-import type { AuthUser, BotLevel, Team, UnitDefinitionSnapshot } from "../types/contract";
+import { getFastTransitions } from "../app/AppSettings";
+import type { AuthUser, BotLevel, Team } from "../types/contract";
 import type { Screen } from "./Screen";
+import { renderLogo } from "./Logo";
+import { slideScreens, type SlideDirection } from "./ScreenTransition";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -13,21 +15,24 @@ const BOT_LEVELS: ReadonlyArray<{ value: BotLevel; label: string }> = [
 export interface LobbyCallbacks {
   onMatchReady(matchId: string, yourTeam: Team): void;
   onOpenCodex(): void;
+  onOpenSettings(): void;
   onLogout(): void;
 }
 
 export class LobbyScreen implements Screen {
   private el: HTMLElement | null = null;
+  private outgoingEl: HTMLElement | null = null;
   private pollHandle: ReturnType<typeof setInterval> | null = null;
   private root: HTMLElement;
   private user: AuthUser;
   private callbacks: LobbyCallbacks;
-  private settingsModal = new SettingsModal();
+  private playIntro: boolean;
 
-  constructor(root: HTMLElement, user: AuthUser, callbacks: LobbyCallbacks) {
+  constructor(root: HTMLElement, user: AuthUser, callbacks: LobbyCallbacks, playIntro = false) {
     this.root = root;
     this.user = user;
     this.callbacks = callbacks;
+    this.playIntro = playIntro;
   }
 
   mount(): void {
@@ -36,9 +41,14 @@ export class LobbyScreen implements Screen {
 
   unmount(): void {
     this.stopPolling();
-    this.settingsModal.close();
+    this.outgoingEl?.remove();
+    this.outgoingEl = null;
     this.el?.remove();
     this.el = null;
+  }
+
+  getElement(): HTMLElement | null {
+    return this.el;
   }
 
   private stopPolling(): void {
@@ -48,35 +58,55 @@ export class LobbyScreen implements Screen {
     }
   }
 
+  /**
+   * Swaps one lobby sub-view for another. These two views belong to the same
+   * Screen instance, so they never pass through App.setScreen - this is the
+   * local equivalent, using the same shared slide helper and the same Fast
+   * Transitions gate.
+   */
+  private swapView(outgoing: HTMLElement | null, incoming: HTMLElement, direction: SlideDirection): void {
+    if (!outgoing) return; // first mount - nothing to slide away from
+    if (getFastTransitions()) {
+      outgoing.remove();
+      return;
+    }
+    this.outgoingEl = outgoing;
+    slideScreens(outgoing, incoming, direction, () => {
+      outgoing.remove();
+      if (this.outgoingEl === outgoing) this.outgoingEl = null;
+    });
+  }
+
   private renderMenu(): void {
     this.stopPolling();
-    this.el?.remove();
+    // Non-null only when coming back from the waiting screen (mount()'s first
+    // call has no previous view) - which is exactly when the DOWN slide applies.
+    const outgoing = this.el;
 
     const wrap = document.createElement("div");
     wrap.className = "centered-screen";
+    wrap.appendChild(renderLogo(this.playIntro));
 
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = this.playIntro ? "card intro-reveal" : "card";
     wrap.appendChild(card);
 
     const header = document.createElement("div");
     header.className = "row";
-    header.style.justifyContent = "space-between";
+    header.style.justifyContent = "center";
     header.style.alignItems = "center";
-    const title = document.createElement("h1");
-    title.textContent = "EBIC";
     const codexBtn = document.createElement("button");
     codexBtn.textContent = "Unit info";
     codexBtn.addEventListener("click", () => this.callbacks.onOpenCodex());
     const settingsBtn = document.createElement("button");
     settingsBtn.textContent = "Settings";
-    settingsBtn.addEventListener("click", () => this.settingsModal.open());
+    settingsBtn.addEventListener("click", () => this.callbacks.onOpenSettings());
     const logoutBtn = document.createElement("button");
     logoutBtn.textContent = "Log out";
     logoutBtn.addEventListener("click", () => {
       void api.logout().finally(() => this.callbacks.onLogout());
     });
-    header.append(title, codexBtn, settingsBtn, logoutBtn);
+    header.append(codexBtn, settingsBtn, logoutBtn);
     card.appendChild(header);
 
     const welcome = document.createElement("div");
@@ -91,8 +121,6 @@ export class LobbyScreen implements Screen {
     const setError = (err: unknown) => {
       errorText.textContent = err instanceof ApiError ? err.message : "Something went wrong.";
     };
-
-    card.appendChild(this.renderFavouritePicker(setError));
 
     // Play vs the computer - listed first because it is the only option that needs
     // nobody else: no join code to share, no waiting for an opponent to connect.
@@ -197,71 +225,20 @@ export class LobbyScreen implements Screen {
 
     this.root.appendChild(wrap);
     this.el = wrap;
-  }
-
-  /**
-   * The hero this account always wants offered. Saved on change rather than behind a
-   * button - there is one setting and no way to get it half-right, so a Save step would
-   * only be something to forget.
-   *
-   * The list is the same GET /api/units the codex uses, so what can be favourited and what
-   * can be drafted are one question with one answer.
-   */
-  private renderFavouritePicker(setError: (err: unknown) => void): HTMLElement {
-    const section = document.createElement("div");
-
-    const heading = document.createElement("h2");
-    heading.textContent = "Favourite unit";
-    section.appendChild(heading);
-
-    const select = document.createElement("select");
-    select.style.width = "100%";
-    select.disabled = true;
-    const none = document.createElement("option");
-    none.value = "";
-    none.textContent = "None";
-    select.appendChild(none);
-    section.appendChild(select);
-
-    const hint = document.createElement("div");
-    hint.className = "hint";
-    hint.textContent = "Always offered as one of your two options in the matching draft round. "
-      + "If your opponent has picked the same favourite, neither of you is offered them.";
-    section.appendChild(hint);
-
-    void api.getUnits()
-      .then(({ units }) => {
-        select.appendChild(optgroupFor("Champions", units.filter((u) => u.type === "CHAMPION")));
-        select.appendChild(optgroupFor("Elites", units.filter((u) => u.type === "ELITE")));
-        select.value = this.user.favouriteUnit ?? "";
-        select.disabled = false;
-      })
-      .catch(setError);
-
-    select.addEventListener("change", () => {
-      const chosen = select.value === "" ? null : select.value;
-      select.disabled = true;
-      void api.setFavouriteUnit(chosen)
-        .then((res) => {
-          this.user = { ...this.user, favouriteUnit: res.favouriteUnit };
-        })
-        .catch((err) => {
-          setError(err);
-          select.value = this.user.favouriteUnit ?? "";
-        })
-        .finally(() => {
-          select.disabled = false;
-        });
-    });
-
-    return section;
+    // Consumed after one render - the waiting-screen's Back button below
+    // calls renderMenu() again, and that re-render must never replay the intro.
+    this.playIntro = false;
+    this.swapView(outgoing, wrap, "down");
   }
 
   private renderWaitingForOpponent(matchId: string, joinCode: string): void {
-    this.el?.remove();
+    // Only ever reached from the Create Match button inside a rendered menu,
+    // so this is always the menu's wrap.
+    const outgoing = this.el;
 
     const wrap = document.createElement("div");
     wrap.className = "centered-screen";
+    wrap.appendChild(renderLogo());
 
     const card = document.createElement("div");
     card.className = "card";
@@ -293,6 +270,7 @@ export class LobbyScreen implements Screen {
 
     this.root.appendChild(wrap);
     this.el = wrap;
+    this.swapView(outgoing, wrap, "up");
 
     this.pollHandle = setInterval(async () => {
       try {
@@ -306,16 +284,4 @@ export class LobbyScreen implements Screen {
       }
     }, POLL_INTERVAL_MS);
   }
-}
-
-function optgroupFor(label: string, units: UnitDefinitionSnapshot[]): HTMLOptGroupElement {
-  const group = document.createElement("optgroup");
-  group.label = label;
-  for (const unit of units) {
-    const option = document.createElement("option");
-    option.value = unit.definitionId;
-    option.textContent = unit.name;
-    group.appendChild(option);
-  }
-  return group;
 }

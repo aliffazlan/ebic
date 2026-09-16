@@ -75,13 +75,14 @@ see `web/src/vfx/StatusEffects.ts`) - most of those effects render with
 generated shapes/particles rather than art, so this folder only grows when
 one specifically needs an image the way Duel's banner does.
 
-## `ui/` — general UI/branding (not yet wired up, no fixed file list)
+## `ui/` — general UI/branding (1 file wired up)
 
-Nothing here is required by name yet — this is a catch-all for whatever visual polish comes up:
-a proper app logo/wordmark (currently just the text "EBIC"), a nicer favicon (currently the
-generic Vite scaffold one at `web/public/favicon.svg`), team emblems (currently plain colored
-circles), victory/defeat splash art, board/tile background texture (currently a flat color hex),
-menu background art. Add what you have; ask before spending time on anything that needs the exact
+`logo.webp` is the app wordmark, shown above the card on the auth and lobby screens by
+`web/src/ui/Logo.ts` (replacing the old plain "EBIC" text there). Everything else here is
+still a catch-all for whatever visual polish comes up: a nicer favicon (currently the generic
+Vite scaffold one at `web/public/favicon.svg`), team emblems (currently plain colored circles),
+victory/defeat splash art, board/tile background texture (currently a flat color hex), menu
+background art. Add what you have; ask before spending time on anything that needs the exact
 filename/size wired into code first.
 
 ## `sfx/` — sound effects (optional, nothing implemented yet — no audio playback exists in the client at all)

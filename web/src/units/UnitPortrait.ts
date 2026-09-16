@@ -31,7 +31,7 @@ export interface PortraitInfo {
   name: string;
 }
 
-const NEUTRAL_BG = "#0f172a";
+const NEUTRAL_BG = "#080606";
 
 /**
  * A unit's full-body art, sized entirely by the caller's CSS. The element gets

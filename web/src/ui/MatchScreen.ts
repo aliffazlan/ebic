@@ -11,6 +11,7 @@ import type { Attribute, ServerMessage, Team, UnitSnapshot, UnitType } from "../
 import type { MatchActions } from "./MatchActions";
 import type { Screen } from "./Screen";
 import { artId, warmPortraits } from "../units/UnitArt";
+import { CHROME_VOID_HEX } from "./Colors";
 
 // How long the pre-encounter strobe plays on the board before the attribute
 // modal actually appears - see API_CONTRACT.md's explanation of the
@@ -140,9 +141,13 @@ export class MatchScreen implements Screen, MatchActions {
     this.container = null;
   }
 
+  getElement(): HTMLElement | null {
+    return this.container;
+  }
+
   private async initPixi(canvasHost: HTMLDivElement): Promise<void> {
     const app = new Application();
-    await app.init({ background: "#0f172a", resizeTo: canvasHost, antialias: true });
+    await app.init({ background: CHROME_VOID_HEX, resizeTo: canvasHost, antialias: true });
     canvasHost.appendChild(app.canvas);
     this.app = app;
 

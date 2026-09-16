@@ -19,6 +19,9 @@ export const TEAM_COLOR: Record<Team, number> = {
   PLAYER_TWO: 0xef4444, // red-500
 };
 
+/** The chrome void backdrop behind the board - keep in sync with --void in style.css and the inline style in index.html. */
+export const CHROME_VOID_HEX = "#050404";
+
 /** 0x3b82f6 -> "#3b82f6", for CSS and for anything that parses SVG colours. */
 export function cssHex(color: number): string {
   return `#${color.toString(16).padStart(6, "0")}`;

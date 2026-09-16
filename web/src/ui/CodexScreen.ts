@@ -37,14 +37,21 @@ export class CodexScreen implements Screen {
   }
 
   mount(): void {
+    // The sliding root is full-bleed and absolutely positioned (so it can
+    // overlap the lobby during a transition); the bordered window inside it
+    // is what the player perceives as the screen.
     const wrap = document.createElement("div");
     wrap.className = "codex-screen";
     this.el = wrap;
     this.root.appendChild(wrap);
 
+    const windowEl = document.createElement("div");
+    windowEl.className = "codex-window";
+    wrap.appendChild(windowEl);
+
     const toolbar = document.createElement("div");
     toolbar.className = "codex-toolbar";
-    wrap.appendChild(toolbar);
+    windowEl.appendChild(toolbar);
 
     const backBtn = document.createElement("button");
     backBtn.textContent = "Back";
@@ -83,7 +90,7 @@ export class CodexScreen implements Screen {
 
     this.grid = document.createElement("div");
     this.grid.className = "codex-grid";
-    wrap.appendChild(this.grid);
+    windowEl.appendChild(this.grid);
 
     this.grid.appendChild(hint("Loading units..."));
     void this.load();
@@ -93,6 +100,10 @@ export class CodexScreen implements Screen {
     this.tooltip.destroy();
     this.el?.remove();
     this.el = null;
+  }
+
+  getElement(): HTMLElement | null {
+    return this.el;
   }
 
   private async load(): Promise<void> {
