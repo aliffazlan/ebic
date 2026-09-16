@@ -539,9 +539,22 @@ option, optgroup {
 .hover-tooltip.upgraded .hover-tooltip-title {
   color: #fcd34d;
 }
+.ability-btn-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .ability-cd {
   font-size: 11px;
   color: #fbbf24;
+}
+
+.ability-hotkey {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
 }
 
 .status-chip {
@@ -886,6 +899,11 @@ option, optgroup {
   border-radius: 0;
   accent-color: var(--ember-bright);
   cursor: pointer;
+}
+
+/* Hotkey rebind button while capturing the next keypress. */
+.settings-row button.listening {
+  color: var(--ember-bright);
 }
 
 input[type="range"] {

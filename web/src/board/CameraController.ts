@@ -191,18 +191,20 @@ export class CameraController {
     if (isTextEntry(document.activeElement)) return;
 
     switch (e.key) {
-      // Arrow/WASD pan the *view*: pressing left reveals what's to the left,
-      // which means moving the board's contents right.
-      case "ArrowLeft": case "a": case "A":
+      // Pans the *view*: pressing left reveals what's to the left, which
+      // means moving the board's contents right. Letter keys (WASD) used to
+      // double for this too, but were dropped so the gameplay hotkeys
+      // (M/A/1/2/3/Escape) have the keyboard to themselves - see Hud.ts.
+      case "ArrowLeft":
         this.apply(panBy(this.camera, KEY_PAN_STEP, 0));
         break;
-      case "ArrowRight": case "d": case "D":
+      case "ArrowRight":
         this.apply(panBy(this.camera, -KEY_PAN_STEP, 0));
         break;
-      case "ArrowUp": case "w": case "W":
+      case "ArrowUp":
         this.apply(panBy(this.camera, 0, KEY_PAN_STEP));
         break;
-      case "ArrowDown": case "s": case "S":
+      case "ArrowDown":
         this.apply(panBy(this.camera, 0, -KEY_PAN_STEP));
         break;
       case "Home": case "0":
@@ -215,8 +217,9 @@ export class CameraController {
   };
 }
 
-/** Keeps the auth/lobby text fields (and any future one) typable while a board exists. */
-function isTextEntry(element: Element | null): boolean {
+/** Keeps the auth/lobby text fields (and any future one) typable while a board exists.
+ *  Exported so Hud's gameplay-hotkey listener can reuse the same guard. */
+export function isTextEntry(element: Element | null): boolean {
   if (!element) return false;
   const tag = element.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||

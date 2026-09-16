@@ -15,11 +15,24 @@ import { abilityTooltip, Tooltip } from "./Tooltip";
 import { renderUnitCard } from "./UnitCard";
 import { teamCssColor } from "./Colors";
 import type { CombatLogEntry, CombatLogSegment } from "../state/CombatLog";
+import { audioManager } from "../audio/AudioManager";
+import { actionForHotkeyCode, getHotkey, setHotkey, hotkeyLabel, type HotkeyAction } from "../app/AppSettings";
+import { isTextEntry } from "../board/CameraController";
+import { volumeRow, hotkeyRow } from "./SettingsRows";
 
 const ATTRIBUTES: Attribute[] = ["STRENGTH", "AGILITY", "INTELLIGENCE"];
 
+const HOTKEY_ROWS: ReadonlyArray<{ action: HotkeyAction; label: string }> = [
+  { action: "move", label: "Move" },
+  { action: "attack", label: "Attack" },
+  { action: "ability1", label: "Ability 1" },
+  { action: "ability2", label: "Ability 2" },
+  { action: "ability3", label: "Ability 3" },
+  { action: "cancel", label: "Deselect / cancel" },
+];
+
 /** Which log the left column shows; null means collapsed to just the tab rail. */
-type LogTab = "combat" | "system" | null;
+type LogTab = "combat" | "system" | "settings" | null;
 
 /** Combat-log halves, top to bottom. */
 const TEAMS: Team[] = ["PLAYER_ONE", "PLAYER_TWO"];
@@ -97,14 +110,49 @@ export class Hud {
     this.actions = actions;
     this.tooltip = new Tooltip();
     this.unsubscribe = this.store.subscribe((state) => this.render(state));
+    window.addEventListener("keydown", this.onKeyDown);
   }
 
   destroy(): void {
+    window.removeEventListener("keydown", this.onKeyDown);
     this.unsubscribe();
     this.hudHost.innerHTML = "";
     this.logHost.innerHTML = "";
     this.tooltip.destroy();
   }
+
+  /**
+   * Gameplay hotkeys: forwards to the same button a click would hit, so there is exactly
+   * one place (renderAbilityButton) that decides whether an ability is actually usable right
+   * now. Move/Attack/Ability1-3 naturally no-op whenever the corresponding button isn't
+   * rendered at all (no unit selected, mid-placement/draft/game-over) - no extra phase
+   * checks needed, the DOM is already the source of truth.
+   */
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isTextEntry(document.activeElement)) return;
+    const action = actionForHotkeyCode(e.code);
+    if (!action) return;
+
+    if (action === "cancel") {
+      const state = this.store.getState();
+      if (state.selectedAbilityId) {
+        this.actions.selectAbility(null);
+      } else if (state.selectedUnitId) {
+        this.actions.selectUnit(null);
+      } else {
+        return;
+      }
+      e.preventDefault();
+      return;
+    }
+
+    const btn = this.hudHost.querySelector<HTMLButtonElement>(`[data-hotkey-slot="${action}"]`);
+    if (btn && !btn.disabled) {
+      btn.click();
+      e.preventDefault();
+    }
+  };
 
   private render(state: MatchUiState): void {
     this.hudHost.innerHTML = "";
@@ -357,8 +405,21 @@ export class Hud {
     const canAct = unit.team === state.yourTeam && isYourTurn && state.prompt?.kind !== "attribute";
     const abilityList = document.createElement("div");
     abilityList.className = "ability-list";
+    // Move/Attack are just two entries in this same array (see the id check
+    // below); Ability 1/2/3 hotkeys bind to the first three *other* entries by
+    // position, whether or not they're passive - a leading passive still
+    // consumes a slot, matching the settings screen's numbering.
+    let nextAbilitySlot = 0;
     for (const ability of unit.abilities) {
-      abilityList.appendChild(this.renderAbilityButton(unit, ability, state, canAct));
+      let slot: HotkeyAction | null;
+      if (ability.id === "move") slot = "move";
+      else if (ability.id === "attack") slot = "attack";
+      else if (nextAbilitySlot < 3) slot = (["ability1", "ability2", "ability3"] as const)[nextAbilitySlot++];
+      else {
+        nextAbilitySlot++;
+        slot = null;
+      }
+      abilityList.appendChild(this.renderAbilityButton(unit, ability, state, canAct, slot));
     }
     section.appendChild(abilityList);
 
@@ -442,22 +503,38 @@ export class Hud {
     ability: AbilitySnapshot,
     state: MatchUiState,
     canAct: boolean,
+    slot: HotkeyAction | null,
   ): HTMLElement {
     const btn = document.createElement("button");
     btn.className = "ability-btn";
     if (state.selectedAbilityId === ability.id) btn.classList.add("selected");
     if (ability.upgraded) btn.classList.add("upgraded");
+    // Set regardless of passive/disabled - onKeyDown forwards a click here, and a
+    // disabled button already no-ops that click, which is exactly the desired
+    // "hotkey does nothing on a passive ability" behaviour with no extra check.
+    if (slot) btn.dataset.hotkeySlot = slot;
 
     const label = document.createElement("span");
     label.textContent = `${ability.name}${ability.passive ? " (passive)" : ""}`;
     btn.appendChild(label);
 
+    const right = document.createElement("span");
+    right.className = "ability-btn-right";
     if (!ability.ready) {
       const cd = document.createElement("span");
       cd.className = "ability-cd";
       cd.textContent = `CD ${ability.currentCooldown}/${ability.maxCooldown}`;
-      btn.appendChild(cd);
+      right.appendChild(cd);
     }
+    // No visible hotkey on a passive ability - it never does anything, even
+    // though it still holds its numbered slot (see renderUnitPanel).
+    if (slot && !ability.passive) {
+      const hotkey = document.createElement("span");
+      hotkey.className = "ability-hotkey";
+      hotkey.textContent = hotkeyLabel(getHotkey(slot));
+      right.appendChild(hotkey);
+    }
+    btn.appendChild(right);
 
     let disabled = !canAct || ability.passive || !ability.ready;
     let reason: string | null = null;
@@ -537,7 +614,9 @@ export class Hud {
       const panel = document.createElement("div");
       panel.className = "log-panel";
       panel.appendChild(
-        this.logTab === "combat" ? this.renderCombatLog(state) : this.renderMessageLog(state),
+        this.logTab === "combat" ? this.renderCombatLog(state)
+          : this.logTab === "system" ? this.renderMessageLog(state)
+          : this.renderSettingsPanel(),
       );
       this.logHost.appendChild(panel);
     }
@@ -550,7 +629,45 @@ export class Hud {
     rail.appendChild(
       this.renderLogTab("system", "System", state.messages.length > this.lastSeenMessageCount),
     );
+    rail.appendChild(this.renderLogTab("settings", "Settings", false));
     return rail;
+  }
+
+  /**
+   * Lets a player adjust audio and hotkeys without leaving the match. Deliberately a
+   * subset of the lobby SettingsScreen: favourite unit is an account-level draft
+   * preference (meaningless mid-match) and Fast Transitions only affects menu
+   * navigation, which doesn't exist once a match has started.
+   */
+  private renderSettingsPanel(): HTMLElement {
+    const section = document.createElement("div");
+    section.className = "hud-section";
+
+    const h3 = document.createElement("h3");
+    h3.textContent = "Settings";
+    section.appendChild(h3);
+
+    section.appendChild(
+      volumeRow("Music volume", audioManager.getMusicVolume(), (v) => audioManager.setMusicVolume(v)),
+    );
+    section.appendChild(
+      volumeRow("SFX volume", audioManager.getSfxVolume(), (v) => audioManager.setSfxVolume(v)),
+    );
+
+    const hotkeysHeading = document.createElement("h3");
+    hotkeysHeading.style.marginTop = "8px";
+    hotkeysHeading.textContent = "Hotkeys";
+    section.appendChild(hotkeysHeading);
+    for (const { action, label } of HOTKEY_ROWS) {
+      section.appendChild(
+        hotkeyRow(label, getHotkey(action), (code) => {
+          setHotkey(action, code);
+          this.render(this.store.getState());
+        }),
+      );
+    }
+
+    return section;
   }
 
   private renderLogTab(tab: LogTab, label: string, unread: boolean): HTMLElement {
