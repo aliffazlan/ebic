@@ -23,6 +23,7 @@ const HOTKEY_ROWS: ReadonlyArray<{ action: HotkeyAction; label: string }> = [
 export interface SettingsCallbacks {
   onBack(): void;
   onFavouriteUnitChange(definitionId: string | null): void;
+  onOpenChangelog(): void;
 }
 
 export class SettingsScreen implements Screen {
@@ -73,6 +74,12 @@ export class SettingsScreen implements Screen {
     for (const { action, label } of HOTKEY_ROWS) {
       panel.appendChild(hotkeyRow(label, getHotkey(action), (code) => setHotkey(action, code)));
     }
+
+    const changelogBtn = document.createElement("button");
+    changelogBtn.style.width = "100%";
+    changelogBtn.textContent = "Changelog";
+    changelogBtn.addEventListener("click", () => this.callbacks.onOpenChangelog());
+    panel.appendChild(changelogBtn);
 
     const errorText = document.createElement("div");
     errorText.className = "error-text";

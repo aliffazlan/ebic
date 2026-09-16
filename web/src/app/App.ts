@@ -2,6 +2,7 @@ import { api } from "../net/api";
 import { audioManager } from "../audio/AudioManager";
 import { getFastTransitions } from "./AppSettings";
 import { AuthScreen } from "../ui/AuthScreen";
+import { ChangelogScreen } from "../ui/ChangelogScreen";
 import { ClickToContinueScreen } from "../ui/ClickToContinueScreen";
 import { CodexScreen } from "../ui/CodexScreen";
 import { FixtureScreen } from "../ui/FixtureScreen";
@@ -148,16 +149,21 @@ export class App {
    * to land on App's copy of the account: going back builds a fresh
    * LobbyScreen from it.
    */
-  private showSettings(): void {
+  private showSettings(direction: SlideDirection | null = "left"): void {
     this.setScreen(
       new SettingsScreen(this.root, this.currentUser?.favouriteUnit ?? null, {
         onBack: () => this.showLobby(false, "right"),
         onFavouriteUnitChange: (favouriteUnit) => {
           if (this.currentUser) this.currentUser = { ...this.currentUser, favouriteUnit };
         },
+        onOpenChangelog: () => this.showChangelog(),
       }),
-      "left",
+      direction,
     );
+  }
+
+  private showChangelog(): void {
+    this.setScreen(new ChangelogScreen(this.root, () => this.showSettings("right")), "left");
   }
 
   private showMatch(matchId: string, yourTeam: Team): void {

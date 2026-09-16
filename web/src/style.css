@@ -1299,6 +1299,35 @@ input[type="range"]::-moz-range-thumb {
   padding-bottom: 20px;
 }
 
+/* Rendered CHANGELOG.md - see ChangelogScreen.ts. Shares .codex-screen/
+   .codex-window/.codex-toolbar with the unit-info window; this is the
+   scrollable body plus typography for marked's HTML output. */
+.changelog-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.changelog-body h1, .changelog-body h2, .changelog-body h3 {
+  color: var(--ember-bright);
+  margin: 16px 0 6px;
+}
+.changelog-body h1:first-child {
+  margin-top: 0;
+}
+.changelog-body p, .changelog-body li {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.changelog-body ul {
+  padding-left: 20px;
+}
+.changelog-body strong {
+  color: var(--text);
+}
+.changelog-body a {
+  color: var(--ember-bright);
+}
+
 /* ---- turn banner ----
    Flashes over the board when the turn flips to you. Lives on .canvas-host
    (already position: relative) rather than in the HUD, whose subtree is
