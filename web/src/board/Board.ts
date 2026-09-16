@@ -9,13 +9,14 @@ import { UnitIconFactory } from "../units/UnitIconFactory";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
 import { spawnDamageIndicator } from "../vfx/DamageIndicator";
-import { spawnAttackAnimation } from "../vfx/AttackAnimationPlayer";
+import { spawnAttackAnimation, buildMissileIcon } from "../vfx/AttackAnimationPlayer";
+import { spawnFloatingIcon, type FloatingIconKind } from "../vfx/FloatingIcon";
 import { safeTick } from "../vfx/SafeTick";
 import { DisplayedUnitState } from "../vfx/DisplayedUnitState";
 import { statusVisualFor } from "../vfx/StatusEffects";
 import { spawnUnitStatusOverlay, drawCloakTile, spawnDuelBanners, spawnStaticLink } from "../vfx/StatusEffectPlayer";
 import type { IndicatorSpec } from "../vfx/VfxIndicators";
-import type { AttackAnimationSpec } from "../vfx/AttackAnimations";
+import { castAnimationFor, type AttackAnimationSpec } from "../vfx/AttackAnimations";
 import type {
   GameStateSnapshot,
   PlacementUnitSnapshot,
@@ -114,6 +115,52 @@ const SPROUT_CIRCLE_RADIUS_PX = HEX_SIZE * Math.sqrt(0.7);
 // "Much larger... centered around the center tile" - sized to roughly cover the
 // centre tile plus the ring of 6 tiles Overgrowth actually plants on.
 const OVERGROWTH_CIRCLE_RADIUS_PX = HEX_SIZE * 2.4;
+// Eureka's bulb / Reload's gear: a floating icon at the caster's portrait, per
+// temp/abilities.txt - see spawnFloatingIconAt/FloatingIcon.ts.
+const EUREKA_BULB_COLOR = 0xfacc15;
+const RELOAD_GEAR_COLOR = 0xf1f5f9;
+// Nanobots' cast: ~10 small blue projectiles converging caster->target, same
+// spawnConvergingParticles shape as Soul Rip, just the opposite direction.
+const NANOBOTS_CAST_COLOR = 0x60a5fa;
+const NANOBOTS_PARTICLE_COUNT = 10;
+// Shrink Ray's cast: a plain one-shot light-blue beam, no damage event to key off.
+const SHRINK_RAY_BEAM_COLOR = 0x38bdf8;
+const SHRINK_RAY_BEAM_FRAMES = 60; // ~1s
+// Homing Missile's cast-phase launch: flies straight up off-screen and despawns, before the
+// (turns-later) impact-phase projectile in AttackAnimations.ts's ABILITY_DAMAGE_ANIMATION_BY_
+// CAUSE_LABEL. Purely cosmetic - nothing downstream needs to sync with it.
+const HOMING_MISSILE_COLOR = 0xe2e8f0;
+const HOMING_MISSILE_LAUNCH_OFFSET_PX = 500;
+const HOMING_MISSILE_LAUNCH_FRAMES = 36; // ~0.6s
+// Translocation's cast: a growing light-blue circle at the destination tile before the
+// relocated unit's sprite reveals there - see translocationsAwaitingMove/translocationsRevealing.
+const TRANSLOCATION_CIRCLE_COLOR = 0x38bdf8;
+const TRANSLOCATION_CIRCLE_RADIUS_PX = HEX_SIZE * 0.9;
+const TRANSLOCATION_CIRCLE_FRAMES = BRANCH_SUMMON_CIRCLE_FRAMES; // ~1.5s, same cadence as Sprout/Overgrowth
+// Acidic Brew's landing pulse - same sickly green as TILE_EFFECT_STYLES.acid's stroke, sized
+// to comfortably cover the upgrade's 1-tile ring and noticeably slower than the "fast" pulses
+// elsewhere (Overwhelming Odds/Pylon Collapse/Homing Missile), per temp/abilities.txt's
+// "a single slow pulse".
+const ACID_PULSE_COLOR = 0xa3e635;
+const ACID_PULSE_RADIUS_PX = HEX_SIZE * 2.2;
+const ACID_PULSE_FRAMES = 50; // ~0.83s
+const WHITE = 0xffffff;
+// Blizzard's cast: a flurry of white "snowball" particles, staggered rather than all at once
+// and starting anywhere within the caster's portrait, per temp/abilities.txt.
+const BLIZZARD_SNOWBALL_COLOR = WHITE;
+const BLIZZARD_SNOWBALL_COUNT = 9;
+const BLIZZARD_SNOWBALL_INTERVAL_MS = 90;
+// Snow Golem's cast: a growing white circle at the destination tile before each golem reveals -
+// same cadence as Sprout/Overgrowth, but per-golem rather than one shared circle (see
+// applySnapshot), so the upgrade's pair can play "at the same time" per temp/abilities.txt.
+const SNOW_GOLEM_CIRCLE_COLOR = WHITE;
+const SNOW_GOLEM_CIRCLE_RADIUS_PX = HEX_SIZE * 0.9;
+const SNOW_GOLEM_CIRCLE_FRAMES = BRANCH_SUMMON_CIRCLE_FRAMES;
+// Snow Blast (the golem's own death effect): 5 white pulses covering its 1-tile splash
+// (SnowBlast.java's default radius), per temp/abilities.txt.
+const SNOW_BLAST_PULSE_RADIUS_PX = HEX_SIZE * 2;
+const SNOW_BLAST_PULSE_COUNT = 5;
+const SNOW_BLAST_PULSE_TOTAL_FRAMES = 45; // ~0.75s, ~5 pulses at Homing Missile's own ~80ms-per-pulse cadence
 
 // PlacementStateSnapshot carries no map radius (see API_CONTRACT.md) -
 // placement always happens before the first real GameStateSnapshot, which is
@@ -281,6 +328,43 @@ export class Board {
   // growing-circle cast VFX (see applySnapshot) - persistent across calls, since further
   // "state" pushes commonly arrive mid-circle (Branch's own turn often isn't over yet).
   private branchlingsAwaitingReveal = new Set<string>();
+  // Set by playVfx on a translocation ability_used event (targetUnitId is the unit actually
+  // being relocated - see VfxCollector.java's MultiTarget handling), waiting for the snapshot
+  // where that unit's q,r actually changes - the event carries no destination tile of its own
+  // (MultiTarget's secondary half never reaches the wire), so where to grow the circle can
+  // only be read off the unit's own new position once it lands.
+  private translocationsAwaitingMove = new Set<string>();
+  // Units whose growing-circle cast VFX is currently playing at their destination - held back
+  // from the normal slide-to-new-position path in applySnapshot's per-unit loop until it
+  // finishes, same role as branchlingsAwaitingReveal.
+  private translocationsRevealing = new Set<string>();
+  // Set by playVfx on an acidic_brew ability_used event, consumed the next time one or more
+  // new "acid" tile effects appear (see applySnapshot) - the cast's TileTarget never reaches
+  // the wire (VfxCollector.java has no case for it), so like Sprout/Overgrowth the destination
+  // can only be resolved once the tile(s) actually land.
+  private pendingAcidicBrewCasts: string[] = [];
+  // Tile keys ("q,r") currently held back from renderTileEffects while their throw+pulse cast
+  // VFX plays - same "hold back, reveal on completion" role as branchlingsAwaitingReveal, just
+  // for tiles instead of units.
+  private acidTilesAwaitingReveal = new Set<string>();
+  // Set by playVfx on a snow_golem ability_used event (the caster's id - both the base cast
+  // and the upgrade's two-tile cast target bare tiles, never a unit, so the event carries no
+  // destination either), consumed the next time one or more new "Snow Golem"-named units
+  // appear. Unlike Sprout/Overgrowth's single shared circle, each claimed golem gets its own
+  // independent throw+circle+reveal - see applySnapshot.
+  private pendingSnowGolemCasts: string[] = [];
+  // Golem ids currently held back pending their own throw+circle cast VFX - same role as
+  // branchlingsAwaitingReveal, just resolved per-unit instead of merged into one circle.
+  private snowGolemsAwaitingReveal = new Set<string>();
+  // Per-unit render counter, bumped at the start of every upsertUnit call for that unit id and
+  // checked again after its await returns - guards against two overlapping applySnapshot calls
+  // (the store subscription fires one per "state" push with no serialization) racing to render
+  // the same unit: a slower, superseded call would otherwise resume after a newer one has
+  // already rebuilt this unit's overlay, unconditionally overwrite activeStatusEffectTicks'
+  // entry with its own (stale) ticks, and silently orphan the newer call's emitter tick with
+  // nothing left able to find and stop it - the root cause of status particles (Nanobots,
+  // Frostbite, ...) sometimes lingering past their effect's actual expiry.
+  private unitRenderGeneration = new Map<string, number>();
   // The previous applySnapshot's tile effects, kept only to diff against the
   // new ones - a newly-appearing "burning" entry is what triggers Eruption's
   // cast burst, since neither its ability_used event nor any damage event
@@ -422,6 +506,44 @@ export class Board {
           this.pendingBranchSummonReveals.push("sprout");
         } else if (event.abilityId === "overgrowth") {
           this.pendingBranchSummonReveals.push("overgrowth");
+        } else if (event.abilityId === "eureka") {
+          const pos = this.resolveUnitPosition(event.sourceUnitId);
+          if (pos) this.spawnFloatingIconAt(pos, "bulb", EUREKA_BULB_COLOR);
+        } else if (event.abilityId === "reload") {
+          const pos = this.resolveUnitPosition(event.sourceUnitId);
+          if (pos) this.spawnFloatingIconAt(pos, "gear", RELOAD_GEAR_COLOR);
+        } else if (event.abilityId === "nanobots" && event.targetUnitId) {
+          this.spawnConvergingParticles(event.sourceUnitId, event.targetUnitId, [NANOBOTS_CAST_COLOR], NANOBOTS_PARTICLE_COUNT);
+        } else if (event.abilityId === "shrink_ray" && event.targetUnitId) {
+          const from = this.resolveUnitPosition(event.sourceUnitId);
+          const to = this.resolveUnitPosition(event.targetUnitId);
+          if (from && to) this.spawnOneShotBeam(from, to, SHRINK_RAY_BEAM_COLOR, SHRINK_RAY_BEAM_FRAMES);
+        } else if (event.abilityId === "homing_missile") {
+          this.spawnHomingMissileLaunch(event.sourceUnitId);
+        } else if (event.abilityId === "translocation" && event.targetUnitId) {
+          this.translocationsAwaitingMove.add(event.targetUnitId);
+        } else if (event.abilityId === "poison_bloom" && event.targetUnitId) {
+          // No DamageEvent at cast time (the poison itself ticks later under causeLabel
+          // "Poison") - dispatched directly here rather than through the damage-triggered
+          // pipeline in ScheduleVfxBatch, via the dedicated cast-only animation table (see
+          // CAST_ANIMATION_BY_ABILITY_ID's own doc comment for why it's kept separate).
+          const from = this.resolveUnitPosition(event.sourceUnitId);
+          const to = this.resolveUnitPosition(event.targetUnitId);
+          const spec = castAnimationFor(event.abilityId);
+          if (from && to && spec) this.playAttackAnimation(from, to, spec, () => {});
+        } else if (event.abilityId === "hidden_potential" && event.targetUnitId) {
+          // Same direct-dispatch shape as Poison Bloom - HiddenPotential.onUse fires no
+          // DamageEvent either.
+          const from = this.resolveUnitPosition(event.sourceUnitId);
+          const to = this.resolveUnitPosition(event.targetUnitId);
+          const spec = castAnimationFor(event.abilityId);
+          if (from && to && spec) this.playAttackAnimation(from, to, spec, () => {});
+        } else if (event.abilityId === "acidic_brew") {
+          this.pendingAcidicBrewCasts.push(event.sourceUnitId);
+        } else if (event.abilityId === "blizzard" && event.targetUnitId) {
+          this.spawnStaggeredConvergingParticles(event.sourceUnitId, event.targetUnitId, [BLIZZARD_SNOWBALL_COLOR], BLIZZARD_SNOWBALL_COUNT, BLIZZARD_SNOWBALL_INTERVAL_MS);
+        } else if (event.abilityId === "snow_golem") {
+          this.pendingSnowGolemCasts.push(event.sourceUnitId);
         }
       }
       if (event.type === "damage" && event.causeLabel === "Decay" && event.sourceUnitId && event.targetUnitId) {
@@ -457,6 +579,13 @@ export class Board {
       const unitId = event.targetUnitId ?? event.sourceUnitId;
       const unit = unitId ? snapshot?.units.find((u) => u.id === unitId) : null;
       const pos = unit ? axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE) : { x: 0, y: 0 };
+      if (event.type === "death" && unit?.name === "Snow Golem") {
+        // SnowBlast.onDeath (backend) fires no DamageEvent and no explicit application event
+        // of its own (it just applies a damage-less BlizzardEffect) - the generic "death"
+        // VfxEvent every unit's death already produces is the only signal available, per
+        // temp/abilities.txt's "5 white pulses, covering the affected area".
+        this.spawnMultiPulse(pos, SNOW_BLAST_PULSE_RADIUS_PX, WHITE, SNOW_BLAST_PULSE_COUNT, SNOW_BLAST_PULSE_TOTAL_FRAMES);
+      }
       spawnParticleBurst(this.vfxLayer, Ticker.shared, {
         x: pos.x,
         y: pos.y,
@@ -551,12 +680,19 @@ export class Board {
    * renderCloakTiles/renderPairEffects, not here.
    */
   private renderUnitStatusEffects(container: Container, unit: UnitSnapshot): void {
+    // One live array, passed by reference all the way down into spawnUnitStatusOverlay
+    // (and, for ember/smoke/snowflake's periodic emitters, into every particle they spawn
+    // afterward) - not built up by spreading each call's own fresh return array. A particle
+    // spawned by an emitter well after this call returns still needs to land in the SAME
+    // array clearStatusEffectTicks will later iterate, or it's invisible to that teardown
+    // and only stops once its own independent lifetime naturally runs out - up to ~0.75s
+    // after clearStatusEffectTicks already ran, i.e. after the status itself is gone.
     const ticks: (() => void)[] = [];
     const tokenRadiusPx = (HEX_SIZE * UNIT_SPRITE_SCALE) / 2;
     for (const effect of unit.effects) {
       const spec = statusVisualFor(effect);
       if (!spec || spec.mode !== "unit") continue;
-      ticks.push(...spawnUnitStatusOverlay(container, Ticker.shared, spec, tokenRadiusPx));
+      spawnUnitStatusOverlay(container, Ticker.shared, spec, tokenRadiusPx, ticks);
     }
     if (ticks.length > 0) this.activeStatusEffectTicks.set(unit.id, ticks);
   }
@@ -788,7 +924,125 @@ export class Board {
       }
     }
 
-    this.renderTileEffects(snapshot.tileEffects ?? []);
+    // Snow Golem: like Sprout/Overgrowth, the cast (a bare tile, or two tiles upgraded) carries
+    // no destination on the wire, so which new "Snow Golem" unit(s) belong to a pending cast can
+    // only be resolved once they land. Unlike Overgrowth, each claimed golem gets its OWN
+    // independent throw+circle+reveal rather than one shared circle, so the upgrade's pair can
+    // genuinely play "at the same time" per temp/abilities.txt instead of being merged into a
+    // single centroid animation.
+    if (this.pendingSnowGolemCasts.length > 0) {
+      const availableGolems = snapshot.units.filter(
+        (u) => u.name === "Snow Golem" && !previousUnitIds.has(u.id) && !this.snowGolemsAwaitingReveal.has(u.id),
+      );
+      while (this.pendingSnowGolemCasts.length > 0 && availableGolems.length > 0) {
+        const casterId = this.pendingSnowGolemCasts.shift()!;
+        const claimed = availableGolems.splice(0); // both of the upgrade's golems, or the base's one
+        const from = this.resolveUnitPosition(casterId);
+        const spec = from ? castAnimationFor("snow_golem") : null;
+        for (const golem of claimed) {
+          const golemId = golem.id;
+          const to = axialToPixel({ q: golem.q, r: golem.r }, HEX_SIZE);
+          this.snowGolemsAwaitingReveal.add(golemId);
+          const reveal = () => {
+            this.spawnGrowingFilledCircle(to, SNOW_GOLEM_CIRCLE_RADIUS_PX, SNOW_GOLEM_CIRCLE_COLOR, SNOW_GOLEM_CIRCLE_FRAMES, () => {
+              this.snowGolemsAwaitingReveal.delete(golemId);
+              const current = this.currentUnits.find((u) => u.id === golemId);
+              if (!current) return; // died or was otherwise removed while awaiting reveal
+              void this.upsertUnit({
+                ...current,
+                currentHp: this.displayedState.hpFor(golemId, current.currentHp),
+                dead: this.displayedState.isDead(golemId),
+              });
+            });
+          };
+          if (from && spec) {
+            this.playAttackAnimation(from, to, spec, reveal);
+          } else {
+            reveal(); // defensive - caster gone, skip straight to the circle
+          }
+        }
+      }
+    }
+
+    // Translocation: the unit named by the cast event (see VfxCollector.java's MultiTarget
+    // handling) hasn't necessarily moved yet - the event fires before the relocation lands,
+    // and carries no destination tile of its own. Once its q,r actually differs from its
+    // sprite's current position, that new position is where the growing circle plays; the
+    // unit itself is held back (translocationsRevealing, checked in the per-unit loop below)
+    // until the circle finishes.
+    if (this.translocationsAwaitingMove.size > 0) {
+      for (const unit of snapshot.units) {
+        if (!this.translocationsAwaitingMove.has(unit.id)) continue;
+        const sprite = this.unitSprites.get(unit.id);
+        if (!sprite) {
+          this.translocationsAwaitingMove.delete(unit.id); // died or otherwise gone - nothing to reveal
+          continue;
+        }
+        const newPos = axialToPixel({ q: unit.q, r: unit.r }, HEX_SIZE);
+        if (sprite.position.x === newPos.x && sprite.position.y === newPos.y) continue; // hasn't landed yet
+        this.translocationsAwaitingMove.delete(unit.id);
+        this.translocationsRevealing.add(unit.id);
+        const unitId = unit.id;
+        this.spawnGrowingFilledCircle(newPos, TRANSLOCATION_CIRCLE_RADIUS_PX, TRANSLOCATION_CIRCLE_COLOR, TRANSLOCATION_CIRCLE_FRAMES, () => {
+          this.translocationsRevealing.delete(unitId);
+          const current = this.currentUnits.find((u) => u.id === unitId);
+          if (!current) return; // died while awaiting reveal
+          // Snaps the sprite straight to its destination (rather than letting upsertUnit's
+          // own "did position change" check kick off a slide-tween there) - the relocation
+          // itself is already told by the circle, a slide immediately after it would double up.
+          const finalSprite = this.unitSprites.get(unitId);
+          if (finalSprite) finalSprite.position.set(newPos.x, newPos.y);
+          void this.upsertUnit({
+            ...current,
+            currentHp: this.displayedState.hpFor(unitId, current.currentHp),
+            dead: this.displayedState.isDead(unitId),
+          });
+        });
+      }
+    }
+
+    // Acidic Brew: like Sprout/Overgrowth, the cast (a bare TileTarget) carries no destination
+    // on the wire (AcidicBrew.onUse's target-resolution has no TileTarget case in
+    // VfxCollector.java), so the throw's destination is only knowable once AcidPoolEffect's
+    // tile(s) actually land. A single cast can register several tiles at once
+    // (getTilesInRadius(centre, radius) - radius 0 base, 1 upgraded), so every newly-appeared
+    // "acid" tile this snapshot is treated as one group whose pixel centroid is the throw's
+    // destination (equal to the real centre tile for a symmetric ring). This has to run
+    // *before* renderTileEffects (unlike Eruption's equivalent diff, which runs after) so the
+    // held-back tiles can be filtered out of that very call - per temp/abilities.txt, the
+    // pulse must finish "before then doing the acid tile overlay".
+    const previousAcidTiles = new Set(
+      this.previousTileEffects.filter((e) => e.kind === "acid").map((e) => `${e.q},${e.r}`),
+    );
+    const newAcidTiles = (snapshot.tileEffects ?? []).filter(
+      (e) => e.kind === "acid" && !previousAcidTiles.has(`${e.q},${e.r}`),
+    );
+    if (newAcidTiles.length > 0 && this.pendingAcidicBrewCasts.length > 0) {
+      const casterId = this.pendingAcidicBrewCasts.shift()!;
+      const tileKeys = newAcidTiles.map((e) => `${e.q},${e.r}`);
+      for (const key of tileKeys) this.acidTilesAwaitingReveal.add(key);
+      const from = this.resolveUnitPosition(casterId);
+      const positions = newAcidTiles.map((e) => axialToPixel({ q: e.q, r: e.r }, HEX_SIZE));
+      const to = {
+        x: positions.reduce((sum, p) => sum + p.x, 0) / positions.length,
+        y: positions.reduce((sum, p) => sum + p.y, 0) / positions.length,
+      };
+      const spec = from ? castAnimationFor("acidic_brew") : null;
+      const releaseTiles = () => {
+        for (const key of tileKeys) this.acidTilesAwaitingReveal.delete(key);
+        this.renderTileEffects(this.previousTileEffects.filter((e) => !this.acidTilesAwaitingReveal.has(`${e.q},${e.r}`)));
+      };
+      if (from && spec) {
+        this.playAttackAnimation(from, to, spec, () => {
+          this.spawnOneShotPulse(to, ACID_PULSE_RADIUS_PX, ACID_PULSE_COLOR, ACID_PULSE_FRAMES, releaseTiles);
+        });
+      } else {
+        // Defensive - caster gone or spec missing: just show the overlay normally, no flourish.
+        for (const key of tileKeys) this.acidTilesAwaitingReveal.delete(key);
+      }
+    }
+
+    this.renderTileEffects((snapshot.tileEffects ?? []).filter((e) => !this.acidTilesAwaitingReveal.has(`${e.q},${e.r}`)));
     this.renderCloakTiles(snapshot.units);
 
     for (const effect of snapshot.tileEffects ?? []) {
@@ -816,6 +1070,16 @@ export class Board {
       this.displayedState.syncToTruth(unit.id, unit.currentHp, unit.dead);
       if (this.branchlingsAwaitingReveal.has(unit.id)) {
         // Not materialized yet - its growing-circle cast VFX is still playing, and the
+        // completion callback above will call upsertUnit for it once that finishes.
+        continue;
+      }
+      if (this.translocationsRevealing.has(unit.id)) {
+        // Held at its old position while its growing-circle cast VFX plays at the
+        // destination - the completion callback above snaps it there once that finishes.
+        continue;
+      }
+      if (this.snowGolemsAwaitingReveal.has(unit.id)) {
+        // Not materialized yet - its own throw+circle cast VFX is still playing, and the
         // completion callback above will call upsertUnit for it once that finishes.
         continue;
       }
@@ -871,6 +1135,7 @@ export class Board {
         this.unitSprites.delete(id);
         this.displayedState.forget(id);
         this.clearStatusEffectTicks(id);
+        this.unitRenderGeneration.delete(id);
       }
     }
     // The stack composition (or its existence at all) may have just changed
@@ -1117,6 +1382,15 @@ export class Board {
     container.removeChildren();
     this.clearStatusEffectTicks(unit.id);
 
+    // See unitRenderGeneration's own doc comment: bumped here, before the only await in this
+    // function, and checked again once it resolves - if a newer call for this same unit id has
+    // started (and, since generations only move forward, necessarily already run its own
+    // synchronous prefix above) while this one was suspended, this one is stale and must not
+    // proceed to render on top of - or clobber the ticks tracked for - whatever that newer call
+    // already did.
+    const myGeneration = (this.unitRenderGeneration.get(unit.id) ?? 0) + 1;
+    this.unitRenderGeneration.set(unit.id, myGeneration);
+
     const texture = await this.iconFactory.getTexture(
       unit.definitionId,
       unit.team,
@@ -1124,6 +1398,7 @@ export class Board {
       unit.name.charAt(0),
       unit.name,
     );
+    if (this.unitRenderGeneration.get(unit.id) !== myGeneration) return;
     const sprite = new Sprite(texture);
     sprite.anchor.set(0.5);
     // Shrink Ray's applied effect ("Shrunk") shrinks the token itself rather
@@ -1389,41 +1664,96 @@ export class Board {
     const fromPos = this.resolveUnitPosition(fromUnitId);
     const toPos = this.resolveUnitPosition(toUnitId);
     if (!fromPos || !toPos) return;
-    const radius = (HEX_SIZE * UNIT_SPRITE_SCALE) / 2;
     for (let i = 0; i < count; i++) {
-      // sqrt(random) for the radius avoids the centre-bunching a plain uniform draw would cause.
-      const angle = Math.random() * Math.PI * 2;
-      const r = radius * Math.sqrt(Math.random());
-      const startX = fromPos.x + Math.cos(angle) * r;
-      const startY = fromPos.y + Math.sin(angle) * r;
-      const color = colors[i % colors.length];
-      const dot = new Graphics().circle(0, 0, dotRadius).fill({ color });
-      dot.position.set(startX, startY);
-      this.vfxLayer.addChild(dot);
-      let elapsed = 0;
-      const tick = safeTick(() => {
-        elapsed += 1;
-        const t = Math.min(1, elapsed / lifeFrames);
-        const eased = t * t; // ease-in - starts slow, accelerates toward the destination
-        dot.position.set(startX + (toPos.x - startX) * eased, startY + (toPos.y - startY) * eased);
-        dot.alpha = 1 - t;
-        if (t >= 1) {
-          Ticker.shared.remove(tick);
-          this.activeVfxOneShotTicks.delete(tick);
-          dot.destroy();
-        }
-      });
-      this.activeVfxOneShotTicks.add(tick);
-      Ticker.shared.add(tick);
+      this.spawnConvergingParticle(fromPos, toPos, colors[i % colors.length], dotRadius, lifeFrames);
     }
+  }
+
+  /**
+   * One converging particle, extracted from spawnConvergingParticles so Blizzard's staggered
+   * flurry (spawnStaggeredConvergingParticles) can spawn them one at a time on an interval
+   * instead of all at once, while every existing all-at-once caller (Mimic, Soul Rip, Decay,
+   * Nanobots) keeps this exact same per-particle shape.
+   */
+  private spawnConvergingParticle(
+    fromPos: { x: number; y: number },
+    toPos: { x: number; y: number },
+    color: number,
+    dotRadius: number,
+    lifeFrames: number,
+  ): void {
+    const radius = (HEX_SIZE * UNIT_SPRITE_SCALE) / 2;
+    // sqrt(random) for the radius avoids the centre-bunching a plain uniform draw would cause.
+    const angle = Math.random() * Math.PI * 2;
+    const r = radius * Math.sqrt(Math.random());
+    const startX = fromPos.x + Math.cos(angle) * r;
+    const startY = fromPos.y + Math.sin(angle) * r;
+    const dot = new Graphics().circle(0, 0, dotRadius).fill({ color });
+    dot.position.set(startX, startY);
+    this.vfxLayer.addChild(dot);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const t = Math.min(1, elapsed / lifeFrames);
+      const eased = t * t; // ease-in - starts slow, accelerates toward the destination
+      dot.position.set(startX + (toPos.x - startX) * eased, startY + (toPos.y - startY) * eased);
+      dot.alpha = 1 - t;
+      if (t >= 1) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        dot.destroy();
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /**
+   * Blizzard's cast: the same converging-particle look, but spawned one at a time on an
+   * interval instead of all at once ("should not spawn at the same time"), and starting
+   * anywhere within the caster's portrait rather than just the centre - spawnConvergingParticle
+   * already draws its own random start point inside fromPos's icon radius, so this only needs
+   * to call it repeatedly instead of in one synchronous loop. Positions are re-resolved live at
+   * each spawn rather than frozen once at cast time, since the flurry spans a meaningfully
+   * longer window than a single ~0.5s burst.
+   */
+  private spawnStaggeredConvergingParticles(
+    fromUnitId: string,
+    toUnitId: string,
+    colors: number[],
+    count: number,
+    intervalMs: number,
+    lifeFrames: number = MIMIC_PARTICLE_LIFE_FRAMES,
+    dotRadius: number = 2.5,
+  ): void {
+    let spawned = 0;
+    let nextSpawn = performance.now();
+    const tick = safeTick(() => {
+      const now = performance.now();
+      if (now < nextSpawn) return;
+      nextSpawn = now + intervalMs;
+      const fromPos = this.resolveUnitPosition(fromUnitId);
+      const toPos = this.resolveUnitPosition(toUnitId);
+      if (fromPos && toPos) {
+        this.spawnConvergingParticle(fromPos, toPos, colors[spawned % colors.length], dotRadius, lifeFrames);
+      }
+      spawned += 1;
+      if (spawned >= count) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
   }
 
   /**
    * A single hollow ring growing from nothing to `radiusPx`, fading slightly
    * as it grows - Overwhelming Odds' cast and Pylon Collapse's death burst
-   * share this exact shape, differing only in colour/radius/duration.
+   * share this exact shape, differing only in colour/radius/duration. `onComplete`
+   * (Acidic Brew only, so far) fires once the ring has destroyed itself.
    */
-  private spawnOneShotPulse(pos: { x: number; y: number }, radiusPx: number, color: number, frames: number): void {
+  private spawnOneShotPulse(pos: { x: number; y: number }, radiusPx: number, color: number, frames: number, onComplete?: () => void): void {
     const ring = new Graphics();
     ring.position.set(pos.x, pos.y);
     this.vfxLayer.addChild(ring);
@@ -1437,6 +1767,7 @@ export class Board {
         Ticker.shared.remove(tick);
         this.activeVfxOneShotTicks.delete(tick);
         ring.destroy();
+        onComplete?.();
       }
     });
     this.activeVfxOneShotTicks.add(tick);
@@ -1473,6 +1804,76 @@ export class Board {
         this.activeVfxOneShotTicks.delete(tick);
         circle.destroy();
         onComplete();
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /** Eureka's bulb / Reload's gear - a floating icon at a unit's portrait, see FloatingIcon.ts. */
+  private spawnFloatingIconAt(pos: { x: number; y: number }, kind: FloatingIconKind, color: number): void {
+    const tick = spawnFloatingIcon(this.indicatorLayer, Ticker.shared, {
+      x: pos.x,
+      y: pos.y - HEX_SIZE * 0.5, // above the token, same offset spawnIndicatorAt uses
+      kind,
+      color,
+      getBoardScale: () => this.root.scale.x,
+      onComplete: () => this.activeIndicatorTicks.delete(tick),
+    });
+    this.activeIndicatorTicks.add(tick);
+  }
+
+  /**
+   * A plain one-shot beam between two points, no travel phase - Shrink Ray's cast has no
+   * DamageEvent to key off (it's a pure stat debuff), so it can't ride the damage-triggered
+   * ABILITY_DAMAGE_ANIMATION_BY_CAUSE_LABEL pipeline the way Orbital Beam does. Same
+   * pulse-width/fade-in-then-out shape as AttackAnimationPlayer's "beam" stroke, adapted as a
+   * self-contained Board helper since this one isn't gated by any VfxEvent's damage reveal.
+   */
+  private spawnOneShotBeam(from: { x: number; y: number }, to: { x: number; y: number }, color: number, frames: number): void {
+    const beam = new Graphics();
+    this.vfxLayer.addChild(beam);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const t = Math.min(1, elapsed / frames);
+      const width = 4 + 1.5 * Math.sin((elapsed / 10) * Math.PI * 2);
+      beam.clear().moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: Math.max(1, width), color, cap: "round" });
+      beam.alpha = t < 0.1 ? t / 0.1 : t > 0.85 ? 1 - (t - 0.85) / 0.15 : 1;
+      if (t >= 1) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        beam.destroy();
+      }
+    });
+    this.activeVfxOneShotTicks.add(tick);
+    Ticker.shared.add(tick);
+  }
+
+  /**
+   * Homing Missile's cast-phase launch: a missile icon flies straight up off the caster and
+   * out of view, then despawns - purely cosmetic, no state to sync with (the actual impact,
+   * turns later, is its own damage-triggered stroke - see ABILITY_DAMAGE_ANIMATION_BY_CAUSE_
+   * LABEL["Homing Missile"] and ScheduleVfxBatch's sky-drop origin override). Reuses
+   * AttackAnimationPlayer's missile icon cache via buildMissileIcon rather than duplicating it.
+   */
+  private spawnHomingMissileLaunch(casterUnitId: string | null): void {
+    const pos = this.resolveUnitPosition(casterUnitId);
+    if (!pos) return;
+    const icon = buildMissileIcon(HOMING_MISSILE_COLOR);
+    icon.position.set(pos.x, pos.y);
+    this.vfxLayer.addChild(icon);
+    let elapsed = 0;
+    const tick = safeTick(() => {
+      elapsed += 1;
+      const t = Math.min(1, elapsed / HOMING_MISSILE_LAUNCH_FRAMES);
+      const eased = t * t; // ease-in - accelerates away, reads as a launch
+      icon.position.y = pos.y - HOMING_MISSILE_LAUNCH_OFFSET_PX * eased;
+      if (t > 0.7) icon.alpha = 1 - (t - 0.7) / 0.3;
+      if (t >= 1) {
+        Ticker.shared.remove(tick);
+        this.activeVfxOneShotTicks.delete(tick);
+        icon.destroy();
       }
     });
     this.activeVfxOneShotTicks.add(tick);
@@ -1592,9 +1993,18 @@ export class Board {
     Ticker.shared.add(tick);
   }
 
-  /** ~3 fast pulses over ~0.7s at the impact point - one ticker cycling through them, rather than 3 staggered calls. */
+  /** ~3 fast pulses over ~0.7s at the detonation point - thin wrapper over the generalized spawnMultiPulse. */
   private spawnSanityEclipsePulses(pos: { x: number; y: number }): void {
-    const framesPerPulse = Math.round(SANITY_ECLIPSE_PULSE_TOTAL_FRAMES / SANITY_ECLIPSE_PULSE_COUNT);
+    this.spawnMultiPulse(pos, SANITY_ECLIPSE_DETONATE_RADIUS_PX, SANITY_ECLIPSE_COLOR, SANITY_ECLIPSE_PULSE_COUNT, SANITY_ECLIPSE_PULSE_TOTAL_FRAMES);
+  }
+
+  /**
+   * N quick hollow pulses cycling in place at a fixed point over `totalFrames` - one ticker
+   * cycling through them, rather than N staggered calls. Generalized from Sanity's Eclipse's
+   * own 3-pulse detonation so Snow Blast's 5-pulse death effect can share it.
+   */
+  private spawnMultiPulse(pos: { x: number; y: number }, radiusPx: number, color: number, count: number, totalFrames: number): void {
+    const framesPerPulse = Math.round(totalFrames / count);
     const ring = new Graphics();
     ring.position.set(pos.x, pos.y);
     this.vfxLayer.addChild(ring);
@@ -1604,8 +2014,8 @@ export class Board {
       const pulseElapsed = elapsed % framesPerPulse;
       const t = pulseElapsed / framesPerPulse;
       const eased = 1 - Math.pow(1 - t, 3);
-      ring.clear().circle(0, 0, SANITY_ECLIPSE_DETONATE_RADIUS_PX * eased).stroke({ width: 3, color: SANITY_ECLIPSE_COLOR, alpha: 1 - t * 0.5 });
-      if (elapsed >= SANITY_ECLIPSE_PULSE_TOTAL_FRAMES) {
+      ring.clear().circle(0, 0, radiusPx * eased).stroke({ width: 3, color, alpha: 1 - t * 0.5 });
+      if (elapsed >= totalFrames) {
         Ticker.shared.remove(tick);
         this.activeVfxOneShotTicks.delete(tick);
         ring.destroy();

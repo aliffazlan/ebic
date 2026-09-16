@@ -20,7 +20,8 @@ export type UnitStatusVisualKind =
   | "snowflakes"
   | "energy-bars"
   | "doom"
-  | "shrink";
+  | "shrink"
+  | "chains";
 
 export interface UnitStatusVisual {
   mode: "unit";
@@ -61,6 +62,8 @@ const POISON_BLOOM_GREEN = 0x166534;
 const OBJURGATION_BLUE = 0x93c5fd;
 const FROSTBITE_BLUE = 0xbfe7ff;
 const REFRACTION_PINK = 0xf9a8d4;
+const INFERNAL_BLADE_RED = 0xdc2626;
+const MANIFESTATION_PURPLE = 0x581c87;
 
 /**
  * One entry per effect name (see EffectSnapshot.name, sourced from the
@@ -94,6 +97,10 @@ export const STATUS_VISUAL_BY_EFFECT_NAME: Record<string, StatusVisualSpec> = {
   // Cosmetic-only marker (see RefractionReadyEffect.java) - present exactly while
   // Lanaya has an unspent Refraction charge this turn.
   "Refraction Ready": { mode: "unit", kind: "translucent-circle", color: REFRACTION_PINK },
+  // Two curved red arcs crossing in an X, per temp/abilities.txt - procedural rather than an
+  // SVG (see spawnChainsOverlay), the same call made for Frostbite's snowflakes.
+  "Infernal Blade": { mode: "unit", kind: "chains", color: INFERNAL_BLADE_RED },
+  Manifestation: { mode: "unit", kind: "smoke", color: MANIFESTATION_PURPLE },
 };
 
 /**

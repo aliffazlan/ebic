@@ -30,46 +30,72 @@ function now(): number {
   return performance.now();
 }
 
+/** Splices `tick` out of `ticks` if present - a particle removing itself once its own lifetime ends. */
+function removeFromTicks(ticks: (() => void)[], tick: () => void): void {
+  const index = ticks.indexOf(tick);
+  if (index !== -1) ticks.splice(index, 1);
+}
+
 /**
  * Builds and starts one unit's status-effect overlay, appended as more
- * children of its own token container. Returns the ticker callbacks it
- * registered (empty for a static, unanimated overlay) - the caller (Board)
- * is responsible for calling `ticker.remove` on each before the next
- * rebuild, the same convention spawnAttackAnimation's strokes use.
+ * children of its own token container. Pushes every ticker callback it
+ * registers into the caller-owned `ticks` array (the caller, Board, is
+ * responsible for calling `ticker.remove` on each before the next rebuild,
+ * the same convention spawnAttackAnimation's strokes use) rather than
+ * returning a fresh array - ember/smoke/snowflake's periodic emitters keep
+ * pushing into this same array as they spawn new particles well after this
+ * call returns, so a particle spawned moments before the status ends is
+ * still reachable by the teardown that runs the instant it does, instead of
+ * being left to finish out its own few-hundred-ms lifetime independently.
  */
 export function spawnUnitStatusOverlay(
   parent: Container,
   ticker: Ticker,
   spec: UnitStatusVisual,
   tokenRadiusPx: number,
-): (() => void)[] {
+  ticks: (() => void)[],
+): void {
   switch (spec.kind) {
     case "stun":
-      return spawnStunStars(parent, ticker, spec.color);
+      ticks.push(...spawnStunStars(parent, ticker, spec.color));
+      return;
     case "pulse":
-      return spawnPulseCircle(parent, ticker, spec.color);
+      ticks.push(...spawnPulseCircle(parent, ticker, spec.color));
+      return;
     case "ember":
-      return spawnEmberEmitter(parent, ticker, spec.color);
+      spawnEmberEmitter(parent, ticker, spec.color, ticks);
+      return;
     case "snowflakes":
-      return spawnSnowflakeEmitter(parent, ticker, spec.color);
+      spawnSnowflakeEmitter(parent, ticker, spec.color, ticks);
+      return;
     case "translucent-circle":
-      return spawnTranslucentCircle(parent, spec.color, tokenRadiusPx * (spec.radiusMultiplier ?? 1));
+      ticks.push(...spawnTranslucentCircle(parent, spec.color, tokenRadiusPx * (spec.radiusMultiplier ?? 1)));
+      return;
     case "smoke":
-      return spawnSmokeEmitter(parent, ticker, spec.color, spec.thick ?? false, tokenRadiusPx);
+      spawnSmokeEmitter(parent, ticker, spec.color, spec.thick ?? false, tokenRadiusPx, ticks);
+      return;
     case "ice":
-      return spawnIconOverlay(parent, "ice", spec.color, tokenRadiusPx * 2.2, 0.55);
+      ticks.push(...spawnIconOverlay(parent, "ice", spec.color, tokenRadiusPx * 2.2, 0.55));
+      return;
     case "shield":
-      return spawnIconOverlay(parent, "shield", spec.color, tokenRadiusPx * 1.8, 0.5);
+      ticks.push(...spawnIconOverlay(parent, "shield", spec.color, tokenRadiusPx * 1.8, 0.5));
+      return;
     case "snow":
       // Was drawn far too big - trimmed 60% narrower, 20% shorter per temp/abilities2.txt.
-      return spawnIconOverlay(parent, "snow", spec.color, tokenRadiusPx * 2.0, 0.7, 0.4, 0.8);
+      ticks.push(...spawnIconOverlay(parent, "snow", spec.color, tokenRadiusPx * 2.0, 0.7, 0.4, 0.8));
+      return;
     case "energy-bars":
-      return spawnEnergyBars(parent, ticker, spec.color, tokenRadiusPx);
+      ticks.push(...spawnEnergyBars(parent, ticker, spec.color, tokenRadiusPx));
+      return;
     case "doom":
-      return spawnDoom(parent, ticker, spec.color);
+      ticks.push(...spawnDoom(parent, ticker, spec.color));
+      return;
     case "shrink":
       // Handled directly by Board as a sprite-scale change - nothing to draw.
-      return [];
+      return;
+    case "chains":
+      ticks.push(...spawnChainsOverlay(parent, spec.color, tokenRadiusPx));
+      return;
   }
 }
 
@@ -148,21 +174,27 @@ const EMBER_LIFE_FRAMES = 40;
 const EMBER_SIZE_PX = 3;
 const EMBER_GRAVITY = 0.09;
 
-function spawnEmberEmitter(parent: Container, ticker: Ticker, color: number): (() => void)[] {
+function spawnEmberEmitter(parent: Container, ticker: Ticker, color: number, ticks: (() => void)[]): void {
   let nextSpawn = now();
   const tick = safeTick(() => {
     const t = now();
     if (t >= nextSpawn) {
       nextSpawn = t + EMBER_INTERVAL_MS;
-      spawnEmberParticle(parent, ticker, color);
+      spawnEmberParticle(parent, ticker, color, ticks);
     }
   });
   ticker.add(tick);
-  return [tick];
+  ticks.push(tick);
 }
 
-/** Self-contained and self-cleaning, same as AttackAnimationPlayer's spawnTrailParticle - not tracked by Board's own teardown set. */
-function spawnEmberParticle(parent: Container, ticker: Ticker, color: number): void {
+/**
+ * Registers itself in the same `ticks` array the emitter (and Board's clearStatusEffectTicks)
+ * uses, unlike AttackAnimationPlayer's spawnTrailParticle - a one-shot cast effect's trail can
+ * safely outlive its cast by a fraction of a second, but a status particle spawned moments
+ * before Burn/Poison itself expires must not be left running past clearStatusEffectTicks, or it
+ * visibly outlives the status by up to its own lifetime.
+ */
+function spawnEmberParticle(parent: Container, ticker: Ticker, color: number, ticks: (() => void)[]): void {
   const dot = new Graphics().rect(-EMBER_SIZE_PX / 2, -EMBER_SIZE_PX / 2, EMBER_SIZE_PX, EMBER_SIZE_PX).fill({ color });
   dot.position.set((Math.random() - 0.5) * 24, 10);
   parent.addChild(dot);
@@ -177,9 +209,11 @@ function spawnEmberParticle(parent: Container, ticker: Ticker, color: number): v
     dot.alpha = Math.max(0, 1 - elapsed / EMBER_LIFE_FRAMES);
     if (elapsed >= EMBER_LIFE_FRAMES) {
       ticker.remove(tick);
+      removeFromTicks(ticks, tick);
       dot.destroy();
     }
   });
+  ticks.push(tick);
   ticker.add(tick);
 }
 
@@ -193,21 +227,21 @@ const SNOWFLAKE_SIZE_PX = 3;
 const SNOWFLAKE_FALL_SPEED = 0.6;
 const SNOWFLAKE_DRIFT_AMPLITUDE = 6;
 
-function spawnSnowflakeEmitter(parent: Container, ticker: Ticker, color: number): (() => void)[] {
+function spawnSnowflakeEmitter(parent: Container, ticker: Ticker, color: number, ticks: (() => void)[]): void {
   let nextSpawn = now();
   const tick = safeTick(() => {
     const t = now();
     if (t >= nextSpawn) {
       nextSpawn = t + SNOWFLAKE_INTERVAL_MS;
-      spawnSnowflakeParticle(parent, ticker, color);
+      spawnSnowflakeParticle(parent, ticker, color, ticks);
     }
   });
   ticker.add(tick);
-  return [tick];
+  ticks.push(tick);
 }
 
-/** Self-contained and self-cleaning, same as spawnEmberParticle - not tracked by Board's own teardown set. */
-function spawnSnowflakeParticle(parent: Container, ticker: Ticker, color: number): void {
+/** See spawnEmberParticle's doc comment - registered in the shared `ticks` array for the same reason. */
+function spawnSnowflakeParticle(parent: Container, ticker: Ticker, color: number, ticks: (() => void)[]): void {
   const flake = new Graphics();
   drawSnowflake(flake, SNOWFLAKE_SIZE_PX, color);
   const startX = (Math.random() - 0.5) * 28;
@@ -223,9 +257,11 @@ function spawnSnowflakeParticle(parent: Container, ticker: Ticker, color: number
     flake.alpha = Math.max(0, 1 - elapsed / SNOWFLAKE_LIFE_FRAMES);
     if (elapsed >= SNOWFLAKE_LIFE_FRAMES) {
       ticker.remove(tick);
+      removeFromTicks(ticks, tick);
       flake.destroy();
     }
   });
+  ticks.push(tick);
   ticker.add(tick);
 }
 
@@ -257,22 +293,39 @@ function spawnTranslucentCircle(parent: Container, color: number, radiusPx: numb
 const SMOKE_INTERVAL_MS = 500;
 const SMOKE_LIFE_FRAMES = 45;
 
-function spawnSmokeEmitter(parent: Container, ticker: Ticker, color: number, thick: boolean, radiusPx: number): (() => void)[] {
+function spawnSmokeEmitter(
+  parent: Container,
+  ticker: Ticker,
+  color: number,
+  thick: boolean,
+  radiusPx: number,
+  ticks: (() => void)[],
+): void {
   let nextSpawn = now();
   const tick = safeTick(() => {
     const t = now();
     if (t >= nextSpawn) {
       nextSpawn = t + SMOKE_INTERVAL_MS;
-      spawnSmokeWisp(parent, ticker, color, thick, radiusPx);
+      spawnSmokeWisp(parent, ticker, color, thick, radiusPx, ticks);
     }
   });
   ticker.add(tick);
-  return [tick];
+  ticks.push(tick);
 }
 
-function spawnSmokeWisp(parent: Container, ticker: Ticker, color: number, thick: boolean, radiusPx: number): void {
-  const lineLenPx = thick ? 7 : 5;
-  const widthPx = thick ? 2 : 1;
+/** See spawnEmberParticle's doc comment - registered in the shared `ticks` array for the same reason. */
+function spawnSmokeWisp(
+  parent: Container,
+  ticker: Ticker,
+  color: number,
+  thick: boolean,
+  radiusPx: number,
+  ticks: (() => void)[],
+): void {
+  // `thick` is Poison Bloom's alone - bumped substantially larger per temp/abilities.txt
+  // ("much larger particles"), safe to change in isolation since nothing else sets it.
+  const lineLenPx = thick ? 16 : 5;
+  const widthPx = thick ? 5 : 1;
   const wisp = new Graphics().moveTo(0, 0).lineTo(0, -lineLenPx).stroke({ width: widthPx, color, alpha: 0.8 });
   wisp.position.set((Math.random() - 0.5) * radiusPx * 1.4, (Math.random() - 0.5) * radiusPx * 1.2);
   parent.addChild(wisp);
@@ -285,9 +338,11 @@ function spawnSmokeWisp(parent: Container, ticker: Ticker, color: number, thick:
     wisp.alpha = Math.max(0, 0.8 * (1 - elapsed / SMOKE_LIFE_FRAMES));
     if (elapsed >= SMOKE_LIFE_FRAMES) {
       ticker.remove(tick);
+      removeFromTicks(ticks, tick);
       wisp.destroy();
     }
   });
+  ticks.push(tick);
   ticker.add(tick);
 }
 
@@ -329,12 +384,16 @@ function spawnIconOverlay(
 
 // --- doom: a pentagram inside a circle, both slowly rotating together ---
 
-const DOOM_ROTATE_PERIOD_MS = 6000;
+// Rotation speed halved (period doubled, was 6000) and opacity dropped to ~70% (was fully
+// opaque) per temp/abilities.txt.
+const DOOM_ROTATE_PERIOD_MS = 12000;
 const DOOM_RADIUS_PX = 16;
+const DOOM_ALPHA = 0.7;
 
 function spawnDoom(parent: Container, ticker: Ticker, color: number): (() => void)[] {
   const g = new Graphics();
   drawPentagram(g, DOOM_RADIUS_PX, color);
+  g.alpha = DOOM_ALPHA;
   parent.addChild(g);
   const tick = safeTick(() => {
     g.rotation = ((now() % DOOM_ROTATE_PERIOD_MS) / DOOM_ROTATE_PERIOD_MS) * Math.PI * 2;
@@ -357,6 +416,38 @@ function drawPentagram(g: Graphics, radius: number, color: number): void {
     g.lineTo(p.x, p.y);
   }
   g.stroke({ width: 2, color, join: "round" });
+}
+
+// --- chains: two curved arcs crossing in an X, static (no ticker) ---
+// Infernal Blade only - procedural rather than an SVG, same call as Frostbite's
+// snowflakes: a simple enough shape not to need real artwork.
+
+// Was 1.3 (deliberately larger than the token, which is exactly why it overflowed the
+// portrait) - shrunk ~40% per the user's own estimate so the X now sits inside it.
+const CHAIN_RADIUS_MULTIPLIER = 0.78;
+const CHAIN_WIDTH_PX = 3;
+const CHAIN_BULGE_FRACTION = 0.18;
+
+function spawnChainsOverlay(parent: Container, color: number, radiusPx: number): (() => void)[] {
+  const g = new Graphics();
+  const r = radiusPx * CHAIN_RADIUS_MULTIPLIER;
+  drawChainArc(g, -r, -r, r, r, color); // top-left to bottom-right
+  drawChainArc(g, r, -r, -r, r, color); // top-right to bottom-left
+  parent.addChild(g);
+  return [];
+}
+
+/** One curved stroke of the X, bulging perpendicular to its own line for a chain-like sag. */
+function drawChainArc(g: Graphics, x1: number, y1: number, x2: number, y2: number, color: number): void {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const bulge = len * CHAIN_BULGE_FRACTION;
+  const cx = (x1 + x2) / 2 + nx * bulge;
+  const cy = (y1 + y2) / 2 + ny * bulge;
+  g.moveTo(x1, y1).quadraticCurveTo(cx, cy, x2, y2).stroke({ width: CHAIN_WIDTH_PX, color, cap: "round" });
 }
 
 // --- energy shield: 3 thin jittering lines across the token, like jail bars ---

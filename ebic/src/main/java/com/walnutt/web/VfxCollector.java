@@ -5,9 +5,13 @@ import java.util.Collections;
 import java.util.List;
 
 import com.walnutt.TriggerHandler;
+import com.walnutt.ability.target.MultiTarget;
+import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.event.AbilityCastEvent;
 import com.walnutt.event.DeathEvent;
+import com.walnutt.event.GameEvent;
 import com.walnutt.event.HealEvent;
+import com.walnutt.event.PassiveProcEvent;
 import com.walnutt.event.PostDamageEvent;
 import com.walnutt.event.StatusAppliedEvent;
 import com.walnutt.game.GameState;
@@ -38,7 +42,15 @@ public final class VfxCollector extends TriggerHandler {
             return;
         }
         String targetId = switch (event.target()) {
-            case com.walnutt.ability.target.UnitTarget unitTarget -> ids.idFor(unitTarget.getUnit());
+            case UnitTarget unitTarget -> ids.idFor(unitTarget.getUnit());
+            // Translocation is the first MultiTarget-based ability (see MultiTarget's own doc
+            // comment) - its primary half names the unit actually being relocated, which the
+            // frontend needs in order to hold that unit's sprite back for its growing-circle
+            // cast VFX. The secondary half (the destination tile) still never reaches the wire
+            // here - see Board.ts's translocationsAwaitingMove, which reads the tile off the
+            // unit's own position in the snapshot that follows instead.
+            case MultiTarget multiTarget when multiTarget.primary() instanceof UnitTarget unitTarget ->
+                ids.idFor(unitTarget.getUnit());
             default -> null;
         };
         buffered.add(new VfxEvent(
@@ -89,6 +101,19 @@ public final class VfxCollector extends TriggerHandler {
             null,
             null
         ));
+    }
+
+    /**
+     * TriggerHandler's catch-all, fired for every event after its own named hook (if any) -
+     * used here only for PassiveProcEvent, which has no named hook of its own (see that
+     * class's doc comment for why it isn't routed through onAbilityUsed instead). Reuses the
+     * "ability_used" VfxEvent shape so the frontend's dispatch code is identical to a real cast.
+     */
+    @Override
+    public void onGameEvent(GameState state, GameEvent event) {
+        if (event instanceof PassiveProcEvent proc) {
+            buffered.add(new VfxEvent("ability_used", Identifiers.normalize(proc.label()), ids.idFor(proc.unit()), null, null, null, null));
+        }
     }
 
     /** Returns and clears the buffered events since the last drain. */

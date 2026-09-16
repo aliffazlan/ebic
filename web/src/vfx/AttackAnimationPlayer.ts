@@ -11,31 +11,51 @@
 import { Container, Graphics, GraphicsContext, Ticker } from "pixi.js";
 import type { PixelCoord } from "../hex/HexMath";
 import { cssHex } from "../ui/Colors";
-import { strokeDurationMs, type AttackAnimationSpec, type AttackAnimationStroke } from "./AttackAnimations";
+import {
+  strokeDurationMs,
+  GROWING_PROJECTILE_DURATION_MS,
+  GROWING_PROJECTILE_GROW_FRACTION,
+  CHARGE_BURST_DEFAULT_CHARGE_MS,
+  CHARGE_BURST_DEFAULT_BURST_MS,
+  type AttackAnimationSpec,
+  type AttackAnimationStroke,
+} from "./AttackAnimations";
 import { spawnParticleBurst } from "./ParticleBurst";
 import { safeTick } from "./SafeTick";
 import slashSvg from "./icons/slash.svg?raw";
 import arrowSvg from "./icons/arrow.svg?raw";
+import missileSvg from "./icons/missile.svg?raw";
+import flaskSvg from "./icons/flask.svg?raw";
+import scrollSvg from "./icons/scroll.svg?raw";
 
 const FPS = 60;
 function msToFrames(ms: number): number {
   return Math.max(1, Math.round((ms / 1000) * FPS));
 }
 
+type StrokeIconKind = "slash" | "arrow" | "missile" | "flask" | "scroll";
 const ICON_COLOR_PLACEHOLDER = "currentColor";
-const ICON_SOURCE: Record<"slash" | "arrow", string> = { slash: slashSvg, arrow: arrowSvg };
+const ICON_SOURCE: Record<StrokeIconKind, string> = {
+  slash: slashSvg,
+  arrow: arrowSvg,
+  missile: missileSvg,
+  flask: flaskSvg,
+  scroll: scrollSvg,
+};
 const SLASH_ICON_HEIGHT_PX = 40;
 const ARROW_ICON_HEIGHT_PX = 34;
+const MISSILE_ICON_HEIGHT_PX = 24;
+const ARC_PROJECTILE_ICON_HEIGHT_PX = 22;
 
 /**
  * One parsed GraphicsContext per (kind, colour) pair. Colour varies per unit
  * here (unlike DamageIndicator's fixed 6-kind cache), but the key space is
- * still bounded by the finite unit roster - at most ~2 kinds x ~15 distinct
+ * still bounded by the finite unit roster - at most ~3 kinds x ~15 distinct
  * colours - so this never grows unbounded and is never evicted.
  */
 const strokeIconContexts = new Map<string, GraphicsContext>();
 
-function strokeIconContextFor(kind: "slash" | "arrow", color: number): GraphicsContext {
+function strokeIconContextFor(kind: StrokeIconKind, color: number): GraphicsContext {
   const key = `${kind}:${cssHex(color)}`;
   const cached = strokeIconContexts.get(key);
   if (cached) return cached;
@@ -44,13 +64,18 @@ function strokeIconContextFor(kind: "slash" | "arrow", color: number): GraphicsC
   return context;
 }
 
-function buildStrokeIcon(kind: "slash" | "arrow", color: number, heightPx: number): Graphics {
+function buildStrokeIcon(kind: StrokeIconKind, color: number, heightPx: number): Graphics {
   const view = new Graphics({ context: strokeIconContextFor(kind, color) });
   const bounds = view.getLocalBounds();
   const scale = bounds.height > 0 ? heightPx / bounds.height : 1;
   view.scale.set(scale);
   view.pivot.set(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   return view;
+}
+
+/** Homing Missile's cast-phase launch (Board.ts) reuses this exact recolour cache rather than duplicating it. */
+export function buildMissileIcon(color: number): Graphics {
+  return buildStrokeIcon("missile", color, MISSILE_ICON_HEIGHT_PX);
 }
 
 /** Ease-out cubic - the same curve animateUnitMove and spawnDamageIndicator use. */
@@ -107,7 +132,7 @@ function spawnStroke(
   onDone: () => void,
 ): () => void {
   const delayFrames = msToFrames(stroke.delayMs ?? 0);
-  const durationFrames = msToFrames(strokeDurationMs(stroke.kind));
+  const durationFrames = msToFrames(strokeDurationMs(stroke));
   let elapsed = 0;
   let view: Graphics | null = null;
   let particleCursor = 0;
@@ -134,13 +159,22 @@ function spawnStroke(
         particleCursor = updateProjectile(view, from, to, t, stroke, parent, ticker, particleCursor, localElapsed);
         break;
       case "growing-projectile":
-        updateGrowingProjectile(view, from, to, t, parent, ticker);
+        particleCursor = updateGrowingProjectile(view, from, to, localElapsed, stroke, parent, ticker, particleCursor);
         break;
       case "lightning":
         updateLightning(view, from, to, localElapsed, t, stroke.width ?? LIGHTNING_WIDTH_PX);
         break;
       case "beam":
         updateBeam(view, from, to, localElapsed, t, stroke.toColor);
+        break;
+      case "pulse":
+        updatePulse(view, to, localElapsed, durationFrames, stroke.pulseCount ?? 5, stroke.pulseRadiusPx ?? PROJECTILE_RADIUS_PX);
+        break;
+      case "arc-projectile":
+        particleCursor = updateArcProjectile(view, from, to, t, stroke, parent, ticker, particleCursor, localElapsed);
+        break;
+      case "charge-burst":
+        particleCursor = updateChargeBurst(view, to, localElapsed, stroke, parent, ticker, particleCursor);
         break;
     }
 
@@ -167,21 +201,33 @@ function createStrokeView(stroke: AttackAnimationStroke): Graphics {
       return view;
     }
     case "projectile":
-      return new Graphics().circle(0, 0, PROJECTILE_RADIUS_PX).fill({ color: stroke.color });
+      return stroke.icon
+        ? buildStrokeIcon(stroke.icon, stroke.color, MISSILE_ICON_HEIGHT_PX)
+        : new Graphics().circle(0, 0, PROJECTILE_RADIUS_PX).fill({ color: stroke.color });
     case "growing-projectile": {
       const view = new Graphics();
       strokeColors.set(view, stroke.color);
       return view;
     }
     case "lightning":
-    case "beam": {
+    case "beam":
+    case "pulse": {
       const view = new Graphics();
-      // Stashed here since lightning/beam redraw their geometry every frame
+      // Stashed here since lightning/beam/pulse redraw their geometry every frame
       // (clear() + a fresh path) and need the colour again each time, but
       // Graphics itself has no "remembered fill colour" accessor.
       strokeColors.set(view, stroke.color);
       return view;
     }
+    case "arc-projectile":
+      // Icon-based when one is given (Acidic Brew's flask, Hidden Potential's scroll);
+      // otherwise a plain circle (Snow Golem's snowball) - same icon-or-dot fallback shape
+      // "projectile" already uses.
+      return stroke.icon
+        ? buildStrokeIcon(stroke.icon, stroke.color, ARC_PROJECTILE_ICON_HEIGHT_PX)
+        : new Graphics().circle(0, 0, stroke.projectileRadiusPx ?? PROJECTILE_RADIUS_PX).fill({ color: stroke.color });
+    case "charge-burst":
+      return new Graphics();
   }
 }
 
@@ -249,6 +295,8 @@ const PROJECTILE_FADE_START = 0.8;
 const PARTICLE_INTERVAL_FRAMES = 3;
 const TRAIL_PARTICLE_RADIUS_PX = 2;
 const TRAIL_PARTICLE_LIFE_FRAMES = 10;
+/** The missile art's own resting orientation - see missile.svg, it points straight up. */
+const MISSILE_ART_UP_ANGLE = -Math.PI / 2;
 
 function updateProjectile(
   view: Graphics,
@@ -266,6 +314,11 @@ function updateProjectile(
   const y = lerp(from.y, to.y, eased);
   view.position.set(x, y);
   view.alpha = t < PROJECTILE_FADE_START ? 1 : 1 - (t - PROJECTILE_FADE_START) / (1 - PROJECTILE_FADE_START);
+  if (stroke.icon) {
+    // General "face direction of travel" formula, not a hardcoded 180deg flip - correct
+    // whichever way the icon happens to be travelling, not just straight down.
+    view.rotation = Math.atan2(to.y - from.y, to.x - from.x) - MISSILE_ART_UP_ANGLE;
+  }
 
   let nextCursor = particleCursor;
   if (stroke.particles && localElapsed - particleCursor >= PARTICLE_INTERVAL_FRAMES) {
@@ -298,34 +351,143 @@ function spawnTrailParticle(parent: Container, ticker: Ticker, x: number, y: num
   ticker.add(tick);
 }
 
+// --- arc-projectile: icon-based, parabolic arc, continuous spin, optional trail/landing burst ---
+// Acidic Brew's flask / Hidden Potential's scroll - "should travel in a small arc rather than
+// a straight line, to simulate as if it is thrown", per temp/abilities.txt.
+
+const ARC_PROJECTILE_FADE_START = 0.85;
+
+function updateArcProjectile(
+  view: Graphics,
+  from: PixelCoord,
+  to: PixelCoord,
+  t: number,
+  stroke: AttackAnimationStroke,
+  parent: Container,
+  ticker: Ticker,
+  particleCursor: number,
+  localElapsed: number,
+): number {
+  const eased = easeOutCubic(t);
+  const x = lerp(from.x, to.x, eased);
+  // Parabolic bulge - 0 at both ends, peaking at the midpoint (4*t*(1-t)) - scaled by
+  // arcHeightPx. Pixi's y grows downward, so subtracting reads as "up".
+  const arcHeight = stroke.arcHeightPx ?? 0;
+  const y = lerp(from.y, to.y, eased) - arcHeight * 4 * t * (1 - t);
+  view.position.set(x, y);
+  // Continuous spin, independent of travel direction - unlike the missile's face-heading
+  // rotation, a thrown flask/scroll just tumbles the whole way.
+  view.rotation += stroke.spinSpeed ?? 0;
+  view.alpha = t < ARC_PROJECTILE_FADE_START ? 1 : 1 - (t - ARC_PROJECTILE_FADE_START) / (1 - ARC_PROJECTILE_FADE_START);
+
+  let nextCursor = particleCursor;
+  if (stroke.trailColor !== undefined && localElapsed - particleCursor >= PARTICLE_INTERVAL_FRAMES) {
+    nextCursor = localElapsed;
+    spawnTrailParticle(parent, ticker, x, y, stroke.trailColor);
+  }
+  if (t >= 1 && stroke.landingBurst) {
+    const burst = stroke.landingBurst;
+    spawnParticleBurst(parent, ticker, {
+      x: to.x,
+      y: to.y,
+      color: burst.color ?? stroke.color,
+      count: burst.count ?? 18,
+      speed: burst.speed ?? 2.6,
+      life: burst.lifeFrames ?? 26,
+      radius: burst.radiusPx ?? 3,
+    });
+  }
+  return nextCursor;
+}
+
 // --- growing-projectile: Fireblast's ball - grows in place, then travels, then bursts ---
+// Plasma Cannon reuses this exact shape at overridden durations/radius/particles/burst - see
+// AttackAnimationStroke's growDurationMs/travelDurationMs/projectileRadiusPx/growParticles/
+// impactBurst fields, all optional so Fireblast (which sets none of them) is pixel-identical
+// to before this stroke gained a second user.
 
 const GROWING_PROJECTILE_RADIUS_PX = 10;
-const GROWING_PROJECTILE_GROW_FRACTION = 0.25; // first 25% of the duration is the grow-in-place phase
+const GROWING_PROJECTILE_DEFAULT_GROW_MS = GROWING_PROJECTILE_DURATION_MS * GROWING_PROJECTILE_GROW_FRACTION;
+const GROWING_PROJECTILE_DEFAULT_TRAVEL_MS = GROWING_PROJECTILE_DURATION_MS * (1 - GROWING_PROJECTILE_GROW_FRACTION);
+const INWARD_PARTICLE_INTERVAL_FRAMES = 4;
 
 function updateGrowingProjectile(
   view: Graphics,
   from: PixelCoord,
   to: PixelCoord,
-  t: number,
+  localElapsed: number,
+  stroke: AttackAnimationStroke,
   parent: Container,
   ticker: Ticker,
-): void {
+  particleCursor: number,
+): number {
   const color = strokeColorOf(view) ?? 0xffffff;
-  if (t < GROWING_PROJECTILE_GROW_FRACTION) {
-    const growT = t / GROWING_PROJECTILE_GROW_FRACTION;
-    const radius = GROWING_PROJECTILE_RADIUS_PX * easeOutCubic(growT);
+  const radiusPx = stroke.projectileRadiusPx ?? GROWING_PROJECTILE_RADIUS_PX;
+  const growFrames = msToFrames(stroke.growDurationMs ?? GROWING_PROJECTILE_DEFAULT_GROW_MS);
+  const travelFrames = msToFrames(stroke.travelDurationMs ?? GROWING_PROJECTILE_DEFAULT_TRAVEL_MS);
+  let nextCursor = particleCursor;
+
+  if (localElapsed <= growFrames) {
+    const growT = localElapsed / growFrames;
+    const radius = radiusPx * easeOutCubic(growT);
     view.position.set(from.x, from.y);
     view.clear().circle(0, 0, radius).fill({ color });
-    return;
+    if (stroke.growParticles && localElapsed - particleCursor >= INWARD_PARTICLE_INTERVAL_FRAMES) {
+      nextCursor = localElapsed;
+      spawnInwardParticle(parent, ticker, from, radiusPx, color);
+    }
+    return nextCursor;
   }
-  const travelT = (t - GROWING_PROJECTILE_GROW_FRACTION) / (1 - GROWING_PROJECTILE_GROW_FRACTION);
+
+  const travelT = Math.min(1, (localElapsed - growFrames) / travelFrames);
   const eased = easeOutCubic(travelT);
   view.position.set(lerp(from.x, to.x, eased), lerp(from.y, to.y, eased));
-  view.clear().circle(0, 0, GROWING_PROJECTILE_RADIUS_PX).fill({ color });
+  view.clear().circle(0, 0, radiusPx).fill({ color });
   if (travelT >= 1) {
-    spawnParticleBurst(parent, ticker, { x: to.x, y: to.y, color, count: 18, speed: 2.6, life: 26, radius: 3 });
+    const burst = stroke.impactBurst;
+    spawnParticleBurst(parent, ticker, {
+      x: to.x,
+      y: to.y,
+      color,
+      count: burst?.count ?? 18,
+      speed: burst?.speed ?? 2.6,
+      life: burst?.lifeFrames ?? 26,
+      radius: burst?.radiusPx ?? 3,
+    });
   }
+  return nextCursor;
+}
+
+const INWARD_PARTICLE_LIFE_FRAMES = 20;
+const INWARD_PARTICLE_RADIUS_PX = 2;
+const INWARD_PARTICLE_SPAWN_RADIUS_MULTIPLIER = 1.8;
+
+/**
+ * One particle converging inward on a static point (the orb's own growing position - unlike
+ * Sanity's Eclipse's charge particles, which chase a live, moving unit, Plasma Cannon's orb
+ * sits still while it grows, so there's nothing to track live). Self-contained/self-cleaning,
+ * same "fine to slightly outlive its parent stroke" convention as spawnTrailParticle.
+ */
+function spawnInwardParticle(parent: Container, ticker: Ticker, center: PixelCoord, spawnRadiusPx: number, color: number): void {
+  const angle = Math.random() * Math.PI * 2;
+  const startX = center.x + Math.cos(angle) * spawnRadiusPx * INWARD_PARTICLE_SPAWN_RADIUS_MULTIPLIER;
+  const startY = center.y + Math.sin(angle) * spawnRadiusPx * INWARD_PARTICLE_SPAWN_RADIUS_MULTIPLIER;
+  const dot = new Graphics().circle(0, 0, INWARD_PARTICLE_RADIUS_PX).fill({ color });
+  dot.position.set(startX, startY);
+  parent.addChild(dot);
+  let elapsed = 0;
+  const tick = safeTick(() => {
+    elapsed += 1;
+    const t = Math.min(1, elapsed / INWARD_PARTICLE_LIFE_FRAMES);
+    const eased = t * t; // ease-in, same convergence feel as Board.ts's spawnConvergingParticles
+    dot.position.set(startX + (center.x - startX) * eased, startY + (center.y - startY) * eased);
+    dot.alpha = 1 - t;
+    if (t >= 1) {
+      ticker.remove(tick);
+      dot.destroy();
+    }
+  });
+  ticker.add(tick);
 }
 
 // --- lightning: procedural jittering bolt, full-length instantly, no travel ---
@@ -397,6 +559,66 @@ function updateBeam(view: Graphics, from: PixelCoord, to: PixelCoord, localElaps
   } else {
     view.alpha = 1;
   }
+}
+
+// --- pulse: N quick hollow rings cycling in place at a fixed point, no travel ---
+// Homing Missile's "5 fast white pulses" impact flash, per temp/abilities.txt - same shape
+// as Board.ts's spawnSanityEclipsePulses, as a stroke so it sequences after the missile's
+// own projectile stroke via delayMs and gates the damage reveal the normal multi-stroke way.
+
+function updatePulse(view: Graphics, at: PixelCoord, localElapsed: number, durationFrames: number, count: number, radiusPx: number): void {
+  const framesPerPulse = Math.max(1, Math.round(durationFrames / count));
+  const pulseElapsed = localElapsed % framesPerPulse;
+  const t = pulseElapsed / framesPerPulse;
+  const eased = easeOutCubic(t);
+  view.position.set(at.x, at.y);
+  view.clear().circle(0, 0, radiusPx * eased).stroke({ width: 3, color: strokeColorOf(view) ?? 0xffffff, alpha: 1 - t * 0.5 });
+}
+
+// --- charge-burst: particles converge on a point, then it detonates in alternating-colour pulses ---
+// Implosion's "dramatic vfx" per temp/abilities.txt: ~2s of magenta/light-blue particles closing
+// in on the target, then ~10 pulses in the same two colours covering the affected area.
+
+const CHARGE_BURST_PARTICLE_INTERVAL_FRAMES = 3;
+const CHARGE_BURST_PARTICLE_SPAWN_RADIUS_PX = 45;
+const CHARGE_BURST_DEFAULT_PULSE_COUNT = 10;
+const CHARGE_BURST_DEFAULT_RADIUS_PX = 60;
+
+function updateChargeBurst(
+  view: Graphics,
+  at: PixelCoord,
+  localElapsed: number,
+  stroke: AttackAnimationStroke,
+  parent: Container,
+  ticker: Ticker,
+  particleCursor: number,
+): number {
+  const chargeFrames = msToFrames(stroke.chargeDurationMs ?? CHARGE_BURST_DEFAULT_CHARGE_MS);
+  let nextCursor = particleCursor;
+
+  if (localElapsed <= chargeFrames) {
+    if (localElapsed - particleCursor >= CHARGE_BURST_PARTICLE_INTERVAL_FRAMES) {
+      nextCursor = localElapsed;
+      const color = Math.random() < 0.5 ? stroke.color : (stroke.secondaryColor ?? stroke.color);
+      // Reuses Plasma Cannon's "converge on a static point" particle exactly - there's no
+      // growing orb to anchor to here, just the target's own fixed position.
+      spawnInwardParticle(parent, ticker, at, CHARGE_BURST_PARTICLE_SPAWN_RADIUS_PX, color);
+    }
+    return nextCursor;
+  }
+
+  const burstElapsed = localElapsed - chargeFrames;
+  const count = stroke.burstPulseCount ?? CHARGE_BURST_DEFAULT_PULSE_COUNT;
+  const burstFrames = msToFrames(stroke.burstDurationMs ?? CHARGE_BURST_DEFAULT_BURST_MS);
+  const framesPerPulse = Math.max(1, Math.round(burstFrames / count));
+  const pulseIndex = Math.floor(burstElapsed / framesPerPulse);
+  const pulseElapsed = burstElapsed % framesPerPulse;
+  const t = pulseElapsed / framesPerPulse;
+  const eased = easeOutCubic(t);
+  const color = pulseIndex % 2 === 0 ? stroke.color : (stroke.secondaryColor ?? stroke.color);
+  view.position.set(at.x, at.y);
+  view.clear().circle(0, 0, (stroke.burstRadiusPx ?? CHARGE_BURST_DEFAULT_RADIUS_PX) * eased).stroke({ width: 3, color, alpha: 1 - t * 0.5 });
+  return nextCursor;
 }
 
 /** Channel-wise lerp between two 0xRRGGBB colours - Orbital Beam's white-to-dark-blue sweep. */

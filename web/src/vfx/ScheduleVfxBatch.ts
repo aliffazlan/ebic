@@ -116,7 +116,20 @@ export function scheduleVfxBatch(events: VfxEvent[], deps: VfxBatchDeps): void {
   // enqueue() step instead of the staggered one-event-per-step treatment every
   // other ability damage cause label gets.
   const eyeOfTheStormEvents = abilityDamageEvents.filter((e) => e.causeLabel === "Eye of the Storm");
-  const staggeredAbilityDamageEvents = abilityDamageEvents.filter((e) => e.causeLabel !== "Eye of the Storm");
+  // HomingMissileEffect.onExpire (backend) deals impact damage to the locked target, then
+  // splash damage to every adjacent enemy, all in one method call under this same causeLabel
+  // and sourceUnitId - one missile, one explosion, but previously N staggered animations for
+  // N victims. Grouped by source below so it plays exactly once per cast regardless of how
+  // many units it actually hits - see that group's own handling further down.
+  const homingMissileEvents = abilityDamageEvents.filter((e) => e.causeLabel === "Homing Missile");
+  // Implosion.onUse (backend) strikes the primary target then every enemy within its splash
+  // radius, all in one synchronous loop under this causeLabel and sourceUnitId - same
+  // one-caster/several-same-batch-events shape as Homing Missile, grouped below so N victims
+  // still play exactly one charge+detonation.
+  const implosionEvents = abilityDamageEvents.filter((e) => e.causeLabel === "Implosion");
+  const staggeredAbilityDamageEvents = abilityDamageEvents.filter(
+    (e) => e.causeLabel !== "Eye of the Storm" && e.causeLabel !== "Homing Missile" && e.causeLabel !== "Implosion",
+  );
 
   const abilityDamageSteps = staggeredAbilityDamageEvents.map((event) => {
     const to = deps.resolveUnitPosition(event.targetUnitId);
@@ -188,6 +201,70 @@ export function scheduleVfxBatch(events: VfxEvent[], deps: VfxBatchDeps): void {
           if (indicatorSpec) deps.showIndicatorAt(to, indicatorSpec);
         });
       }
+    }, gapMs);
+  }
+
+  const homingMissileBySource = new Map<string, VfxEvent[]>();
+  for (const event of homingMissileEvents) {
+    const key = event.sourceUnitId ?? "";
+    const list = homingMissileBySource.get(key) ?? [];
+    list.push(event);
+    homingMissileBySource.set(key, list);
+  }
+  for (const groupEvents of homingMissileBySource.values()) {
+    const spec = abilityDamageAnimationFor("Homing Missile");
+    if (!spec) continue; // defensive - shouldn't happen, the table entry was just added above
+    const gapMs = attackAnimationDurationMs(spec);
+    // The locked target (impact) is always buffered before any splash victim - see
+    // HomingMissileEffect.onExpire - so the first event in arrival order names the one tile
+    // the missile actually strikes; every other event in the group is a splash victim that
+    // still gets its own indicator, just no separate animation.
+    const to = deps.resolveUnitPosition(groupEvents[0].targetUnitId);
+    const from = to ? { x: to.x, y: to.y - ORBITAL_BEAM_SKY_OFFSET_PX } : null;
+    const reveals = groupEvents.map((event) => {
+      const pos = deps.resolveUnitPosition(event.targetUnitId);
+      const indicatorSpec = indicatorFor(event);
+      if (indicatorSpec) deps.beginPendingHpChange(indicatorSpec.unitId);
+      return { pos, indicatorSpec };
+    });
+    deps.indicators.enqueue(() => {
+      if (!from || !to) return;
+      deps.playAttackAnimation(from, to, spec, () => {
+        for (const { pos, indicatorSpec } of reveals) {
+          if (pos && indicatorSpec) deps.showIndicatorAt(pos, indicatorSpec);
+        }
+      });
+    }, gapMs);
+  }
+
+  const implosionBySource = new Map<string, VfxEvent[]>();
+  for (const event of implosionEvents) {
+    const key = event.sourceUnitId ?? "";
+    const list = implosionBySource.get(key) ?? [];
+    list.push(event);
+    implosionBySource.set(key, list);
+  }
+  for (const groupEvents of implosionBySource.values()) {
+    const spec = abilityDamageAnimationFor("Implosion");
+    if (!spec) continue; // defensive - shouldn't happen, the table entry was just added above
+    const gapMs = attackAnimationDurationMs(spec);
+    // The primary target (struck first, see Implosion.onUse) anchors the charge+detonation;
+    // splash victims still get their own indicator, just no separate stationary effect.
+    const at = deps.resolveUnitPosition(groupEvents[0].targetUnitId);
+    const reveals = groupEvents.map((event) => {
+      const pos = deps.resolveUnitPosition(event.targetUnitId);
+      const indicatorSpec = indicatorFor(event);
+      if (indicatorSpec) deps.beginPendingHpChange(indicatorSpec.unitId);
+      return { pos, indicatorSpec };
+    });
+    deps.indicators.enqueue(() => {
+      if (!at) return;
+      // No travel phase - from and to are the same stationary point.
+      deps.playAttackAnimation(at, at, spec, () => {
+        for (const { pos, indicatorSpec } of reveals) {
+          if (pos && indicatorSpec) deps.showIndicatorAt(pos, indicatorSpec);
+        }
+      });
     }, gapMs);
   }
 

@@ -6,6 +6,7 @@ import com.walnutt.ability.Move;
 import com.walnutt.ability.PassiveAbility;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.event.AbilityCastEvent;
+import com.walnutt.event.PassiveProcEvent;
 import com.walnutt.event.PostDamageEvent;
 import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
@@ -63,6 +64,9 @@ public class Reload extends PassiveAbility {
             return;
         }
         if (!acted && !damaged && !self.isDead()) {
+            // Cosmetic-only - see PassiveProcEvent's own doc comment for why this isn't a
+            // faked AbilityCastEvent.
+            state.getEventBus().publish(state, new PassiveProcEvent(self, "Reload"));
             for (Ability ability : self.getAbilities()) {
                 if (!ability.isPassive()) {
                     ability.decreaseCooldown(ability.getCurrentCooldown());

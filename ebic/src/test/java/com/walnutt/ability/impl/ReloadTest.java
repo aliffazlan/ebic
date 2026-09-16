@@ -24,6 +24,9 @@ import com.walnutt.unit.BasicUnit;
 import com.walnutt.unit.EliteUnit;
 import com.walnutt.unit.Unit;
 import com.walnutt.unit.UnitStats;
+import com.walnutt.web.UnitIdRegistry;
+import com.walnutt.web.VfxCollector;
+import com.walnutt.web.dto.VfxEvent;
 
 class ReloadTest {
 
@@ -142,5 +145,41 @@ class ReloadTest {
 
         f.reload().onTurnStart(f.state(), new TurnStartEvent(Team.PLAYER_ONE));
         assertTrue(f.cannon().isReady(), "the next quiet round reloads normally");
+    }
+
+    /**
+     * Reload has no cast of its own to hook (it's a PassiveAbility triggered from
+     * onTurnStart, never routed through the normal ability_used publish path) - see
+     * PassiveProcEvent's own doc comment for why it gets a dedicated event rather than a
+     * faked AbilityCastEvent. VfxCollector is wired the same way WebRenderer wires it in a
+     * real match: registered as a global EventBus listener.
+     */
+    @Test
+    void aQuietRoundProducesExactlyOneVfxEvent() {
+        Fixture f = fixture();
+        f.cannon().resetToMax();
+        VfxCollector vfx = new VfxCollector(new UnitIdRegistry());
+        f.state().getEventBus().addGlobalListener(vfx);
+
+        f.reload().onTurnStart(f.state(), new TurnStartEvent(Team.PLAYER_ONE));
+
+        List<VfxEvent> events = vfx.drain();
+        assertEquals(1, events.size());
+        assertEquals("ability_used", events.get(0).type());
+        assertEquals("reload", events.get(0).abilityId());
+    }
+
+    @Test
+    void actingDuringTheRoundProducesNoVfxEvent() {
+        Fixture f = fixture();
+        f.cannon().resetToMax();
+        VfxCollector vfx = new VfxCollector(new UnitIdRegistry());
+        f.state().getEventBus().addGlobalListener(vfx);
+
+        f.reload().onAbilityUsed(f.state(),
+            new AbilityCastEvent(f.maxwell(), f.cannon(), new NoTarget(), AbilityCastEvent.Phase.POST));
+        f.reload().onTurnStart(f.state(), new TurnStartEvent(Team.PLAYER_ONE));
+
+        assertTrue(vfx.drain().isEmpty(), "no reload happened, so no vfx cue either");
     }
 }
