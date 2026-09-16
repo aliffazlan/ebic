@@ -6,6 +6,7 @@ import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.effect.impl.BlizzardEffect;
 import com.walnutt.game.GameState;
+import com.walnutt.unit.SummonedUnit;
 import com.walnutt.unit.Unit;
 
 /** Yuki - roots and damages a unit over time; reapplying stacks the duration instead of refreshing it. */
@@ -55,5 +56,34 @@ public class Blizzard extends Ability {
      */
     public boolean disarms() {
         return isUpgraded();
+    }
+
+    /**
+     * Upgrading Blizzard only changes what a FUTURE cast does - it never reaches into a
+     * BlizzardEffect already ticking on some victim from before the upgrade. Sweep every living
+     * unit and force the disarm onto any storm this Yuki laid herself, or that one of her golems
+     * (Blizzard Fist / Snow Blast) laid on her behalf, so an already-buried victim is disarmed
+     * the instant Shawl unlocks this rather than only on their next hit.
+     */
+    @Override
+    protected void onRetroactiveUpgrade(GameState state) {
+        Unit yuki = getOwner();
+        if (yuki == null) {
+            return;
+        }
+        for (Unit unit : state.getAllActiveUnits()) {
+            unit.getActiveEffect(BlizzardEffect.class).ifPresent(effect -> {
+                if (isOwnedByYukiOrHerGolems(effect.getSource(), yuki)) {
+                    effect.refresh(damage, true);
+                }
+            });
+        }
+    }
+
+    private static boolean isOwnedByYukiOrHerGolems(Unit source, Unit yuki) {
+        if (source == yuki) {
+            return true;
+        }
+        return source instanceof SummonedUnit summon && summon.getSummoner() == yuki;
     }
 }

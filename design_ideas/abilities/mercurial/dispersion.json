@@ -4,7 +4,7 @@
     "description": "Disperses %dmg_reflect:pct%% of all damage this unit takes back onto enemies within %radius% tile.",
     "stats": {
         "radius": 1,
-        "dmg_reflect": 0.25
+        "dmg_reflect": 0.3
     },
     "upgrade": {
         "summary": "Gains an active that raises the dispersal to %active_reflect:pct%% for %duration% turns.",

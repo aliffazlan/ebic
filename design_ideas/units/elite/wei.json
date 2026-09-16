@@ -1,9 +1,9 @@
 {
     "name": "Wei",
     "type": "elite",
-    "max_hp": 650,
-    "strength": 30,
-    "agility": 90,
+    "max_hp": 710,
+    "strength": 36,
+    "agility": 84,
     "intelligence" :20,
     "attack_range": 1,
     "abilities": [

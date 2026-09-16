@@ -38,7 +38,7 @@ class AurothUpgradeTest {
 
         bite(f, auroth, victim, 10);
 
-        assertEquals(5, victim.getEffects().get(0).getRemainingTurns(), "2 turns before the upgrade");
+        assertEquals(6, victim.getEffects().get(0).getRemainingTurns(), "3 turns before the upgrade");
     }
 
     /**
@@ -71,7 +71,7 @@ class AurothUpgradeTest {
         bite(f, auroth, basic, 65);
 
         assertFalse(basic.isDead());
-        assertEquals(2, basic.getEffects().get(0).getRemainingTurns());
+        assertEquals(3, basic.getEffects().get(0).getRemainingTurns());
     }
 
     /** An embraced ALLY keeps its feet; an embraced enemy is shut down exactly as before. */

@@ -153,6 +153,16 @@ public abstract class Ability extends TriggerHandler {
     }
 
     /**
+     * Same as {@link #upgrade()}, but also runs {@link #onRetroactiveUpgrade}, for the one
+     * caller (Hidden Potential) that has a GameState in hand at the moment of upgrading.
+     * A plain {@link #upgrade()} is left untouched for anywhere else that doesn't.
+     */
+    public final void upgrade(GameState state) {
+        upgrade();
+        onRetroactiveUpgrade(state);
+    }
+
+    /**
      * Re-read whatever this ability cached from its definition at construction. Default
      * no-op, correct for anything that reads its numbers straight off {@link #getStats()}.
      *
@@ -160,6 +170,17 @@ public abstract class Ability extends TriggerHandler {
      * override already sees the upgraded values.
      */
     protected void onUpgraded() {
+    }
+
+    /**
+     * Sweeps for and fixes up already-live {@link com.walnutt.effect.Effect} instances this
+     * ability's OWNER (or something it summoned) applied before the upgrade landed - upgrading
+     * only changes numbers this ability itself caches, it never reaches back into effects
+     * already sitting on other units. Default no-op; an ability whose debuff needs to pick up
+     * new upgraded behavior retroactively (Blizzard's disarm, Poison Sting's vulnerability)
+     * overrides this instead of leaving stale effects to only update on the next re-application.
+     */
+    protected void onRetroactiveUpgrade(GameState state) {
     }
 
     /** This ability's current tuning value for {@code key} - the upgraded one once upgraded. */

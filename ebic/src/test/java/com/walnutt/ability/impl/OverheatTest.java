@@ -35,8 +35,8 @@ class OverheatTest {
     private GameState state;
 
     /**
-     * Unlocks the Overheat already on the board, which is the form that banks heat past the
-     * threshold rather than burning it off.
+     * Unlocks the Overheat already on the board, which is the form that spreads Burn on a
+     * proc instead of dealing direct damage.
      */
     private void unlockOverheat() {
         ember.getAbilities().stream().filter(Overheat.class::isInstance).forEach(Ability::upgrade);
@@ -86,82 +86,80 @@ class OverheatTest {
     @Test
     void heatBelowTheThresholdDoesNothing() {
         setUpBoard();
-        hit(30);
+        hit(50);
 
-        assertEquals(30, heat());
-        assertEquals(0, burnStacks(neighbour), "nothing should be alight yet");
+        assertEquals(50, heat());
+        assertEquals(100_000, neighbour.getHealth(), "nothing should have overheated yet");
     }
 
-    /** The brief's first example: 60 damage procs once and leaves 10 banked. */
+    /** The brief's example: 100 damage crosses the 80 threshold, procs once, and empties the gauge. */
     @Test
-    void crossingTheThresholdProcsOnceAndBurnsOffTheRemainder() {
+    void crossingTheThresholdProcsOnceAndDealsDamageToNeighbours() {
         setUpBoard();
-        hit(60);
+        hit(100);
 
-        // The base form empties the gauge. Banking the extra 10 toward the next proc is the
-        // upgrade - see the test below, and overheat.json.
-        assertEquals(0, heat(), "the gauge is emptied, not decremented");
-        assertEquals(1, burnStacks(neighbour), "the adjacent enemy catches fire");
+        assertEquals(0, heat(), "the gauge is always emptied, not decremented");
+        assertEquals(100_000 - 30, neighbour.getHealth(), "the adjacent enemy takes the overheat's damage");
+        assertEquals(0, burnStacks(neighbour), "the base form deals damage, not Burn");
     }
 
+    /** Upgraded, the same crossing spreads Burn instead of dealing direct damage - and still empties fully. */
     @Test
-    void upgradedItKeepsWhateverWasPastTheThreshold() {
+    void upgradedItSpreadsBurnInsteadOfDamageAndStillEmptiesFully() {
         setUpBoard();
         unlockOverheat();
 
-        hit(60);
+        hit(100);
 
-        assertEquals(10, heat(), "60 - 50 threshold = 10 banked toward the next proc");
+        assertEquals(0, heat(), "upgraded no longer keeps anything past the threshold");
+        assertEquals(100_000, neighbour.getHealth(), "upgraded, no direct damage is dealt");
         assertEquals(1, burnStacks(neighbour));
     }
 
-    /** One huge hit is worth exactly one proc either way; what differs is what survives it. */
+    /** One huge hit is worth exactly one proc; the rest of the gauge is always lost. */
     @Test
-    void oneBigHitProcsOnlyOnce_andTheBaseFormKeepsNoneOfIt() {
+    void oneBigHitProcsOnlyOnce_andKeepsNoneOfIt() {
         setUpBoard();
-        hit(130);
+        hit(200);
 
-        assertEquals(0, heat(), "one threshold fires and the other 80 is lost");
-        assertEquals(1, burnStacks(neighbour));
+        assertEquals(0, heat(), "one threshold fires and the rest is lost");
+        assertEquals(100_000 - 30, neighbour.getHealth());
 
         // New turn: the latch clears, but there is no banked heat left to cash in.
         state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_TWO));
 
         assertEquals(0, heat());
-        assertEquals(1, burnStacks(neighbour), "nothing more to give");
+        assertEquals(100_000 - 30, neighbour.getHealth(), "nothing more to give");
     }
 
-    /** Upgraded, the same hit banks 80, which fires again on a later turn with no fresh damage. */
+    /** The overheat proc's own damage must not feed the gauge it just fired from - no infinite loop. */
     @Test
-    void upgradedTheBankedRemainderFiresOnALaterTurn() {
-        setUpBoard();
-        unlockOverheat();
-
-        hit(130);
-        assertEquals(80, heat(), "only one threshold is consumed per turn");
-        assertEquals(1, burnStacks(neighbour));
-
-        state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_TWO));
-
-        assertEquals(30, heat(), "80 - 50 = 30");
-        assertEquals(2, burnStacks(neighbour), "a second stack from the banked heat");
-    }
-
-    @Test
-    void theOverheatingUnitDoesNotBurnItself() {
+    void theOverheatsOwnDamageDoesNotFeedTheGauge() {
         setUpBoard();
         hit(100);
 
-        assertEquals(0, burnStacks(victim), "Overheat sets neighbours alight, never its own host");
-        assertEquals(1, burnStacks(neighbour));
+        assertEquals(0, heat(), "the proc emptied the gauge and its own damage added nothing back");
+    }
+
+    @Test
+    void theOverheatingUnitDoesNotDamageOrBurnItself() {
+        setUpBoard();
+        int victimHealthBeforeProc = victim.getHealth();
+        hit(100);
+
+        assertEquals(victimHealthBeforeProc - 100, victim.getHealth(),
+            "Overheat strikes neighbours, never its own host");
+        assertEquals(0, burnStacks(victim));
+        assertEquals(100_000 - 30, neighbour.getHealth());
     }
 
     @Test
     void alliesStandingNextToAnOverheatingEnemyAreUnharmed() {
         setUpBoard();
-        hit(60);
+        hit(100);
 
-        assertEquals(0, burnStacks(ally), "Ember's own side never catches fire");
+        assertEquals(100_000, ally.getHealth(), "Ember's own side is never struck by the overheat");
+        assertEquals(0, burnStacks(ally));
     }
 
     @Test
@@ -175,13 +173,14 @@ class OverheatTest {
     }
 
     /**
-     * Burn ticks are sourced from Ember, so they feed the very gauge that produces more
-     * Burn. The once-per-turn cap is what keeps that loop from compounding.
+     * Upgraded, Burn ticks are sourced from Ember, so they feed the very gauge that produces
+     * more Burn. The once-per-turn cap is what keeps that loop from compounding.
      */
     @Test
     void theBurnFeedbackLoopStaysBoundedAcrossManyTurns() {
         setUpBoard();
-        hit(50);
+        unlockOverheat();
+        hit(80);
 
         for (int turn = 0; turn < 20; turn++) {
             state.getEventBus().publish(state, new TurnStartEvent(Team.PLAYER_TWO));

@@ -13,6 +13,7 @@ import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.combat.Attribute;
 import com.walnutt.data.AbilityFactory;
 import com.walnutt.data.JsonDataLoader;
+import com.walnutt.event.DamageEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
@@ -64,42 +65,67 @@ class OblivionConfinementTest {
 
         assertTrue(f.victim.hasStatus(StatusFlag.STUNNED));
         assertTrue(f.victim.hasStatus(StatusFlag.INVULNERABLE));
-        assertEquals(75, f.victim.getAttributeValue(Attribute.INTELLIGENCE), "100 less 25%");
-        assertEquals(25, f.caster.getAttributeValue(Attribute.INTELLIGENCE));
+        assertEquals(65, f.victim.getAttributeValue(Attribute.INTELLIGENCE), "100 less 35%");
+        assertEquals(35, f.caster.getAttributeValue(Attribute.INTELLIGENCE));
 
         letThemEscape(f);
 
         assertFalse(f.victim.hasStatus(StatusFlag.STUNNED));
-        // The whole toll is taken on the way in now. Taking a second helping on the way out is
-        // the upgrade, not the baseline - see oblivion_confinement.json.
-        assertEquals(75, f.victim.getAttributeValue(Attribute.INTELLIGENCE));
-        assertEquals(25, f.caster.getAttributeValue(Attribute.INTELLIGENCE));
+        // The whole toll is taken on the way in, and nothing further happens on the way out -
+        // there is no more "steal again on escape" mechanic, upgraded or not.
+        assertEquals(65, f.victim.getAttributeValue(Attribute.INTELLIGENCE));
+        assertEquals(35, f.caster.getAttributeValue(Attribute.INTELLIGENCE));
     }
 
+    /** Upgraded: every blow the caster lands anywhere - not just the imprisonment cast - also steals intelligence. */
     @Test
-    void upgradedItTakesASecondHelpingWhenTheTargetReturns() {
+    void upgradedItAlsoStealsIntelligenceOnAnyDamageDealt() {
         Fixture f = fixture();
         f.ability.upgrade();
 
-        f.ability.onUse(f.state, new UnitTarget(f.victim));
-        assertEquals(75, f.victim.getAttributeValue(Attribute.INTELLIGENCE));
+        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 100, 100));
+        f.state.getPlayers().get(1).addUnit(bystander);
+        f.state.getMap().moveUnit(bystander, f.state.getMap().getTile(new Position(1, 0)));
 
-        letThemEscape(f);
+        DamageEvent hit = new DamageEvent(f.caster, bystander, 10);
+        bystander.takeDamage(f.state, hit);
 
-        // Reckoned from what is left, not from the original: 25% of 75 rounds to 19.
-        assertEquals(56, f.victim.getAttributeValue(Attribute.INTELLIGENCE));
-        assertEquals(44, f.caster.getAttributeValue(Attribute.INTELLIGENCE));
+        assertEquals(90, bystander.getAttributeValue(Attribute.INTELLIGENCE), "10% of 100 stolen just after the blow");
+        assertEquals(10, f.caster.getAttributeValue(Attribute.INTELLIGENCE));
     }
 
-    /** A cast made before the upgrade keeps the terms it was made under. */
+    /** The passive steal always takes at least 1, even off a victim with very little intelligence left. */
     @Test
-    void anImprisonmentAlreadyRunningIsNotRetroactivelyUpgraded() {
+    void upgradedThePassiveStealAlwaysTakesAtLeastOne() {
         Fixture f = fixture();
-        f.ability.onUse(f.state, new UnitTarget(f.victim));
         f.ability.upgrade();
 
-        letThemEscape(f);
+        Unit weakling = new BasicUnit("Weakling", Team.PLAYER_TWO, new UnitStats(0, 0, 3, 100));
+        f.state.getPlayers().get(1).addUnit(weakling);
+        f.state.getMap().moveUnit(weakling, f.state.getMap().getTile(new Position(1, 1)));
 
-        assertEquals(75, f.victim.getAttributeValue(Attribute.INTELLIGENCE));
+        DamageEvent hit = new DamageEvent(f.caster, weakling, 10);
+        weakling.takeDamage(f.state, hit);
+
+        assertEquals(2, weakling.getAttributeValue(Attribute.INTELLIGENCE),
+            "10% of 3 rounds to 0, floored up to the minimum of 1");
+    }
+
+    /** Only damage dealt AFTER the upgrade triggers the passive - it isn't retroactive either. */
+    @Test
+    void thePassiveStealOnlyAppliesToDamageDealtAfterTheUpgrade() {
+        Fixture f = fixture();
+        Unit bystander = new BasicUnit("Bystander", Team.PLAYER_TWO, new UnitStats(0, 0, 100, 100));
+        f.state.getPlayers().get(1).addUnit(bystander);
+        f.state.getMap().moveUnit(bystander, f.state.getMap().getTile(new Position(1, 0)));
+
+        DamageEvent beforeUpgrade = new DamageEvent(f.caster, bystander, 10);
+        bystander.takeDamage(f.state, beforeUpgrade);
+        assertEquals(100, bystander.getAttributeValue(Attribute.INTELLIGENCE), "not upgraded yet, no passive steal");
+
+        f.ability.upgrade();
+        DamageEvent afterUpgrade = new DamageEvent(f.caster, bystander, 10);
+        bystander.takeDamage(f.state, afterUpgrade);
+        assertEquals(90, bystander.getAttributeValue(Attribute.INTELLIGENCE), "upgraded now, the passive fires");
     }
 }

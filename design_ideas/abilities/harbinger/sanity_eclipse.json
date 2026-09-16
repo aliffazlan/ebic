@@ -12,7 +12,7 @@
         "duration": 1,
         "delay": 1,
         "radius": 1,
-        "int_diff_dmg": 1
+        "int_diff_dmg": 1.5
     },
     "upgrade": {
         "summary": "The orb falls %recasts% more time on the same tile, after the same delay.",

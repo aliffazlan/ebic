@@ -7,7 +7,55 @@ Every version lives in this one file, newest first — the project is small enou
 scrollable history beats hunting through per-version files. Entries are written for players
 rather than for the diff: what changed about playing the game, not which classes moved.
 
-## [Unreleased] — 0.3.0
+## [Unreleased] — 0.4.0
+
+A pass across the roster now that a season of 0.3.0 has settled the numbers — ten units
+retuned, three abilities rebuilt outright, and an upgrade that finally reaches the fight
+already in progress.
+
+### Balance
+
+- **Ember**: health 970 → 960, intelligence 94 → 88.
+- **Overheat**: threshold raised 50 → 80. Base and upgrade swap what a proc does — the base
+  form now deals 30 damage to every other adjacent enemy instead of spreading Burn, and
+  always empties the gauge outright rather than banking anything past the threshold.
+  Spreading Burn on a proc is the upgrade's own trick now.
+- **Harbinger**: health 1400 → 1200, strength 70 → 66, intelligence 80 → 86.
+- **Oblivion Confinement**: intelligence stolen on cast raised to 35%. The upgrade no longer
+  takes a second helping when the target escapes — instead Harbinger permanently steals 10%
+  of a victim's intelligence (minimum 1) off every blow he lands, from any source, imprisoned
+  target or not.
+- **Sanity's Eclipse**: intelligence-difference damage multiplier 1 → 1.5.
+- **Objurgation**: triggers below 40% health (was 50%), converts intelligence to shielding at
+  2.5 health per point (was 1), and its barrier now lasts 3 turns (was 4).
+- **Valor**: health 1100 → 1280, strength 60 → 68, agility 50 → 54.
+- **Duel**: the mutual 100% damage amp between duellists is now part of the base ability, not
+  something the upgrade unlocks. Upgraded, it lasts 5 turns (was 3) and the damage Valor
+  deals to his rival rises further, to 200% more — what he takes back in return stays at the
+  base 100%.
+- **Zenith**: Pylon's own beam now hunts for a target within 2 tiles instead of 1.
+- **Auroth**: Frostbite lasts 3 turns (was 2) and its execute threshold rises to 20% health
+  (was 10%); upgraded, its duration is now 6 turns (was 5).
+- **Dirge**: Decay's strength steal drops to 1 (was 2). Soul Rip's damage multiplier drops to
+  40% (was 50%).
+- **Shawl**: Hidden Potential now costs 14 Insight (was 10), and Shawl starts every match
+  already holding 6.
+- **Mercurial**: health 810 → 860, strength 40 → 38, agility 40 → 36. Dispersion's reflect
+  share rises to 30% (was 25%).
+- **Wei**: health 650 → 710, agility 90 → 84, strength 30 → 36.
+- **Yuki**: health 450 → 440. Blizzard's damage rises to 30 (was 25).
+
+### Fixed
+
+- **Unlocking Blizzard mid-match left an already-buried victim un-disarmed.** Upgrading only
+  changed what a future storm did, so a unit already rooted by Yuki — or one of her Snow
+  Golems — kept its old, non-disarming terms until it was hit again. Upgrading now reaches
+  back and disarms every storm she or her golems already have running.
+- **Poison Sting had the identical gap, unreported until now.** An already-poisoned target's
+  vulnerability bonus now updates the instant Poison Sting is upgraded too, rather than
+  waiting for the next sting to reapply it.
+
+## [0.3.0]
 
 An alchemist who does not fight so much as *improve* — and, behind him, the machinery for an
 ability to have a second, better form.

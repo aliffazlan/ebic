@@ -25,7 +25,11 @@ public class DuelEffect extends Effect {
     private final double duelHealPercent;
     private final double winMultiplier;
     private DuelEffect partner;
-    /** Upgrade: extra damage each duellist takes from the other. 0 until upgraded. */
+    /**
+     * Extra damage the OWNER of this half takes from its opponent. A base-kit effect (100%)
+     * regardless of upgrade state; only the enemy-facing half (see Duel.onUse) rises further
+     * once upgraded, so the two halves are no longer necessarily equal.
+     */
     private double mutualVulnerability;
     /** The ability to refresh on a win, when it is the upgraded form. Null otherwise. */
     private Ability refreshOnWin;
@@ -55,8 +59,11 @@ public class DuelEffect extends Effect {
     }
 
     /**
-     * Upgrade wiring, set on the CASTER's half only. Both halves carry the vulnerability - the
-     * exchange has to be symmetric - but only Valor's own Duel comes back up on a win.
+     * Wiring for how much extra damage the OWNER of this half takes from the opponent. Both
+     * halves get a non-zero rate from the moment Duel is cast (the base 100% mutual amp);
+     * upgraded, Duel passes a higher rate to the enemy's half only, so the exchange becomes
+     * asymmetric - see Duel.onUse for which half gets which value. Only Valor's own Duel
+     * comes back up on a win, hence refreshOnWin being null on the enemy's half.
      */
     public void upgradeWith(double mutualVulnerability, Ability refreshOnWin) {
         this.mutualVulnerability = mutualVulnerability;
@@ -64,8 +71,8 @@ public class DuelEffect extends Effect {
     }
 
     /**
-     * Upgraded, the two duellists tear through each other far faster - but only each other. A
-     * third party wading in is unaffected, which is what keeps this a duel rather than a
+     * Each duellist takes extra damage from the OTHER, at whatever rate this half was given -
+     * a third party wading in is unaffected, which is what keeps this a duel rather than a
      * general vulnerability.
      */
     @Override

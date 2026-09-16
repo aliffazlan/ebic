@@ -4,6 +4,7 @@
     "description": "Damage dealt by this unit builds Insight. Spend %cost% of it on an ally within %cast_range% tiles to permanently upgrade one of their abilities.",
     "details": [
         "One Insight per instance of damage this unit deals - a swing, a tick of acid, anything traced back to it.",
+        "This unit starts the match already holding %initial_insight% Insight.",
         "The cast opens a list of the target's abilities, and whichever is chosen is upgraded for the rest of the match.",
         "This unit is a legal target for its own brew, and there is no limit on how many of one unit's abilities may be unlocked.",
         "Each ability can be upgraded only once, and abilities with nothing written for them - a summon's own kit, an effect - never appear in the list."
@@ -14,7 +15,8 @@
     "stats": {
         "cooldown": 1,
         "cast_range": 4,
-        "cost": 10
+        "cost": 14,
+        "initial_insight": 6
     },
     "upgrade": {
         "repeatable": true,

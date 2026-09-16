@@ -62,17 +62,18 @@ class ValorUpgradeTest {
         on(valor, "duel").onUse(f.state(), new UnitTarget(rival));
 
         rival.takeDamage(f.state(), new DamageEvent(valor, rival, 100));
-        assertEquals(200, 2000 - rival.getHealth(), "twice as much, from their duel partner");
+        assertEquals(300, 2000 - rival.getHealth(), "three times as much (200% more) from their duel partner");
 
         rival.takeDamage(f.state(), new DamageEvent(bystander, rival, 100));
-        assertEquals(300, 2000 - rival.getHealth(), "a third party is unaffected");
+        assertEquals(400, 2000 - rival.getHealth(), "a third party is unaffected");
 
         valor.takeDamage(f.state(), new DamageEvent(rival, valor, 100));
-        assertEquals(200, 2000 - valor.getHealth(), "and it cuts both ways");
+        assertEquals(200, 2000 - valor.getHealth(), "what Valor takes back stays at the base rate (100% more)");
     }
 
+    /** Base Duel already carries the mutual 100% amp - that part is no longer upgrade-only. */
     @Test
-    void theBaseDuelAmplifiesNothing() {
+    void theBaseDuelAlreadyAmplifiesBothWaysEqually() {
         UpgradeFixture f = UpgradeFixture.create();
         Unit valor = f.heroWith("Valor", Team.PLAYER_ONE, new UnitStats(50, 30, 30, 2000),
             0, 0, false, "duel");
@@ -81,7 +82,7 @@ class ValorUpgradeTest {
         on(valor, "duel").onUse(f.state(), new UnitTarget(rival));
         rival.takeDamage(f.state(), new DamageEvent(valor, rival, 100));
 
-        assertEquals(100, 2000 - rival.getHealth());
+        assertEquals(200, 2000 - rival.getHealth(), "twice as much, even un-upgraded");
     }
 
     @Test

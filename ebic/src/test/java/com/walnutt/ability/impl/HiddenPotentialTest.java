@@ -162,11 +162,11 @@ class HiddenPotentialTest {
     @Test
     void insightAccruesOnePerInstanceOfDamageShawlDeals() {
         Fixture f = fixture(ScriptedChooser.picking("perplexing_shot"));
-        assertEquals(0, f.hiddenPotential.getInsight(), "the pool exists from turn one, reading zero");
+        assertEquals(6, f.hiddenPotential.getInsight(), "the pool exists from turn one, starting at 6");
 
         dealDamage(f.state, f.shawl, f.enemy, 4);
 
-        assertEquals(4, f.hiddenPotential.getInsight(), "one per instance, not per point of damage");
+        assertEquals(10, f.hiddenPotential.getInsight(), "one per instance, not per point of damage");
     }
 
     @Test
@@ -177,15 +177,15 @@ class HiddenPotentialTest {
         dealDamage(f.state, f.enemy, f.shawl, 3);  // being hit is not dealing damage
         dealDamage(f.state, f.shawl, f.shawl, 3);  // and he cannot farm it off himself
 
-        assertEquals(0, f.hiddenPotential.getInsight());
+        assertEquals(6, f.hiddenPotential.getInsight(), "unchanged from the starting 6");
     }
 
     @Test
     void cannotBeCastWithoutTheFullCost_norOnAnEnemy() {
         Fixture f = fixture(ScriptedChooser.picking("perplexing_shot"));
-        dealDamage(f.state, f.shawl, f.enemy, 9);
+        dealDamage(f.state, f.shawl, f.enemy, 7);
 
-        assertFalse(f.hiddenPotential.canUse(f.state, new UnitTarget(f.ally)), "9 Insight, costs 10");
+        assertFalse(f.hiddenPotential.canUse(f.state, new UnitTarget(f.ally)), "13 Insight, costs 14");
 
         dealDamage(f.state, f.shawl, f.enemy, 1);
 
@@ -205,7 +205,7 @@ class HiddenPotentialTest {
             .filter(a -> "perplexing_shot".equals(a.getDefinitionId())).findFirst().orElseThrow();
         assertTrue(perplexingShot.isUpgraded());
         assertEquals(10, perplexingShot.getStats().get("bounces").intValue());
-        assertEquals(2, f.hiddenPotential.getInsight(), "12 earned, 10 spent");
+        assertEquals(4, f.hiddenPotential.getInsight(), "6 starting + 12 earned, 14 spent");
         assertEquals(1, f.hiddenPotential.getUpgradesGranted());
         assertFalse(f.hiddenPotential.isReady());
     }
@@ -218,7 +218,7 @@ class HiddenPotentialTest {
         f.hiddenPotential.onUse(f.state, new UnitTarget(f.ally));
 
         assertEquals(1, f.chooser.timesAsked, "the dialogue was genuinely raised");
-        assertEquals(12, f.hiddenPotential.getInsight(), "nothing spent");
+        assertEquals(18, f.hiddenPotential.getInsight(), "nothing spent");
         assertEquals(0, f.hiddenPotential.getUpgradesGranted());
         assertTrue(f.hiddenPotential.isReady(), "and it can be cast again immediately");
     }
@@ -255,7 +255,7 @@ class HiddenPotentialTest {
         assertFalse(perplexingShot.enabled());
         assertEquals("Already upgraded", perplexingShot.detail());
         assertEquals(1, f.hiddenPotential.getUpgradesGranted(), "the second cast unlocked nothing");
-        assertEquals(20, f.hiddenPotential.getInsight(), "and so charged nothing");
+        assertEquals(22, f.hiddenPotential.getInsight(), "and so charged nothing");
     }
 
     @Test
@@ -273,7 +273,7 @@ class HiddenPotentialTest {
         assertEquals(1, f.chooser.lastOffered.size());
         assertFalse(f.chooser.lastOffered.get(0).enabled());
         assertEquals("Nothing to upgrade", f.chooser.lastOffered.get(0).detail());
-        assertEquals(12, f.hiddenPotential.getInsight(), "a dead end charges nothing");
+        assertEquals(18, f.hiddenPotential.getInsight(), "a dead end charges nothing");
     }
 
     @Test

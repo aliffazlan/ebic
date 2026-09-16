@@ -1,9 +1,9 @@
 {
     "name": "Valor",
     "type": "champion",
-    "max_hp": 1100,
-    "strength": 60,
-    "agility": 50,
+    "max_hp": 1280,
+    "strength": 68,
+    "agility": 54,
     "intelligence" : 60,
     "attack_range": 1,
     "abilities": [

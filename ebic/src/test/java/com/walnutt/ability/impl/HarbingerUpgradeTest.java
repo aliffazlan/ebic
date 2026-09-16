@@ -38,8 +38,8 @@ class HarbingerUpgradeTest {
         for (int i = 0; i < 4; i++) {
             orb.onTurnStart(f.state(), new TurnStartEvent(Team.PLAYER_ONE));
         }
-        // 100 intelligence over 0, at 1 damage per point.
-        return (5000 - victim.getHealth()) / 100;
+        // 100 intelligence over 0, at 1.5 damage per point.
+        return (5000 - victim.getHealth()) / 150;
     }
 
     @Test
@@ -86,7 +86,7 @@ class HarbingerUpgradeTest {
         harbinger.takeDamage(f.state(), new DamageEvent(enemy, harbinger, 500));
 
         assertFalse(harbinger.isDead(), "he cheated death");
-        assertEquals(100, harbinger.getHealth(), "all 100 intelligence became 100 health");
+        assertEquals(250, harbinger.getHealth(), "all 100 intelligence became 250 health at 2.5 hp per point");
         assertEquals(0, harbinger.getAttributeValue(Attribute.INTELLIGENCE), "and there is none left");
     }
 
@@ -103,15 +103,15 @@ class HarbingerUpgradeTest {
         Unit enemy = f.basic("Enemy", Team.PLAYER_TWO, new UnitStats(0, 0, 0, 1000), 0, 1);
         harbinger.getHealthPool().setCurrent(50);
 
-        // 20% of 100 intelligence, at 1 hp per point, is a 20 hp barrier - big enough to
-        // fully absorb a 15-damage hit while leaving 5 hp of it standing afterwards.
+        // 20% of 100 intelligence, at 2.5 hp per point, is a 50 hp barrier - big enough to
+        // fully absorb a 15-damage hit while leaving 35 hp of it standing afterwards.
         harbinger.takeDamage(f.state(), new DamageEvent(enemy, harbinger, 15));
 
         assertFalse(harbinger.isDead());
         assertEquals(50, harbinger.getHealth(), "the barrier ate the whole hit");
         assertEquals(80, harbinger.getAttributeValue(Attribute.INTELLIGENCE), "20% burned regardless of how much of the barrier was spent");
-        assertEquals(5, harbinger.getActiveEffect(com.walnutt.effect.impl.BarrierEffect.class)
-            .orElseThrow().getRemainingBarrierHp(), "5 hp of the 20 hp barrier survived the hit");
+        assertEquals(35, harbinger.getActiveEffect(com.walnutt.effect.impl.BarrierEffect.class)
+            .orElseThrow().getRemainingBarrierHp(), "35 hp of the 50 hp barrier survived the hit");
     }
 
     /** A hit too big for the barrier alone still gets partial mitigation, but is not survived. */

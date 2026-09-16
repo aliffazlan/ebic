@@ -6,13 +6,13 @@
         "A frostbitten unit shatters and dies instantly the moment it falls below %kill_threshold:pct%% of its maximum health."
     ],
     "stats": {
-        "duration": 2,
-        "kill_threshold": 0.1
+        "duration": 3,
+        "kill_threshold": 0.2
     },
     "upgrade": {
         "summary": "Lasts %duration% turns, and basic units shatter below %basic_kill_threshold:pct%% health.",
         "stats": {
-            "duration": 5,
+            "duration": 6,
             "basic_kill_threshold": 0.4
         },
         "details": [

@@ -48,14 +48,14 @@ class MercurialUpgradeTest {
         assertFalse(on(mercurial, "dispersion").isPassive(), "it is an active now");
         assertEquals(6, on(mercurial, "dispersion").getMaxCooldown());
 
-        // Passive share first: 25% of 100 goes back to the adjacent enemy.
+        // Passive share first: 30% of 100 goes back to the adjacent enemy.
         mercurial.takeDamage(f.state(), new DamageEvent(attacker, mercurial, 100));
-        assertEquals(25, 2000 - enemy.getHealth());
+        assertEquals(30, 2000 - enemy.getHealth());
 
         on(mercurial, "dispersion").onUse(f.state(), new NoTarget());
         mercurial.takeDamage(f.state(), new DamageEvent(attacker, mercurial, 100));
 
-        assertEquals(175, 2000 - enemy.getHealth(), "150% of the blow while it is raised");
+        assertEquals(180, 2000 - enemy.getHealth(), "150% of the blow while it is raised");
     }
 
     @Test

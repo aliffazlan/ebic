@@ -3,6 +3,7 @@
     "type": "active",
     "description": "Locks an adjacent enemy into single combat for %duration% turns. Neither unit may act, and each is forced to attack the other at the end of its turn.",
     "details": [
+        "While the duel runs, each combatant takes %duel_vulnerability:pct%% more damage from the other - the exchange is settled roughly twice as fast.",
         "The survivor permanently gains %duel_bonus% to every attribute and heals %duel_heal:pct%% of its maximum health.",
         "That reward is multiplied by %win_multiplier% if the loser was more than a basic unit.",
         "Separating the duellists ends it early, with no reward for either."
@@ -13,15 +14,17 @@
         "duration": 3,
         "duel_bonus": 20,
         "duel_heal": 0.5,
-        "win_multiplier": 2.5
+        "win_multiplier": 2.5,
+        "duel_vulnerability": 1
     },
     "upgrade": {
-        "summary": "Duellists take %duel_vulnerability:pct%% more damage from each other, and a win refreshes the cooldown.",
+        "summary": "Lasts %duration% turns, the enemy takes %duel_vulnerability_upgraded:pct%% more damage from this unit, and a win refreshes the cooldown.",
         "stats": {
-            "duel_vulnerability": 1
+            "duration": 5,
+            "duel_vulnerability_upgraded": 2
         },
         "details": [
-            "While the duel runs, each combatant takes %duel_vulnerability:pct%% more damage from the other - the exchange is settled roughly twice as fast.",
+            "While the duel runs, each combatant already takes %duel_vulnerability:pct%% more damage from the other - upgraded, that rises to %duel_vulnerability_upgraded:pct%% for the damage this unit deals to the enemy. What this unit takes back stays at %duel_vulnerability:pct%%.",
             "The survivor permanently gains %duel_bonus% to every attribute and heals %duel_heal:pct%% of its maximum health.",
             "That reward is multiplied by %win_multiplier% if the loser was more than a basic unit.",
             "Winning also refreshes this ability outright, so a duel won is a duel that can be started again at once.",

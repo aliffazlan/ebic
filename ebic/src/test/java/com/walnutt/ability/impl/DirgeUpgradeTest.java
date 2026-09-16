@@ -30,10 +30,10 @@ class DirgeUpgradeTest {
 
         on(dirge, "soul_rip").onUse(f.state(), new UnitTarget(enemy));
 
-        // 2 strength crosses first (50/10 becomes 52/8), so the damage is half of 44, not of 40.
+        // 2 strength crosses first (50/10 becomes 52/8), so the damage is 40% of 44, not of 40.
         assertEquals(52, dirge.getAttributeValue(Attribute.STRENGTH));
         assertEquals(8, enemy.getAttributeValue(Attribute.STRENGTH));
-        assertEquals(500 - 22, enemy.getHealth());
+        assertEquals(500 - 18, enemy.getHealth());
     }
 
     @Test
@@ -46,8 +46,8 @@ class DirgeUpgradeTest {
 
         on(dirge, "soul_rip").onUse(f.state(), new UnitTarget(ally));
 
-        // The heal is reckoned from the untouched gap (50 - 10), and the gift lands afterwards.
-        assertEquals(120, ally.getHealth());
+        // The heal is reckoned from the untouched gap (50 - 10) at 40%, and the gift lands afterwards.
+        assertEquals(116, ally.getHealth());
         assertEquals(12, ally.getAttributeValue(Attribute.STRENGTH));
         assertEquals(50, dirge.getAttributeValue(Attribute.STRENGTH), "a gift, not a transfer");
     }

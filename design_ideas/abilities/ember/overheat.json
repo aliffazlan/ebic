@@ -1,22 +1,26 @@
 {
     "name": "Overheat",
     "type": "passive",
-    "description": "Tracks the damage this unit deals to each enemy. Once one has accumulated %threshold% damage it overheats, applying %burn_stacks% stack of Burn to every other enemy within %radius% tile.",
+    "description": "Tracks the damage this unit deals to each enemy. Once one has accumulated %threshold% damage it overheats, dealing %damage% damage to every other enemy within %radius% tile.",
     "details": [
         "An overheating unit never burns itself, only its neighbours.",
-        "Each enemy can overheat at most once per turn, and overheating empties its counter - damage past the threshold is lost."
+        "Each enemy can overheat at most once per turn, and overheating always empties its counter - damage past the threshold is lost.",
+        "The overheat's own damage does not count toward anyone's gauge."
     ],
     "stats": {
-        "threshold": 50,
+        "threshold": 80,
         "radius": 1,
-        "burn_stacks": 1
+        "damage": 30
     },
     "upgrade": {
-        "summary": "Damage past the threshold is kept rather than burned off.",
+        "summary": "Overheating spreads Burn instead of dealing direct damage.",
         "details": [
             "An overheating unit never burns itself, only its neighbours.",
-            "Each enemy can overheat at most once per turn.",
-            "Overheating takes exactly %threshold% off the counter and leaves the rest, so a single huge hit banks most of the next overheat."
-        ]
+            "Each enemy can overheat at most once per turn, and overheating always empties its counter - damage past the threshold is lost.",
+            "Overheating applies %burn_stacks% stack of Burn to every other enemy within %radius% tile instead of dealing direct damage."
+        ],
+        "stats": {
+            "burn_stacks": 1
+        }
     }
 }

@@ -8,10 +8,10 @@
     ],
     "stats": {
         "cooldown": 4,
-        "int_to_hp": 1,
+        "int_to_hp": 2.5,
         "int_consumed": 0.2,
-        "hp_threshold": 0.5,
-        "barrier_duration": 4
+        "hp_threshold": 0.4,
+        "barrier_duration": 3
     },
     "upgrade": {
         "summary": "A killing blow instead burns every point of intelligence into health.",

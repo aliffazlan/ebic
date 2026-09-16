@@ -8,7 +8,7 @@
     "stats": {
         "radius": 1,
         "health_steal": 5,
-        "str_steal": 2
+        "str_steal": 1
     },
     "upgrade": {
         "summary": "A second, wider rot drains %aura_health_steal% more health from enemies within %aura_radius% tiles.",

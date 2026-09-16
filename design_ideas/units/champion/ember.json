@@ -1,10 +1,10 @@
 {
     "name": "Ember",
     "type": "champion",
-    "max_hp": 970,
+    "max_hp": 960,
     "strength": 35,
     "agility": 50,
-    "intelligence" : 94,
+    "intelligence" : 88,
     "attack_range": 1,
     "abilities": [
         "overheat", "fireblast", "eruption"

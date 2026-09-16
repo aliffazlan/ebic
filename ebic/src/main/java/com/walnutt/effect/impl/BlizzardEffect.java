@@ -33,6 +33,10 @@ public class BlizzardEffect extends Effect {
         this.category = EffectCategory.DEBUFF;
     }
 
+    public Unit getSource() {
+        return source;
+    }
+
     @Override
     public void onTurnStart(GameState state, TurnStartEvent event) {
         if (getOwner() == null || isExpired() || event.team() != getOwner().getTeam()) {
@@ -49,12 +53,12 @@ public class BlizzardEffect extends Effect {
     /**
      * Brings an existing storm up to the caster's current one - see Effect.extendDuration for why
      * this matters. Yuki unlocking Blizzard mid-match must start disarming whoever is ALREADY
-     * buried, not only the next victim.
+     * buried, not only the next victim - see Blizzard.onRetroactiveUpgrade, the other caller.
      *
      * Raised, never lowered: the golem's damage-less Blizzard Fist must not water down a storm
      * Yuki herself laid, and an un-upgraded fist must not strip a disarm.
      */
-    private void refresh(int damagePerTurn, boolean disarms) {
+    public void refresh(int damagePerTurn, boolean disarms) {
         this.damagePerTurn = Math.max(this.damagePerTurn, damagePerTurn);
         if (disarms) {
             this.flags.add(StatusFlag.DISARMED);

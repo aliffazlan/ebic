@@ -36,6 +36,7 @@ public class HiddenPotential extends Ability {
     private int cost;
     private int statBonus;
     private int hpBonus;
+    private int initialInsight;
     /**
      * Abilities this Shawl has unlocked, anywhere, including this one. The counter his own
      * upgrade pays out on - see {@link #payOutBonus}.
@@ -51,6 +52,7 @@ public class HiddenPotential extends Ability {
         this.cost = definition.getInt("cost", 10);
         this.statBonus = definition.getInt("stat_bonus", 20);
         this.hpBonus = definition.getInt("hp_bonus", 100);
+        this.initialInsight = definition.getInt("initial_insight", 0);
     }
 
     @Override
@@ -71,9 +73,11 @@ public class HiddenPotential extends Ability {
     @Override
     protected void onAttached(Unit newOwner) {
         if (newOwner.getActiveEffect(InsightEffect.class).isEmpty()) {
-            newOwner.addEffect(new InsightEffect(
+            InsightEffect pool = new InsightEffect(
                 "Gained whenever this unit deals damage, and spent to unlock an ally's hidden potential.",
-                cost));
+                cost);
+            newOwner.addEffect(pool);
+            pool.add(initialInsight);
         }
     }
 
@@ -166,7 +170,7 @@ public class HiddenPotential extends Ability {
             return;
         }
 
-        picked.upgrade();
+        picked.upgrade(state);
         upgradesGranted++;
         payOutBonus(state);
         pool.setNextThreshold(cost);
