@@ -5,24 +5,16 @@
 // mount/unmount/getElement lifecycle.
 
 import { audioManager } from "../audio/AudioManager";
-import { getFastTransitions, setFastTransitions, getHotkey, setHotkey, type HotkeyAction } from "../app/AppSettings";
+import { getFastTransitions, setFastTransitions } from "../app/AppSettings";
 import { api, ApiError } from "../net/api";
 import type { UnitDefinitionSnapshot } from "../types/contract";
 import type { Screen } from "./Screen";
-import { volumeRow, hotkeyRow } from "./SettingsRows";
-
-const HOTKEY_ROWS: ReadonlyArray<{ action: HotkeyAction; label: string }> = [
-  { action: "move", label: "Move" },
-  { action: "attack", label: "Attack" },
-  { action: "ability1", label: "Ability 1" },
-  { action: "ability2", label: "Ability 2" },
-  { action: "ability3", label: "Ability 3" },
-  { action: "cancel", label: "Deselect / cancel" },
-];
+import { volumeRow } from "./SettingsRows";
 
 export interface SettingsCallbacks {
   onBack(): void;
   onFavouriteUnitChange(definitionId: string | null): void;
+  onOpenHotkeys(): void;
   onOpenChangelog(): void;
 }
 
@@ -68,12 +60,11 @@ export class SettingsScreen implements Screen {
       this.toggleRow("Fast Transitions", getFastTransitions(), (on) => setFastTransitions(on)),
     );
 
-    const hotkeysHeading = document.createElement("h3");
-    hotkeysHeading.textContent = "Hotkeys";
-    panel.appendChild(hotkeysHeading);
-    for (const { action, label } of HOTKEY_ROWS) {
-      panel.appendChild(hotkeyRow(label, getHotkey(action), (code) => setHotkey(action, code)));
-    }
+    const hotkeysBtn = document.createElement("button");
+    hotkeysBtn.style.width = "100%";
+    hotkeysBtn.textContent = "Hotkeys";
+    hotkeysBtn.addEventListener("click", () => this.callbacks.onOpenHotkeys());
+    panel.appendChild(hotkeysBtn);
 
     const changelogBtn = document.createElement("button");
     changelogBtn.style.width = "100%";

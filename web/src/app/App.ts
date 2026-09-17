@@ -6,6 +6,7 @@ import { ChangelogScreen } from "../ui/ChangelogScreen";
 import { ClickToContinueScreen } from "../ui/ClickToContinueScreen";
 import { CodexScreen } from "../ui/CodexScreen";
 import { FixtureScreen } from "../ui/FixtureScreen";
+import { HotkeysScreen } from "../ui/HotkeysScreen";
 import { LoadingScreen } from "../ui/LoadingScreen";
 import { LobbyScreen } from "../ui/LobbyScreen";
 import { MatchScreen } from "../ui/MatchScreen";
@@ -156,10 +157,15 @@ export class App {
         onFavouriteUnitChange: (favouriteUnit) => {
           if (this.currentUser) this.currentUser = { ...this.currentUser, favouriteUnit };
         },
+        onOpenHotkeys: () => this.showHotkeys(),
         onOpenChangelog: () => this.showChangelog(),
       }),
       direction,
     );
+  }
+
+  private showHotkeys(): void {
+    this.setScreen(new HotkeysScreen(this.root, () => this.showSettings("down")), "up");
   }
 
   private showChangelog(): void {
