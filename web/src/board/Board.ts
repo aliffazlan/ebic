@@ -1,7 +1,7 @@
 // Hex board rendering: layered Containers (board tiles -> units -> vfx -> ui
 // overlay), driven by GameStateSnapshot pushed through GameStateStore.
 
-import { Application, Container, Graphics, Sprite, Ticker } from "pixi.js";
+import { Application, Container, Graphics, Sprite, Text, Ticker } from "pixi.js";
 import { type AxialCoord, axialToPixel, hexDistance, hexPolygonPoints, mapTiles } from "../hex/HexMath";
 import { contentBounds } from "./Camera";
 import { CameraController } from "./CameraController";
@@ -13,6 +13,7 @@ import {
   BARRIER_FILL_ALPHA,
   BARRIER_SEPARATOR_COLOR,
 } from "../units/UnitHp";
+import { groupUnitsByTile, isLowPriorityUnit, pickTopmostUnit } from "../units/UnitStacking";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
 import { spawnDamageIndicator } from "../vfx/DamageIndicator";
@@ -45,6 +46,13 @@ const TILE_FILL = 0x1e293b;
 const TILE_STROKE = 0x334155;
 const TILE_HOVER = 0x334155;
 const SELECTED_RING_COLOR = 0xfacc15;
+// Paint-order tiers for stacked units sharing a tile (Board.unitsLayer.sortableChildren):
+// low-priority occupants (Pylon/Drone/anything HIDDEN) sit below normal units, and a
+// selected unit is always promoted above both regardless of its own tier.
+const UNIT_Z_LOW = 0;
+const UNIT_Z_NORMAL = 10;
+const UNIT_Z_SELECTED = 20;
+const STACK_BADGE_RADIUS_PX = 8;
 const LEGAL_TILE_COLOR = 0x4ade80;
 const LEGAL_UNIT_RING_COLOR = 0x4ade80;
 const STROBE_RING_COLOR = 0xf97316;
@@ -253,6 +261,17 @@ export class Board {
   private cameraController: CameraController;
   private tileGraphics = new Map<string, Graphics>();
   private unitSprites = new Map<string, Container>();
+  // The HP/barrier-bar sub-container built inside upsertUnit for each unit, kept here so
+  // applyRenderPriority can flip .visible on it (hide a stacked-under unit's bar) without
+  // forcing a full token rebuild. Absent for a dead unit - see upsertUnit's dead branch.
+  private hpBarGroups = new Map<string, Container>();
+  // Each unit's stack-count badge (circle + Text), built once per token rebuild, hidden by
+  // default, toggled on only for the single topmost occupant of a >1-unit tile group.
+  private stackBadges = new Map<string, { root: Container; label: Text }>();
+  // Mirrors the store's last-seen selection so applyRenderPriority can be re-run from
+  // refreshHighlights: a pure selection change pushes no new snapshot, so applySnapshot
+  // never re-runs, but paint order/bar visibility still must flip.
+  private lastSelectedUnitId: string | null = null;
   private mapRadius = -1;
   private mapRowLimit = -1;
   private unsubscribe: () => void;
@@ -396,6 +415,10 @@ export class Board {
       this.graveyardLayer,
       this.indicatorLayer,
     );
+    // Lets stacked-unit tokens paint in priority order (see UNIT_Z_* / applyRenderPriority)
+    // instead of plain insertion order - Pixi re-sorts automatically whenever a child's
+    // zIndex changes.
+    this.unitsLayer.sortableChildren = true;
 
     this.cameraController = new CameraController(app.canvas, {
       getViewport: () => ({ width: this.app.screen.width, height: this.app.screen.height }),
@@ -1140,6 +1163,8 @@ export class Board {
         }
         sprite.destroy({ children: true });
         this.unitSprites.delete(id);
+        this.hpBarGroups.delete(id);
+        this.stackBadges.delete(id);
         this.displayedState.forget(id);
         this.clearStatusEffectTicks(id);
         this.unitRenderGeneration.delete(id);
@@ -1428,18 +1453,24 @@ export class Board {
       sprite.height = HEX_SIZE * 0.7;
       container.alpha = 0.45;
       this.placeInGraveyard(unit, container);
+      this.hpBarGroups.delete(unit.id);
+      this.stackBadges.delete(unit.id);
+      this.applyRenderPriority();
       return;
     }
 
     const barWidth = HEX_SIZE * 1.1;
     const barY = HEX_SIZE / 2 + 3;
     const barHeight = 5;
-    container.addChild(
+    const hpGroup = new Container();
+    container.addChild(hpGroup);
+    this.hpBarGroups.set(unit.id, hpGroup);
+    hpGroup.addChild(
       new Graphics().rect(-barWidth / 2, barY, barWidth, barHeight).fill({ color: 0x000000, alpha: 0.6 }),
     );
     const hpFraction = unit.maxHp > 0 ? Math.max(0, unit.currentHp / unit.maxHp) : 0;
     const hpColor = hpFraction > 0.5 ? 0x22c55e : hpFraction > 0.25 ? 0xeab308 : 0xef4444;
-    container.addChild(
+    hpGroup.addChild(
       new Graphics().rect(-barWidth / 2, barY, barWidth * hpFraction, barHeight).fill({ color: hpColor }),
     );
     const visibleSeparators = hpSeparatorThresholds(unit.maxHp).filter((t) => unit.currentHp > t);
@@ -1450,11 +1481,11 @@ export class Board {
         separators.moveTo(x, barY).lineTo(x, barY + barHeight);
       }
       separators.stroke({ width: 1, color: HP_SEPARATOR_COLOR });
-      container.addChild(separators);
+      hpGroup.addChild(separators);
     }
     if (unit.maxBarrierHp > 0) {
       const barrierFraction = Math.max(0, unit.currentBarrierHp / unit.maxBarrierHp);
-      container.addChild(
+      hpGroup.addChild(
         new Graphics().rect(-barWidth / 2, barY, barWidth * barrierFraction, barHeight)
           .fill({ color: BARRIER_FILL_COLOR, alpha: BARRIER_FILL_ALPHA }),
       );
@@ -1468,9 +1499,29 @@ export class Board {
           barrierSeparators.moveTo(x, barY).lineTo(x, barY + barHeight);
         }
         barrierSeparators.stroke({ width: 1, color: BARRIER_SEPARATOR_COLOR });
-        container.addChild(barrierSeparators);
+        hpGroup.addChild(barrierSeparators);
       }
     }
+
+    // Stack-count badge: yellow circle + number, top-right of the icon, hidden by default -
+    // applyRenderPriority turns it on (with the right count) only for the topmost occupant
+    // of a tile shared by more than one live unit.
+    const badgeRoot = new Container();
+    badgeRoot.visible = false;
+    const badgeX = (HEX_SIZE * UNIT_SPRITE_SCALE) * 0.4;
+    const badgeY = -(HEX_SIZE * UNIT_SPRITE_SCALE) * 0.4;
+    const badgeLabel = new Text({
+      text: "",
+      style: { fill: 0x1e293b, fontSize: 11, fontWeight: "bold", fontFamily: "sans-serif" },
+    });
+    badgeLabel.anchor.set(0.5);
+    badgeLabel.position.set(badgeX, badgeY);
+    badgeRoot.addChild(
+      new Graphics().circle(badgeX, badgeY, STACK_BADGE_RADIUS_PX).fill({ color: SELECTED_RING_COLOR }),
+      badgeLabel,
+    );
+    container.addChild(badgeRoot);
+    this.stackBadges.set(unit.id, { root: badgeRoot, label: badgeLabel });
 
     container.alpha = 1;
     this.renderUnitStatusEffects(container, unit);
@@ -1491,6 +1542,45 @@ export class Board {
     // else: position is unchanged (or applyMoveAnimation is false, e.g. an
     // incidental HP/dead-only refresh) - leave it exactly where it is
     // (including mid-tween - nothing to do).
+    this.applyRenderPriority();
+  }
+
+  /**
+   * Recomputes every live unit's paint-order tier (unitsLayer.zIndex) and, for any tile shared
+   * by more than one live unit, which single occupant shows its HP bar and stack-count badge.
+   * Cheap (bounded by total live unit count, no allocation beyond the grouping map) and safe to
+   * call often - every upsertUnit completion and every refreshHighlights (selection change) does.
+   */
+  private applyRenderPriority(): void {
+    for (const unit of this.currentUnits) {
+      if (unit.dead) continue;
+      const container = this.unitSprites.get(unit.id);
+      if (!container) continue;
+      const isSelected = unit.id === this.lastSelectedUnitId;
+      container.zIndex = isSelected ? UNIT_Z_SELECTED : isLowPriorityUnit(unit) ? UNIT_Z_LOW : UNIT_Z_NORMAL;
+    }
+
+    for (const group of groupUnitsByTile(this.currentUnits).values()) {
+      if (group.length <= 1) {
+        const only = group[0];
+        if (only) {
+          const hpGroup = this.hpBarGroups.get(only.id);
+          if (hpGroup) hpGroup.visible = true;
+          const badge = this.stackBadges.get(only.id);
+          if (badge) badge.root.visible = false;
+        }
+        continue;
+      }
+      const topmost = pickTopmostUnit(group, this.lastSelectedUnitId);
+      for (const unit of group) {
+        const hpGroup = this.hpBarGroups.get(unit.id);
+        if (hpGroup) hpGroup.visible = unit.id === topmost.id;
+        const badge = this.stackBadges.get(unit.id);
+        if (!badge) continue;
+        badge.root.visible = unit.id === topmost.id;
+        if (unit.id === topmost.id) badge.label.text = String(group.length);
+      }
+    }
   }
 
   /**
@@ -2120,6 +2210,12 @@ export class Board {
    * accepts or rejects it - the zone highlight here is purely informational.
    */
   private refreshHighlights(state: MatchUiState): void {
+    // A pure selection change pushes no new snapshot, so applySnapshot/upsertUnit never
+    // re-run - this is what re-derives paint order/HP-bar/badge visibility for it anyway,
+    // since store.subscribe calls refreshHighlights unconditionally on every state push.
+    this.lastSelectedUnitId = state.selectedUnitId;
+    this.applyRenderPriority();
+
     this.uiLayer.removeChildren();
 
     // Placement's legal zone is constant for the whole phase (see

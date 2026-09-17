@@ -22,12 +22,14 @@ import com.walnutt.unit.Unit;
  * random adjacent enemy in the base form.
  *
  * Upgraded, casting it on an enemy instead latches this same effect onto that unit
- * ({@code latchedTarget} non-null): Grivath shares its tile, is untargetable and invulnerable,
- * automatically follows it (onMove) for as long as the latch holds, and every strike targets it
- * directly at the higher latch-mode attack count rather than a random adjacent enemy. While
- * latched he is also DISARMED and SILENCED - unable to attack or cast anything else - but
- * deliberately NOT rooted or stunned: MOVE is the one action left open, and choosing to walk
- * off the shared tile (onMove, the owner-is-the-mover branch) ends the latch early on the spot.
+ * ({@code latchedTarget} non-null): Grivath shares its tile, is untargetable, invulnerable and
+ * HIDDEN - marking him as the tile's secondary occupant for rendering/priority purposes, the same
+ * flag Evayne's Cloak and Dagger uses - automatically follows it (onMove) for as long as the
+ * latch holds, and every strike targets it directly at the higher latch-mode attack count rather
+ * than a random adjacent enemy. While latched he is also DISARMED and SILENCED - unable to attack
+ * or cast anything else - but deliberately NOT rooted or stunned: MOVE is the one action left
+ * open, and choosing to walk off the shared tile (onMove, the owner-is-the-mover branch) ends the
+ * latch early on the spot.
  *
  * Grivath pops off - untargetable/invulnerable/disarmed/silenced all drop, strike() reverts to
  * the base form's random-adjacent behavior for whatever duration remains - the moment any of:
@@ -64,6 +66,7 @@ public class FeastEffect extends Effect {
         if (latchedTarget != null) {
             this.flags.add(StatusFlag.UNTARGETABLE);
             this.flags.add(StatusFlag.INVULNERABLE);
+            this.flags.add(StatusFlag.HIDDEN);
             this.flags.add(StatusFlag.DISARMED);
             this.flags.add(StatusFlag.SILENCED);
         }
