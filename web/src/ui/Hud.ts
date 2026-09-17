@@ -11,6 +11,7 @@ import type {
 } from "../types/contract";
 import type { MatchActions } from "./MatchActions";
 import { renderUnitFullBody } from "../units/UnitPortrait";
+import { hpSeparatorThresholds } from "../units/UnitHp";
 import { abilityTooltip, Tooltip } from "./Tooltip";
 import { renderUnitCard } from "./UnitCard";
 import { teamCssColor } from "./Colors";
@@ -62,6 +63,27 @@ function renderLogLine(segments: CombatLogSegment[]): HTMLElement {
 function formatRange(unit: UnitSnapshot): string {
   const min = unit.minAttackRange ?? 0;
   return min > 0 ? `Range ${unit.attackRange} (min ${min})` : `Range ${unit.attackRange}`;
+}
+
+/**
+ * Builds the .hp-bar-outer element (fill + darker-green separator ticks at
+ * every 100 maxHp) shared by the sidebar unit panel and the encounter card.
+ */
+function renderHpBar(unit: UnitSnapshot): HTMLElement {
+  const hpOuter = document.createElement("div");
+  hpOuter.className = "hp-bar-outer";
+  const hpInner = document.createElement("div");
+  hpInner.className = "hp-bar-inner";
+  hpInner.style.width = `${unit.maxHp > 0 ? Math.max(0, (unit.currentHp / unit.maxHp) * 100) : 0}%`;
+  hpOuter.appendChild(hpInner);
+  for (const threshold of hpSeparatorThresholds(unit.maxHp)) {
+    if (unit.currentHp <= threshold) continue;
+    const tick = document.createElement("div");
+    tick.className = "hp-bar-separator";
+    tick.style.left = `${(threshold / unit.maxHp) * 100}%`;
+    hpOuter.appendChild(tick);
+  }
+  return hpOuter;
 }
 
 // Mirrors com.walnutt.status.StatusFlag's blocksMovement()/blocksAttack()/
@@ -360,13 +382,7 @@ export class Hud {
     sub.textContent = `${unit.unitType} · ${unit.team === state.yourTeam ? "Yours" : "Enemy"}${unit.dead ? " · Dead" : ""}`;
     section.appendChild(sub);
 
-    const hpOuter = document.createElement("div");
-    hpOuter.className = "hp-bar-outer";
-    const hpInner = document.createElement("div");
-    hpInner.className = "hp-bar-inner";
-    hpInner.style.width = `${unit.maxHp > 0 ? Math.max(0, (unit.currentHp / unit.maxHp) * 100) : 0}%`;
-    hpOuter.appendChild(hpInner);
-    section.appendChild(hpOuter);
+    section.appendChild(renderHpBar(unit));
 
     const hpText = document.createElement("div");
     hpText.className = "hint";
@@ -1036,13 +1052,7 @@ export class Hud {
     sub.textContent = `${unit.unitType} · ${unit.team === yourTeam ? "Yours" : "Enemy"}`;
     card.appendChild(sub);
 
-    const hpOuter = document.createElement("div");
-    hpOuter.className = "hp-bar-outer";
-    const hpInner = document.createElement("div");
-    hpInner.className = "hp-bar-inner";
-    hpInner.style.width = `${unit.maxHp > 0 ? Math.max(0, (unit.currentHp / unit.maxHp) * 100) : 0}%`;
-    hpOuter.appendChild(hpInner);
-    card.appendChild(hpOuter);
+    card.appendChild(renderHpBar(unit));
 
     const hpText = document.createElement("div");
     hpText.className = "hint";

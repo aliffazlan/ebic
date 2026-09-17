@@ -499,10 +499,19 @@ option, optgroup {
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 8px;
+  position: relative;
 }
 .hp-bar-inner {
   height: 100%;
   background: #22c55e;
+}
+.hp-bar-separator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #15803d; /* keep in sync with UnitHp.ts HP_SEPARATOR_COLOR_CSS */
+  pointer-events: none;
 }
 
 .ability-list {

@@ -6,6 +6,7 @@ import { type AxialCoord, axialToPixel, hexDistance, hexPolygonPoints, mapTiles 
 import { contentBounds } from "./Camera";
 import { CameraController } from "./CameraController";
 import { UnitIconFactory } from "../units/UnitIconFactory";
+import { hpSeparatorThresholds, HP_SEPARATOR_COLOR } from "../units/UnitHp";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
 import { spawnDamageIndicator } from "../vfx/DamageIndicator";
@@ -1421,14 +1422,25 @@ export class Board {
 
     const barWidth = HEX_SIZE * 1.1;
     const barY = HEX_SIZE / 2 + 3;
+    const barHeight = 5;
     container.addChild(
-      new Graphics().rect(-barWidth / 2, barY, barWidth, 5).fill({ color: 0x000000, alpha: 0.6 }),
+      new Graphics().rect(-barWidth / 2, barY, barWidth, barHeight).fill({ color: 0x000000, alpha: 0.6 }),
     );
     const hpFraction = unit.maxHp > 0 ? Math.max(0, unit.currentHp / unit.maxHp) : 0;
     const hpColor = hpFraction > 0.5 ? 0x22c55e : hpFraction > 0.25 ? 0xeab308 : 0xef4444;
     container.addChild(
-      new Graphics().rect(-barWidth / 2, barY, barWidth * hpFraction, 5).fill({ color: hpColor }),
+      new Graphics().rect(-barWidth / 2, barY, barWidth * hpFraction, barHeight).fill({ color: hpColor }),
     );
+    const visibleSeparators = hpSeparatorThresholds(unit.maxHp).filter((t) => unit.currentHp > t);
+    if (visibleSeparators.length > 0) {
+      const separators = new Graphics();
+      for (const threshold of visibleSeparators) {
+        const x = -barWidth / 2 + barWidth * (threshold / unit.maxHp);
+        separators.moveTo(x, barY).lineTo(x, barY + barHeight);
+      }
+      separators.stroke({ width: 1, color: HP_SEPARATOR_COLOR });
+      container.addChild(separators);
+    }
 
     container.alpha = 1;
     this.renderUnitStatusEffects(container, unit);
