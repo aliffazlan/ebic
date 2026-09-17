@@ -102,6 +102,8 @@ public final class WebServer {
         app.post("/api/matches/{matchId}/leave", this::handleLeaveLobby);
         app.post("/api/matches/{matchId}/visibility", this::handleSetVisibility);
         app.post("/api/matches/{matchId}/join", this::handleJoinPublicLobby);
+        app.post("/api/matches/{matchId}/spectate", this::handleSpectatePublicLobby);
+        app.post("/api/matches/spectate", this::handleSpectateByCode);
 
         app.wsBeforeUpgrade("/ws/matches/{matchId}", this::authorizeWsUpgrade);
         app.ws("/ws/matches/{matchId}", ws -> {
@@ -238,6 +240,30 @@ public final class WebServer {
         sendJson(ctx, 200, payload);
     }
 
+    private void handleSpectatePublicLobby(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        String matchId = ctx.pathParam("matchId");
+        MatchService.SpectateInfo info = matches.spectatePublicLobby(user.userId(), matchId);
+        sendJson(ctx, 200, spectateInfoJson(info));
+    }
+
+    private void handleSpectateByCode(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        JsonObject body = readJsonBody(ctx);
+        String joinCode = JsonSupport.optString(body, "joinCode");
+        MatchService.SpectateInfo info = matches.spectateByCode(user.userId(), joinCode);
+        sendJson(ctx, 200, spectateInfoJson(info));
+    }
+
+    private JsonObject spectateInfoJson(MatchService.SpectateInfo info) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("matchId", info.matchId());
+        payload.addProperty("status", info.status());
+        payload.addProperty("playerOneName", info.playerOneName());
+        payload.addProperty("playerTwoName", info.playerTwoName());
+        return payload;
+    }
+
     /**
      * The display label passes the raw status straight through as its own value - LOBBY,
      * DRAFTING, and IN_PROGRESS (rendered "IN PROGRESS") are all shown distinctly rather than
@@ -335,11 +361,24 @@ public final class WebServer {
         }
         AuthService.AuthedUser user = requireAuth(ctx);
         String matchId = ctx.pathParam("matchId");
-        MatchService.MatchParticipants participants = matches.getParticipants(matchId)
+        MatchService.MatchAuthInfo info = matches.getMatchAuthInfo(matchId)
                 .orElseThrow(() -> new ApiException(401, "not a participant in this match"));
-        if (user.userId() != participants.playerOneId() && user.userId() != participants.playerTwoId()) {
+        boolean isParticipant = user.userId() == info.playerOneId() || user.userId() == info.playerTwoId();
+        if (isParticipant) {
+            return;
+        }
+        if (!canSpectate(info, ctx.queryParam("code"))) {
             throw new ApiException(401, "not a participant in this match");
         }
+    }
+
+    /** A spectator needs the match already IN_PROGRESS, plus either it being public or the caller
+     * knowing its join code - mirrors how joinMatch already treats a code as the real secret. */
+    private boolean canSpectate(MatchService.MatchAuthInfo info, String suppliedCode) {
+        if (info.status() != MatchService.Status.IN_PROGRESS) {
+            return false;
+        }
+        return info.isPublic() || (info.joinCode() != null && info.joinCode().equals(suppliedCode));
     }
 
     private void onWsConnect(WsConnectContext ctx) {
@@ -357,15 +396,26 @@ public final class WebServer {
             return;
         }
         Team team = session.teamFor(user.userId());
-        if (team == null) {
+        ClientChannel channel = new JavalinClientChannel(ctx);
+        if (team != null) {
+            session.registerChannel(team, channel);
+            ctx.attribute("session", session);
+            ctx.attribute("team", team);
+            ctx.attribute("channel", channel);
+            return;
+        }
+        // Not a seated participant - independently re-validate spectator eligibility rather than
+        // trusting authorizeWsUpgrade's attributes (same "wsBeforeUpgrade doesn't reliably hand
+        // off context" posture documented above).
+        MatchService.MatchAuthInfo info = matches.getMatchAuthInfo(matchId).orElse(null);
+        if (info == null || !canSpectate(info, ctx.queryParam("code"))) {
             ctx.closeSession(4401, "not a participant");
             return;
         }
-        ClientChannel channel = new JavalinClientChannel(ctx);
-        session.registerChannel(team, channel);
+        session.registerSpectatorChannel(channel, user.username());
         ctx.attribute("session", session);
-        ctx.attribute("team", team);
         ctx.attribute("channel", channel);
+        ctx.attribute("spectator", Boolean.TRUE);
     }
 
     private void onWsMessage(WsMessageContext ctx) {
@@ -405,10 +455,15 @@ public final class WebServer {
 
     private void onWsClose(WsCloseContext ctx) {
         GameSession session = ctx.attribute("session");
-        Team team = ctx.attribute("team");
         ClientChannel channel = ctx.attribute("channel");
-        if (session != null && team != null && channel != null) {
+        if (session == null || channel == null) {
+            return;
+        }
+        Team team = ctx.attribute("team");
+        if (team != null) {
             session.unregisterChannel(team, channel);
+        } else if (Boolean.TRUE.equals(ctx.attribute("spectator"))) {
+            session.unregisterSpectatorChannel(channel);
         }
     }
 

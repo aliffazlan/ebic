@@ -297,6 +297,114 @@ class MatchServiceTest {
     }
 
     @Test
+    void joinMatch_distinguishesAlreadyStartedFromGenuinelyFull() {
+        MatchService.MatchSummary full = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, full.joinCode());
+        ApiException fullEx = assertThrows(ApiException.class, () -> matches.joinMatch(p3UserId, full.joinCode()));
+        assertEquals("lobby is full", fullEx.getMessage());
+
+        MatchService.MatchSummary started = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, started.joinCode());
+        matches.startLobby(p1UserId, started.matchId());
+        ApiException startedEx = assertThrows(ApiException.class, () -> matches.joinMatch(p3UserId, started.joinCode()));
+        assertEquals("this match has already started", startedEx.getMessage());
+    }
+
+    @Test
+    void spectatePublicLobby_happyPathOnceInProgress() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, true);
+        matches.joinMatch(p2UserId, created.joinCode());
+        matches.startLobby(p1UserId, created.matchId());
+        matches.setStatus(created.matchId(), MatchService.Status.IN_PROGRESS);
+
+        MatchService.SpectateInfo info = matches.spectatePublicLobby(p3UserId, created.matchId());
+        assertEquals("IN_PROGRESS", info.status());
+        assertEquals("hostplayer", info.playerOneName());
+        assertEquals("guestplayer", info.playerTwoName());
+    }
+
+    @Test
+    void spectatePublicLobby_rejectsBeforeInProgress() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, true);
+        matches.joinMatch(p2UserId, created.joinCode());
+
+        ApiException lobbyEx = assertThrows(ApiException.class,
+            () -> matches.spectatePublicLobby(p3UserId, created.matchId()));
+        assertEquals(409, lobbyEx.getStatus());
+        assertEquals("this match cannot be spectated", lobbyEx.getMessage());
+
+        matches.startLobby(p1UserId, created.matchId());
+        ApiException draftingEx = assertThrows(ApiException.class,
+            () -> matches.spectatePublicLobby(p3UserId, created.matchId()));
+        assertEquals("this match cannot be spectated", draftingEx.getMessage());
+    }
+
+    @Test
+    void spectatePublicLobby_rejectsAPrivateMatch() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+        matches.startLobby(p1UserId, created.matchId());
+        matches.setStatus(created.matchId(), MatchService.Status.IN_PROGRESS);
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.spectatePublicLobby(p3UserId, created.matchId()));
+        assertEquals("this match cannot be spectated", e.getMessage());
+    }
+
+    @Test
+    void spectatePublicLobby_rejectsASeatedParticipant() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, true);
+        matches.joinMatch(p2UserId, created.joinCode());
+        matches.startLobby(p1UserId, created.matchId());
+        matches.setStatus(created.matchId(), MatchService.Status.IN_PROGRESS);
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.spectatePublicLobby(p1UserId, created.matchId()));
+        assertEquals(409, e.getStatus());
+        assertEquals("you are already in this match", e.getMessage());
+    }
+
+    @Test
+    void spectateByCode_worksForAPrivateInProgressMatch() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+        matches.startLobby(p1UserId, created.matchId());
+        matches.setStatus(created.matchId(), MatchService.Status.IN_PROGRESS);
+
+        MatchService.SpectateInfo info = matches.spectateByCode(p3UserId, created.joinCode());
+        assertEquals(created.matchId(), info.matchId());
+        assertEquals("hostplayer", info.playerOneName());
+    }
+
+    @Test
+    void spectateByCode_rejectsUnknownCode() {
+        ApiException e = assertThrows(ApiException.class, () -> matches.spectateByCode(p3UserId, "ZZZZZZ"));
+        assertEquals(404, e.getStatus());
+    }
+
+    @Test
+    void spectateByCode_rejectsBeforeInProgress() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.spectateByCode(p3UserId, created.joinCode()));
+        assertEquals("this match cannot be spectated", e.getMessage());
+    }
+
+    @Test
+    void getMatchAuthInfo_reflectsCurrentRow() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, true);
+        matches.joinMatch(p2UserId, created.joinCode());
+
+        MatchService.MatchAuthInfo info = matches.getMatchAuthInfo(created.matchId()).orElseThrow();
+        assertEquals(p1UserId, info.playerOneId());
+        assertEquals(p2UserId, info.playerTwoId());
+        assertEquals(MatchService.Status.LOBBY, info.status());
+        assertTrue(info.isPublic());
+        assertEquals(created.joinCode(), info.joinCode());
+
+        assertTrue(matches.getMatchAuthInfo("no-such-id").isEmpty());
+    }
+
+    @Test
     void purgeStaleMatches_removesEverythingExceptFinished() {
         MatchService.MatchSummary lobby = matches.createMatch(p1UserId, false);
         MatchService.MatchSummary drafting = matches.createMatch(p1UserId, false);

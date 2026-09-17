@@ -1388,6 +1388,15 @@ input[type="range"]::-moz-range-thumb {
   outline: 2px solid #facc15;
   border-color: #facc15;
 }
+/* IN PROGRESS rows are selectable to spectate (not to join) - a distinct accent from the
+   plain joinable state so the list reads at a glance which action a row leads to. */
+.public-lobby-row.spectatable {
+  border-color: #38bdf8;
+}
+.public-lobby-row.spectatable:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px #38bdf8;
+}
 
 /* Rendered CHANGELOG.md - see ChangelogScreen.ts. Shares .codex-screen/
    .codex-window/.codex-toolbar with the unit-info window; this is the

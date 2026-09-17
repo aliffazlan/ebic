@@ -84,6 +84,14 @@ export interface CreateBotMatchResponse {
   level: BotLevel;
 }
 
+/** What a spectate request returns - both names, since a spectatable match is always IN_PROGRESS. */
+export interface SpectateInfo {
+  matchId: string;
+  status: MatchStatus;
+  playerOneName: string;
+  playerTwoName: string;
+}
+
 export interface MatchInfo {
   matchId: string;
   status: MatchStatus;
@@ -357,6 +365,17 @@ export interface PlacementStateSnapshot {
   legalTiles: { q: number; r: number }[];
 }
 
+// One render tick's vfx batch (possibly empty) paired with the currentTeam its "state"
+// snapshot named - sent only as replay history to a newly-connecting spectator (see
+// ChannelHub.registerSpectator on the server), never as part of the live vfx/state stream a
+// player sees. Lets MatchScreen rebuild a spectator's combat log via the exact same
+// appendCombatLog/commitCombatLog calls a live player's client makes, without touching the
+// board or its animations.
+export interface CombatLogBatch {
+  events: VfxEvent[];
+  currentTeam: Team;
+}
+
 export type ServerMessage =
   | { type: "state"; payload: GameStateSnapshot }
   | { type: "vfx"; payload: VfxEvent[] }
@@ -364,7 +383,8 @@ export type ServerMessage =
   | { type: "placement_state"; payload: PlacementStateSnapshot }
   | { type: "prompt"; payload: PromptPayload }
   | { type: "message"; text: string }
-  | { type: "game_over"; payload: { winnerTeam: string; winnerName: string } };
+  | { type: "game_over"; payload: { winnerTeam: string; winnerName: string } }
+  | { type: "combat_log_batch"; payload: CombatLogBatch };
 
 // ---- WebSocket: client -> server ----
 

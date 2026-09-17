@@ -10,7 +10,15 @@ import type {
 } from "../types/contract";
 
 export interface MatchUiState {
-  yourTeam: Team;
+  // Null for a spectator - a read-only viewer who is not one of the two seated players.
+  // Every existing comparison against a real Team is naturally always false for null, which
+  // is what already disables ability/end-turn/attribute-prompt interaction for spectators
+  // without needing its own separate gating - see isSpectator below for the cases (labels,
+  // badges) that DO need an explicit branch.
+  yourTeam: Team | null;
+  isSpectator: boolean;
+  playerOneName: string;
+  playerTwoName: string;
   connected: boolean;
   snapshot: GameStateSnapshot | null;
   draftRound: DraftRoundSnapshot | null;
@@ -67,9 +75,12 @@ export class GameStateStore extends Store<MatchUiState> {
   // turn they belong to - see commitCombatLog.
   private pendingLogLines: CombatLogSegment[][] = [];
 
-  constructor(yourTeam: Team) {
+  constructor(yourTeam: Team | null, playerOneName: string, playerTwoName: string) {
     super({
       yourTeam,
+      isSpectator: yourTeam === null,
+      playerOneName,
+      playerTwoName,
       connected: false,
       snapshot: null,
       draftRound: null,

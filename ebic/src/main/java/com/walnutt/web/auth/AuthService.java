@@ -152,6 +152,23 @@ public final class AuthService {
         }
     }
 
+    /**
+     * Looked up by GameSessionManager to give GameSession the display names it needs for
+     * disconnect/reconnect/spectator-join broadcast text - resolveSession already returns a
+     * username but only for the currently-connecting user, not for "the other seat".
+     */
+    public String getUsername(long userId) {
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "SELECT username FROM users WHERE id = ?")) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString("username") : null;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to read username", e);
+        }
+    }
+
     /** A null definitionId clears the favourite - that is what the "None" option sends. */
     public void setFavouriteUnit(long userId, String definitionId) {
         try (PreparedStatement ps = db.connection().prepareStatement(

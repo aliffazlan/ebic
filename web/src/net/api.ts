@@ -14,6 +14,7 @@ import type {
   MatchInfo,
   PublicLobbiesResponse,
   SetVisibilityResponse,
+  SpectateInfo,
   StartLobbyResponse,
   UnitsResponse,
 } from "../types/contract";
@@ -147,6 +148,19 @@ export const api = {
     return request<SetVisibilityResponse>(`/matches/${encodeURIComponent(matchId)}/visibility`, {
       method: "POST",
       body: JSON.stringify({ isPublic }),
+    });
+  },
+
+  /** Spectating a specific lobby picked from the public browser - requires it to be IN_PROGRESS and public. */
+  spectatePublicLobby(matchId: string): Promise<SpectateInfo> {
+    return request<SpectateInfo>(`/matches/${encodeURIComponent(matchId)}/spectate`, { method: "POST" });
+  },
+
+  /** Spectating by join code - works for a private match too, since the code is the real secret. */
+  spectateByCode(joinCode: string): Promise<SpectateInfo> {
+    return request<SpectateInfo>("/matches/spectate", {
+      method: "POST",
+      body: JSON.stringify({ joinCode }),
     });
   },
 };

@@ -70,32 +70,44 @@ export class MatchScreen implements Screen, MatchActions {
   private previousCurrentTeam: Team | null = null;
   private onExit: () => void;
 
-  constructor(root: HTMLElement, matchId: string, yourTeam: Team, onExit: () => void) {
+  constructor(
+    root: HTMLElement,
+    matchId: string,
+    yourTeam: Team | null,
+    playerOneName: string,
+    playerTwoName: string,
+    onExit: () => void,
+    spectateCode?: string,
+  ) {
     this.root = root;
     this.matchId = matchId;
     this.onExit = onExit;
-    this.store = new GameStateStore(yourTeam);
-    this.socket = new GameSocket(matchId, {
-      onMessage: (msg) => this.handleMessage(msg),
-      onOpen: () => {
-        this.store.setState({ connected: true });
-        this.store.pushMessage("Connected to match.");
+    this.store = new GameStateStore(yourTeam, playerOneName, playerTwoName);
+    this.socket = new GameSocket(
+      matchId,
+      {
+        onMessage: (msg) => this.handleMessage(msg),
+        onOpen: () => {
+          this.store.setState({ connected: true });
+          this.store.pushMessage("Connected to match.");
+        },
+        onClose: () => {
+          this.store.setState({ connected: false });
+          this.store.pushMessage("Disconnected from match - reconnecting...");
+        },
+        onError: () => this.store.pushMessage("Connection error."),
+        onReconnecting: (attempt) => {
+          // Only the first attempt gets its own message - a burst of "attempt
+          // N" lines during a longer outage would just be noise in the log;
+          // the top-bar "Reconnecting..." badge (driven by `connected`) is the
+          // ongoing indicator, this is just the initial heads-up.
+          if (attempt === 1) {
+            this.store.pushMessage("Connection lost, attempting to reconnect...");
+          }
+        },
       },
-      onClose: () => {
-        this.store.setState({ connected: false });
-        this.store.pushMessage("Disconnected from match - reconnecting...");
-      },
-      onError: () => this.store.pushMessage("Connection error."),
-      onReconnecting: (attempt) => {
-        // Only the first attempt gets its own message - a burst of "attempt
-        // N" lines during a longer outage would just be noise in the log;
-        // the top-bar "Reconnecting..." badge (driven by `connected`) is the
-        // ongoing indicator, this is just the initial heads-up.
-        if (attempt === 1) {
-          this.store.pushMessage("Connection lost, attempting to reconnect...");
-        }
-      },
-    });
+      spectateCode,
+    );
   }
 
   mount(): void {
@@ -224,6 +236,14 @@ export class MatchScreen implements Screen, MatchActions {
           }
         }
         break;
+      case "combat_log_batch":
+        // Replay-only history for a spectator who just joined mid-match (see ChannelHub.
+        // registerSpectator on the server) - deliberately calls only the two store methods
+        // the live "vfx"/"state" pair already drives, with no warmArt/scheduleVfxBatch/board
+        // interaction, so catching up on history never flashes stale animations.
+        this.store.appendCombatLog(msg.payload.events);
+        this.store.commitCombatLog(msg.payload.currentTeam);
+        break;
       case "draft_round":
         // Both option lists - the cards are about to be rendered, and the
         // opponent's are shown alongside for transparency.
@@ -234,7 +254,7 @@ export class MatchScreen implements Screen, MatchActions {
       case "placement_state":
         warmArt(this.board, msg.payload.units.map((u) => ({
           definitionId: u.definitionId, name: u.name, unitType: u.unitType,
-        })), this.store.getState().yourTeam);
+        })), this.store.getState().yourTeam ?? undefined);
         this.store.setState({ placementState: msg.payload, selectedUnitId: null });
         break;
       case "prompt": {

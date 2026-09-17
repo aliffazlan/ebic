@@ -62,6 +62,7 @@ public final class GameSessionManager {
 
             GameSession session = new GameSession(id, participants.playerOneId(), participants.playerTwoId(),
                 matchService, botTeam, level == null ? null : level.config(), favourites(participants, botTeam),
+                auth.getUsername(participants.playerOneId()), auth.getUsername(participants.playerTwoId()),
                 () -> sessions.remove(id), abandonScheduler);
             session.start();
             return session;

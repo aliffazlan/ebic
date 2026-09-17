@@ -10,6 +10,7 @@ import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
 import com.walnutt.ui.Renderer;
+import com.walnutt.web.dto.CombatLogBatch;
 import com.walnutt.web.dto.DraftRoundSnapshot;
 import com.walnutt.web.dto.GameStateSnapshot;
 import com.walnutt.web.dto.UnitDefinitionSnapshot;
@@ -47,10 +48,15 @@ public final class WebRenderer implements Renderer {
     @Override
     public void render(GameState state) {
         List<VfxEvent> events = vfx.drain();
+        GameStateSnapshot snapshot = mapper.toSnapshot(state);
         if (!events.isEmpty()) {
             hub.broadcast(JsonSupport.envelope("vfx", events));
         }
-        GameStateSnapshot snapshot = mapper.toSnapshot(state);
+        // Recorded on every tick, even when events is empty: a round can complete on a turn
+        // with no vfx at all (a plain move), and commitCombatLog still needs that tick's call
+        // client-side to open a new page at the right boundary - recording only non-empty
+        // batches would silently drop those page breaks for a spectator replaying this history.
+        hub.recordCombatLogBatch(JsonSupport.envelope("combat_log_batch", new CombatLogBatch(events, snapshot.currentTeam())));
         String json = JsonSupport.envelope("state", snapshot);
         hub.cacheState(json);
         hub.broadcast(json);

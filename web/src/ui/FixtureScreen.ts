@@ -76,7 +76,7 @@ export class FixtureScreen implements Screen, MatchActions {
   private app: Application | null = null;
   private board: Board | null = null;
   private hud: Hud | null = null;
-  private store = new GameStateStore("PLAYER_ONE");
+  private store = new GameStateStore("PLAYER_ONE", "Player One", "Player Two");
   private root: HTMLElement;
   private mode: FixtureMode;
   private indicators = new IndicatorScheduler();

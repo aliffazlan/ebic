@@ -37,6 +37,9 @@ export class GameSocket {
   private ws: WebSocket | null = null;
   private readonly matchId: string;
   private readonly handlers: GameSocketHandlers;
+  /** Only set for spectating a private match by code - the WS upgrade re-validates it
+   * server-side, since a spectator is never a seated participant. */
+  private readonly spectateCode?: string;
   private heartbeatTimer: number | null = null;
   private reconnectTimer: number | null = null;
   private reconnectAttempt = 0;
@@ -45,9 +48,10 @@ export class GameSocket {
   // from under us," which is the only case that should auto-reconnect.
   private intentionalClose = false;
 
-  constructor(matchId: string, handlers: GameSocketHandlers) {
+  constructor(matchId: string, handlers: GameSocketHandlers, spectateCode?: string) {
     this.matchId = matchId;
     this.handlers = handlers;
+    this.spectateCode = spectateCode;
   }
 
   connect(): void {
@@ -57,7 +61,8 @@ export class GameSocket {
 
   private openSocket(): void {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${protocol}//${location.host}/ws/matches/${encodeURIComponent(this.matchId)}`;
+    const codeParam = this.spectateCode ? `?code=${encodeURIComponent(this.spectateCode)}` : "";
+    const url = `${protocol}//${location.host}/ws/matches/${encodeURIComponent(this.matchId)}${codeParam}`;
     const ws = new WebSocket(url);
 
     ws.onopen = () => {

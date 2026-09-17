@@ -350,16 +350,26 @@ export class Hud {
     const badges = document.createElement("div");
     badges.style.marginTop = "4px";
     const teamBadge = document.createElement("span");
-    teamBadge.className = `badge ${state.yourTeam === "PLAYER_ONE" ? "team-one" : "team-two"}`;
-    teamBadge.textContent = state.yourTeam === "PLAYER_ONE" ? "Player One" : "Player Two";
+    if (state.isSpectator) {
+      teamBadge.className = "badge";
+      teamBadge.textContent = "Spectating";
+    } else {
+      teamBadge.className = `badge ${state.yourTeam === "PLAYER_ONE" ? "team-one" : "team-two"}`;
+      teamBadge.textContent = state.yourTeam === "PLAYER_ONE" ? "Player One" : "Player Two";
+    }
     badges.appendChild(teamBadge);
 
     if (state.snapshot) {
-      const isYourTurn = state.snapshot.currentTeam === state.yourTeam;
       const turnBadge = document.createElement("span");
-      turnBadge.className = `badge ${isYourTurn ? "turn-yours" : "turn-theirs"}`;
       turnBadge.style.marginLeft = "6px";
-      turnBadge.textContent = isYourTurn ? "Your turn" : "Opponent's turn";
+      if (state.isSpectator) {
+        turnBadge.className = "badge turn-theirs";
+        turnBadge.textContent = state.snapshot.currentTeam === "PLAYER_ONE" ? "Player One's turn" : "Player Two's turn";
+      } else {
+        const isYourTurn = state.snapshot.currentTeam === state.yourTeam;
+        turnBadge.className = `badge ${isYourTurn ? "turn-yours" : "turn-theirs"}`;
+        turnBadge.textContent = isYourTurn ? "Your turn" : "Opponent's turn";
+      }
       badges.appendChild(turnBadge);
     }
     if (!state.connected) {
@@ -377,7 +387,7 @@ export class Hud {
     section.appendChild(left);
 
     const leaveBtn = document.createElement("button");
-    leaveBtn.textContent = "Leave";
+    leaveBtn.textContent = state.isSpectator ? "Stop spectating" : "Leave";
     leaveBtn.addEventListener("click", () => this.actions.exitToLobby());
     section.appendChild(leaveBtn);
 
@@ -407,7 +417,10 @@ export class Hud {
 
     const sub = document.createElement("div");
     sub.className = "unit-panel-sub";
-    sub.textContent = `${unit.unitType} · ${unit.team === state.yourTeam ? "Yours" : "Enemy"}${unit.dead ? " · Dead" : ""}`;
+    const ownershipLabel = state.isSpectator
+      ? (unit.team === "PLAYER_ONE" ? "Player One" : "Player Two")
+      : (unit.team === state.yourTeam ? "Yours" : "Enemy");
+    sub.textContent = `${unit.unitType} · ${ownershipLabel}${unit.dead ? " · Dead" : ""}`;
     section.appendChild(sub);
 
     const barrierBar = renderBarrierBar(unit);
@@ -795,9 +808,12 @@ export class Hud {
     const half = document.createElement("div");
     half.className = "combat-log-half";
 
+    const { playerOneName, playerTwoName } = this.store.getState();
     const heading = document.createElement("h4");
     heading.className = "combat-log-half-heading";
-    heading.textContent = team === "PLAYER_ONE" ? "Player One" : "Player Two";
+    // Named for every viewer, not just spectators - a player wants to know their
+    // opponent's actual username here too, not just which side of the board they're on.
+    heading.textContent = team === "PLAYER_ONE" ? `Player One (${playerOneName})` : `Player Two (${playerTwoName})`;
     heading.style.color = teamCssColor(team);
     half.appendChild(heading);
 
@@ -986,6 +1002,10 @@ export class Hud {
     };
     const self = this.store.findUnit(prompt.unitId);
     const opponent = this.store.findUnit(prompt.opponentUnitId);
+    // An "attribute" prompt is only ever sent to the one participant it's for (sendTo, never
+    // broadcast) - a spectator never receives one, so yourTeam is never actually null here;
+    // the fallback exists purely to satisfy the type after widening it for spectator support.
+    const yourTeam = state.yourTeam ?? "PLAYER_ONE";
 
     const encounter = document.createElement("div");
     encounter.className = "encounter-row";
@@ -994,14 +1014,14 @@ export class Hud {
     // "PLAYER_TWO turns" one: which team sits on the left here depends on who is
     // looking, so keying the flip on team would leave a PLAYER_TWO viewer
     // watching their own hero and the enemy face away from each other.
-    encounter.appendChild(this.renderEncounterCard(self, state.yourTeam, false));
+    encounter.appendChild(this.renderEncounterCard(self, yourTeam, false));
 
     const vs = document.createElement("div");
     vs.className = "encounter-vs";
     vs.textContent = "VS";
     encounter.appendChild(vs);
 
-    encounter.appendChild(this.renderEncounterCard(opponent, state.yourTeam, true));
+    encounter.appendChild(this.renderEncounterCard(opponent, yourTeam, true));
     panel.appendChild(encounter);
 
     // Once this client has sent its own attribute pick, keep the encounter
@@ -1108,8 +1128,12 @@ export class Hud {
     backdrop.appendChild(panel);
 
     const title = document.createElement("h2");
-    const youWon = state.gameOver!.winnerTeam === state.yourTeam;
-    title.textContent = youWon ? "Victory!" : "Defeat";
+    if (state.isSpectator) {
+      title.textContent = "Game Over";
+    } else {
+      const youWon = state.gameOver!.winnerTeam === state.yourTeam;
+      title.textContent = youWon ? "Victory!" : "Defeat";
+    }
     panel.appendChild(title);
 
     const winnerText = document.createElement("div");

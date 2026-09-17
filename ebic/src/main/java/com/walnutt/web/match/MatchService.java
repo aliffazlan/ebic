@@ -39,6 +39,20 @@ public final class MatchService {
     public record MatchParticipants(String matchId, long playerOneId, long playerTwoId) {
     }
 
+    /** What a spectator sees once they're let in - both names, since IN_PROGRESS guarantees both seats are filled. */
+    public record SpectateInfo(String matchId, String status, String playerOneName, String playerTwoName) {
+    }
+
+    /**
+     * WS-layer-only lookup for authorizeWsUpgrade/onWsConnect to decide participant vs.
+     * spectator vs. reject in one query. Deliberately separate from MatchParticipants, which
+     * GameSessionManager uses for a different purpose (its "both seats filled" session-creation
+     * gate) with different Optional-empty semantics - this one always returns a row if the
+     * match exists, regardless of whether player_two_id is set.
+     */
+    public record MatchAuthInfo(long playerOneId, long playerTwoId, Status status, boolean isPublic, String joinCode) {
+    }
+
     /**
      * The account a bot match's second seat belongs to. A real users row, rather than a
      * nullable player_two_id, so that every existing read path - getParticipants,
@@ -199,7 +213,13 @@ public final class MatchService {
                 if (playerOneId == callerUserId || (playerTwoId != null && playerTwoId == callerUserId)) {
                     throw new ApiException(409, "you are already in this match");
                 }
-                if (!Status.LOBBY.name().equals(status) || playerTwoId != null) {
+                // Split so the client can tell "this LOBBY is genuinely full" (still an error)
+                // from "this match is already running" (the join-by-code box retries as a
+                // spectate-by-code call on this specific message).
+                if (!Status.LOBBY.name().equals(status)) {
+                    throw new ApiException(409, "this match has already started");
+                }
+                if (playerTwoId != null) {
                     throw new ApiException(409, "lobby is full");
                 }
 
@@ -263,6 +283,105 @@ public final class MatchService {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to join public lobby", e);
+        }
+    }
+
+    /**
+     * Spectating from the public lobby browser: requires the match to still be public at the
+     * moment of the request (not just when it was listed) and already IN_PROGRESS - DRAFTING
+     * and LOBBY are deliberately excluded, since a spectator watches combat, not draft/placement.
+     */
+    public SpectateInfo spectatePublicLobby(long callerUserId, String matchId) {
+        SpectateInfo info = loadSpectateInfo(matchId, callerUserId, false);
+        if (info == null) {
+            throw new ApiException(409, "this match cannot be spectated");
+        }
+        return info;
+    }
+
+    /**
+     * Spectating by join code: unlike the browser path, this is not gated on is_public - a
+     * private match's own code is deliberately enough to spectate it, matching how joinMatch
+     * already treats codes as the actual secret rather than the visibility flag.
+     */
+    public SpectateInfo spectateByCode(long callerUserId, String joinCode) {
+        if (joinCode == null || joinCode.isBlank()) {
+            throw new ApiException(404, "no such match");
+        }
+        String matchId = findMatchIdByCode(joinCode.trim().toUpperCase());
+        if (matchId == null) {
+            throw new ApiException(404, "no such match");
+        }
+        SpectateInfo info = loadSpectateInfo(matchId, callerUserId, true);
+        if (info == null) {
+            throw new ApiException(409, "this match cannot be spectated");
+        }
+        return info;
+    }
+
+    private String findMatchIdByCode(String joinCode) {
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "SELECT id FROM matches WHERE join_code = ?")) {
+            ps.setString(1, joinCode);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString("id") : null;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to look up match by join code", e);
+        }
+    }
+
+    /** Shared lookup for both spectate paths; returns null if not eligible (caller throws the right ApiException). */
+    private SpectateInfo loadSpectateInfo(String matchId, long callerUserId, boolean byCode) {
+        String sql = """
+            SELECT m.status, m.player_one_id, m.player_two_id, m.is_public,
+                   p1.username AS p1name, p2.username AS p2name
+            FROM matches m
+            JOIN users p1 ON p1.id = m.player_one_id
+            LEFT JOIN users p2 ON p2.id = m.player_two_id
+            WHERE m.id = ?
+            """;
+        try (PreparedStatement ps = db.connection().prepareStatement(sql)) {
+            ps.setString(1, matchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new ApiException(404, "no such match");
+                }
+                long playerOneId = rs.getLong("player_one_id");
+                Long playerTwoId = rs.getObject("player_two_id") == null ? null : rs.getLong("player_two_id");
+                if (playerOneId == callerUserId || (playerTwoId != null && playerTwoId == callerUserId)) {
+                    throw new ApiException(409, "you are already in this match");
+                }
+                boolean isPublic = rs.getBoolean("is_public");
+                boolean statusOk = Status.IN_PROGRESS.name().equals(rs.getString("status"));
+                boolean visibilityOk = byCode || isPublic;
+                if (!statusOk || !visibilityOk) {
+                    return null;
+                }
+                return new SpectateInfo(matchId, Status.IN_PROGRESS.name(), rs.getString("p1name"), rs.getString("p2name"));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load match for spectating", e);
+        }
+    }
+
+    /** WS-layer lookup: everything authorizeWsUpgrade/onWsConnect need to admit a participant or spectator. */
+    public Optional<MatchAuthInfo> getMatchAuthInfo(String matchId) {
+        String sql = "SELECT player_one_id, player_two_id, status, is_public, join_code FROM matches WHERE id = ?";
+        try (PreparedStatement ps = db.connection().prepareStatement(sql)) {
+            ps.setString(1, matchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return Optional.empty();
+                }
+                Object p2Obj = rs.getObject("player_two_id");
+                long playerTwoId = p2Obj == null ? -1 : rs.getLong("player_two_id");
+                return Optional.of(new MatchAuthInfo(
+                    rs.getLong("player_one_id"), playerTwoId, Status.valueOf(rs.getString("status")),
+                    rs.getBoolean("is_public"), rs.getString("join_code")));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load match auth info", e);
         }
     }
 

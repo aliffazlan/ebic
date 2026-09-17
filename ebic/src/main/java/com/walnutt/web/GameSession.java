@@ -4,6 +4,8 @@ import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +47,12 @@ public final class GameSession {
     private final BotHandler bot;
     /** Each human seat's favourite hero, guaranteed one of its two options in the matching draft round. */
     private final Map<Team, String> favourites;
+    /** For the disconnect/reconnect/spectator-join broadcast text - not used by game logic. */
+    private final String playerOneUsername;
+    private final String playerTwoUsername;
+    /** Tracks which teams have connected at least once, to tell a first connect (silent) from a
+     * reconnect (broadcasts a message) in registerChannel(). */
+    private final Set<Team> everConnected = ConcurrentHashMap.newKeySet();
     /** Evicts this session from GameSessionManager's map once the match ends (success or error). */
     private final Runnable onCleanup;
     /** Shared with all sessions via GameSessionManager; null in the no-scheduler test constructors. */
@@ -57,16 +65,19 @@ public final class GameSession {
     private Thread thread;
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService) {
-        this(matchId, playerOneUserId, playerTwoUserId, matchService, null, null, Map.of(), () -> { }, null);
+        this(matchId, playerOneUserId, playerTwoUserId, matchService, null, null, Map.of(),
+            "Player One", "Player Two", () -> { }, null);
     }
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService,
                         Team botTeam, BotConfig botConfig) {
-        this(matchId, playerOneUserId, playerTwoUserId, matchService, botTeam, botConfig, Map.of(), () -> { }, null);
+        this(matchId, playerOneUserId, playerTwoUserId, matchService, botTeam, botConfig, Map.of(),
+            "Player One", "Player Two", () -> { }, null);
     }
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService,
-                        Team botTeam, BotConfig botConfig, Map<Team, String> favourites, Runnable onCleanup,
+                        Team botTeam, BotConfig botConfig, Map<Team, String> favourites,
+                        String playerOneUsername, String playerTwoUsername, Runnable onCleanup,
                         ScheduledExecutorService scheduler) {
         this.matchId = matchId;
         this.playerOneUserId = playerOneUserId;
@@ -75,6 +86,8 @@ public final class GameSession {
         this.botTeam = botTeam;
         this.bot = botTeam == null ? null : new BotHandler(botConfig);
         this.favourites = favourites == null ? Map.of() : Map.copyOf(favourites);
+        this.playerOneUsername = playerOneUsername == null ? "Player One" : playerOneUsername;
+        this.playerTwoUsername = playerTwoUsername == null ? "Player Two" : playerTwoUsername;
         this.onCleanup = onCleanup == null ? () -> { } : onCleanup;
         this.scheduler = scheduler;
         this.renderer = new WebRenderer(hub, new GameStateSnapshotMapper(ids), vfx, this::onGameOver);
@@ -139,13 +152,34 @@ public final class GameSession {
     }
 
     public void registerChannel(Team team, ClientChannel channel) {
+        boolean isReconnect = !everConnected.add(team);
         hub.register(team, channel);
+        if (isReconnect && matchService.getRawStatus(matchId) == MatchService.Status.IN_PROGRESS) {
+            hub.broadcast(JsonSupport.messageEnvelope(usernameFor(team) + " reconnected to the game."));
+        }
         onPresenceChanged();
     }
 
     public void unregisterChannel(Team team, ClientChannel channel) {
-        hub.unregister(team, channel);
+        boolean actuallyDisconnected = hub.unregister(team, channel);
+        if (actuallyDisconnected && matchService.getRawStatus(matchId) == MatchService.Status.IN_PROGRESS) {
+            hub.broadcast(JsonSupport.messageEnvelope(usernameFor(team) + " disconnected from the game."));
+        }
         onPresenceChanged();
+    }
+
+    private String usernameFor(Team team) {
+        return team == Team.PLAYER_ONE ? playerOneUsername : playerTwoUsername;
+    }
+
+    /** A read-only viewer joining never affects presence/abandon logic - only real seats do. */
+    public void registerSpectatorChannel(ClientChannel channel, String username) {
+        hub.registerSpectator(channel);
+        hub.broadcast(JsonSupport.messageEnvelope(username + " joined the game as Spectator."));
+    }
+
+    public void unregisterSpectatorChannel(ClientChannel channel) {
+        hub.unregisterSpectator(channel);
     }
 
     /**
@@ -199,6 +233,10 @@ public final class GameSession {
             return;
         }
         LOG.log(Level.INFO, "Match " + matchId + " destroyed - both players disconnected and never reconnected");
+        // Sent before finishing/evicting the session so any still-connected spectator (spectators
+        // never count toward the disconnect check above, so they're typically the only ones left)
+        // learns why the board just froze, rather than being left to wonder.
+        hub.broadcast(JsonSupport.messageEnvelope("This match was abandoned and has been destroyed."));
         try {
             matchService.finishMatch(matchId, null);
         } catch (RuntimeException ignored) {

@@ -1247,7 +1247,10 @@ export class Board {
    * full bar) instead of guessing.
    */
   private applyPlacementSnapshot(units: PlacementUnitSnapshot[]): void {
-    const yourTeam = this.store.getState().yourTeam;
+    // A spectator's yourTeam is null, but placement_state is never sent to a spectator -
+    // spectators only ever connect once a match is IN_PROGRESS, after placement is done -
+    // so this fallback is unreachable in practice; it exists purely to satisfy the type.
+    const yourTeam = this.store.getState().yourTeam ?? "PLAYER_ONE";
     const synthetic: UnitSnapshot[] = units.map((u) => ({
       id: u.unitId,
       name: u.name,

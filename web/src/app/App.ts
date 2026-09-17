@@ -155,6 +155,8 @@ export class App {
         onBack: () => this.showLobby(false, "down"),
         onJoined: (matchId, yourTeam, playerOneName, isPublic) =>
           this.showLobbyRoom(matchId, yourTeam, null, playerOneName, isPublic),
+        onSpectate: (matchId, playerOneName, playerTwoName, joinCode) =>
+          void this.startSpectate(matchId, playerOneName, playerTwoName, joinCode),
       }),
       "up",
     );
@@ -214,8 +216,32 @@ export class App {
     this.setScreen(new ChangelogScreen(this.root, () => this.showSettings("right")), "left");
   }
 
-  private showMatch(matchId: string, yourTeam: Team): void {
-    this.setScreen(new MatchScreen(this.root, matchId, yourTeam, () => void this.endMatch()));
+  private async showMatch(matchId: string, yourTeam: Team): Promise<void> {
+    // Fetched here (rather than threaded through every onMatchReady call site in
+    // LobbyScreen/LobbyRoomScreen) so both player names reach the combat log for
+    // every match, not just ones a caller happened to already have both names for.
+    const info = await api.getMatch(matchId);
+    this.setScreen(
+      new MatchScreen(this.root, matchId, yourTeam, info.playerOneName, info.playerTwoName ?? "", () =>
+        void this.endMatch(),
+      ),
+    );
+  }
+
+  /** A read-only viewer's entry point - no lobby room, no join code to show, names already
+   * known from the spectate HTTP response so no extra fetch is needed. */
+  private showSpectate(matchId: string, playerOneName: string, playerTwoName: string, joinCode?: string): void {
+    this.setScreen(
+      new MatchScreen(
+        this.root,
+        matchId,
+        null,
+        playerOneName,
+        playerTwoName,
+        () => void this.endMatch(),
+        joinCode,
+      ),
+    );
   }
 
   /**
@@ -227,7 +253,7 @@ export class App {
   private async startMatch(matchId: string, yourTeam: Team): Promise<void> {
     if (this.navBusy) return;
     if (getFastTransitions()) {
-      this.showMatch(matchId, yourTeam);
+      await this.showMatch(matchId, yourTeam);
       return;
     }
     this.navBusy = true;
@@ -237,8 +263,36 @@ export class App {
       overlay.style.opacity = "1";
       overlay.classList.remove("fade-overlay-in");
       await delay(HOLD_MS);
-      this.showMatch(matchId, yourTeam); // instant swap, hidden behind the black
+      await this.showMatch(matchId, yourTeam); // instant swap, hidden behind the black
       await nextFrames(2); // let Pixi/board paint before the overlay clears
+      await runOverlayFade(overlay, "fade-overlay-out", FADE_MS);
+    } finally {
+      overlay.remove();
+      this.navBusy = false;
+    }
+  }
+
+  /** Same fade choreography as startMatch, landing on the read-only spectate screen instead. */
+  private async startSpectate(
+    matchId: string,
+    playerOneName: string,
+    playerTwoName: string,
+    joinCode?: string,
+  ): Promise<void> {
+    if (this.navBusy) return;
+    if (getFastTransitions()) {
+      this.showSpectate(matchId, playerOneName, playerTwoName, joinCode);
+      return;
+    }
+    this.navBusy = true;
+    const overlay = createFadeOverlay();
+    try {
+      await runOverlayFade(overlay, "fade-overlay-in", FADE_MS);
+      overlay.style.opacity = "1";
+      overlay.classList.remove("fade-overlay-in");
+      await delay(HOLD_MS);
+      this.showSpectate(matchId, playerOneName, playerTwoName, joinCode);
+      await nextFrames(2);
       await runOverlayFade(overlay, "fade-overlay-out", FADE_MS);
     } finally {
       overlay.remove();

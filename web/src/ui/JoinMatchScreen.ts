@@ -12,6 +12,9 @@ import type { PublicLobbySummary, Team } from "../types/contract";
 export interface JoinMatchCallbacks {
   onBack(): void;
   onJoined(matchId: string, yourTeam: Team, playerOneName: string, isPublic: boolean): void;
+  /** joinCode is only set for a private match spectated by code - the WS connection needs
+   * it to prove eligibility, since a spectator is never a seated participant. */
+  onSpectate(matchId: string, playerOneName: string, playerTwoName: string, joinCode?: string): void;
 }
 
 export class JoinMatchScreen implements Screen {
@@ -126,6 +129,19 @@ export class JoinMatchScreen implements Screen {
         const info = await api.getMatch(res.matchId);
         this.callbacks.onJoined(res.matchId, info.yourTeam, info.playerOneName, info.isPublic);
       } catch (err) {
+        // A code for a match that's already running can't be joined as a player, but it can
+        // still be spectated - the same box handles both rather than making the user guess
+        // which one applies.
+        if (err instanceof ApiError && err.message === "this match has already started") {
+          try {
+            const info = await api.spectateByCode(code);
+            this.callbacks.onSpectate(info.matchId, info.playerOneName, info.playerTwoName, code);
+            return;
+          } catch (spectateErr) {
+            this.showError(spectateErr);
+            return;
+          }
+        }
         this.showError(err);
       } finally {
         codeBtn.disabled = false;
@@ -141,7 +157,10 @@ export class JoinMatchScreen implements Screen {
     this.selectedLobby = null;
     this.selectedRow?.classList.remove("selected");
     this.selectedRow = null;
-    if (this.joinSelectedBtn) this.joinSelectedBtn.disabled = true;
+    if (this.joinSelectedBtn) {
+      this.joinSelectedBtn.disabled = true;
+      this.joinSelectedBtn.textContent = "Join lobby";
+    }
   }
 
   private async refresh(): Promise<void> {
@@ -171,9 +190,13 @@ export class JoinMatchScreen implements Screen {
 
   private renderLobbyRow(lobby: PublicLobbySummary): HTMLElement {
     const joinable = lobby.status === "LOBBY" && !lobby.full;
+    const spectatable = lobby.status === "IN PROGRESS";
+    const selectable = joinable || spectatable;
 
     const row = document.createElement("div");
-    row.className = joinable ? "public-lobby-row" : "public-lobby-row full";
+    row.className = "public-lobby-row";
+    if (!selectable) row.classList.add("full");
+    if (spectatable) row.classList.add("spectatable");
 
     const name = document.createElement("span");
     name.textContent = `${lobby.playerOneName}'s lobby`;
@@ -184,13 +207,16 @@ export class JoinMatchScreen implements Screen {
     status.textContent = lobby.status;
     row.appendChild(status);
 
-    if (joinable) {
+    if (selectable) {
       row.addEventListener("click", () => {
         this.selectedRow?.classList.remove("selected");
         this.selectedLobby = lobby;
         this.selectedRow = row;
         row.classList.add("selected");
-        if (this.joinSelectedBtn) this.joinSelectedBtn.disabled = false;
+        if (this.joinSelectedBtn) {
+          this.joinSelectedBtn.disabled = false;
+          this.joinSelectedBtn.textContent = spectatable ? "Spectate" : "Join lobby";
+        }
       });
     }
 
@@ -200,6 +226,9 @@ export class JoinMatchScreen implements Screen {
   private async doJoinSelected(): Promise<void> {
     const lobby = this.selectedLobby;
     if (!lobby || !this.joinSelectedBtn) return;
+    if (lobby.status === "IN PROGRESS") {
+      return this.doSpectateSelected();
+    }
     this.joinSelectedBtn.disabled = true;
     try {
       const res = await api.joinPublicLobby(lobby.matchId);
@@ -209,6 +238,21 @@ export class JoinMatchScreen implements Screen {
       // The list can go stale between a refresh and this click (the owner went private,
       // someone else filled the seat, etc.) - re-sync the list once the popup is dismissed
       // rather than leaving a now-wrong row selected and joinable-looking.
+      this.showError(err, () => void this.refresh());
+      this.joinSelectedBtn.disabled = false;
+    }
+  }
+
+  private async doSpectateSelected(): Promise<void> {
+    const lobby = this.selectedLobby;
+    if (!lobby || !this.joinSelectedBtn) return;
+    this.joinSelectedBtn.disabled = true;
+    try {
+      const info = await api.spectatePublicLobby(lobby.matchId);
+      this.callbacks.onSpectate(info.matchId, info.playerOneName, info.playerTwoName);
+    } catch (err) {
+      // Same staleness story as doJoinSelected - the match could have finished, or gone
+      // private, between the last refresh and this click.
       this.showError(err, () => void this.refresh());
       this.joinSelectedBtn.disabled = false;
     }
