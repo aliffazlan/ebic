@@ -26,11 +26,12 @@ public class DuelEffect extends Effect {
     private final double winMultiplier;
     private DuelEffect partner;
     /**
-     * Extra damage the OWNER of this half takes from its opponent. A base-kit effect (100%)
-     * regardless of upgrade state; only the enemy-facing half (see Duel.onUse) rises further
-     * once upgraded, so the two halves are no longer necessarily equal.
+     * Total damage multiplier the OWNER of this half takes from its opponent. A base-kit
+     * effect (200% damage, i.e. double) regardless of upgrade state; only the enemy-facing
+     * half (see Duel.onUse) rises further once upgraded, so the two halves are no longer
+     * necessarily equal.
      */
-    private double mutualVulnerability;
+    private double damageMultiplier;
     /** The ability to refresh on a win, when it is the upgraded form. Null otherwise. */
     private Ability refreshOnWin;
     private boolean resolved;
@@ -59,31 +60,31 @@ public class DuelEffect extends Effect {
     }
 
     /**
-     * Wiring for how much extra damage the OWNER of this half takes from the opponent. Both
-     * halves get a non-zero rate from the moment Duel is cast (the base 100% mutual amp);
-     * upgraded, Duel passes a higher rate to the enemy's half only, so the exchange becomes
-     * asymmetric - see Duel.onUse for which half gets which value. Only Valor's own Duel
-     * comes back up on a win, hence refreshOnWin being null on the enemy's half.
+     * Wiring for the total damage multiplier the OWNER of this half takes from the opponent.
+     * Both halves get a non-zero rate from the moment Duel is cast (the base 200% mutual
+     * amp); upgraded, Duel passes a higher rate to the enemy's half only, so the exchange
+     * becomes asymmetric - see Duel.onUse for which half gets which value. Only Valor's own
+     * Duel comes back up on a win, hence refreshOnWin being null on the enemy's half.
      */
-    public void upgradeWith(double mutualVulnerability, Ability refreshOnWin) {
-        this.mutualVulnerability = mutualVulnerability;
+    public void upgradeWith(double damageMultiplier, Ability refreshOnWin) {
+        this.damageMultiplier = damageMultiplier;
         this.refreshOnWin = refreshOnWin;
     }
 
     /**
-     * Each duellist takes extra damage from the OTHER, at whatever rate this half was given -
-     * a third party wading in is unaffected, which is what keeps this a duel rather than a
-     * general vulnerability.
+     * Each duellist takes damage from the OTHER at whatever total multiplier this half was
+     * given - a third party wading in is unaffected, which is what keeps this a duel rather
+     * than a general vulnerability.
      */
     @Override
     public void onIncomingDamage(GameState state, DamageEvent event) {
-        if (isExpired() || getOwner() == null || mutualVulnerability <= 0) {
+        if (isExpired() || getOwner() == null || damageMultiplier <= 0) {
             return;
         }
         if (event.getTarget() != getOwner() || event.getSource() != opponent || event.getDamage() <= 0) {
             return;
         }
-        event.multiplyDamage(1 + mutualVulnerability);
+        event.multiplyDamage(damageMultiplier);
     }
 
     @Override

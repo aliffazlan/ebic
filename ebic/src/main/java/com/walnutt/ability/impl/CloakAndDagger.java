@@ -7,7 +7,9 @@ import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.TileTarget;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.effect.impl.CloakEffect;
+import com.walnutt.event.PostMoveEvent;
 import com.walnutt.game.GameState;
+import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.unit.Unit;
 
@@ -42,7 +44,12 @@ public class CloakAndDagger extends Ability {
     @Override
     public void onUse(GameState state, Target target) {
         Tile destination = ((TileTarget) target).getTile();
+        Position from = owner.getPosition();
         state.getMap().moveUnit(owner, destination); // forced stack if occupied - bypasses isWalkable() on purpose
+        // A forced relocation, not a chosen Move: no markMoved, no PreMoveEvent (nothing should
+        // be able to cancel it) - but PostMoveEvent still fires so anything tracking this unit's
+        // position (a Feast latch, Cloak's own onMove ambush) sees it, same as an ordinary step.
+        state.getEventBus().publish(state, new PostMoveEvent(owner, from, destination.getPosition()));
 
         CloakEffect cloak = new CloakEffect(duration, damagePenalty);
         cloak.setAmbushControlDuration(ambushControlDuration);

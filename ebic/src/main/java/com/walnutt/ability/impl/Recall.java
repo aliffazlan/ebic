@@ -5,7 +5,9 @@ import com.walnutt.ability.target.NoTarget;
 import com.walnutt.ability.target.Target;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.effect.impl.ShadowLifespanEffect;
+import com.walnutt.event.PostMoveEvent;
 import com.walnutt.game.GameState;
+import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.unit.SummonedUnit;
 import com.walnutt.unit.Unit;
@@ -53,9 +55,13 @@ public class Recall extends Ability {
 
         // The shadow comes off the board FIRST, or its own body would be standing on the tile
         // Mercurial is about to land on. A forced relocation like Manifestation's own: no
-        // markMoved, and no Pre/PostMoveEvent.
+        // markMoved and no PreMoveEvent (nothing should be able to cancel it) - but
+        // PostMoveEvent still fires so anything tracking the summoner's position (a Feast
+        // latch, Cloak's own onMove ambush) sees it, same as an ordinary step.
         owner.getActiveEffect(ShadowLifespanEffect.class).ifPresent(shadow -> shadow.remove(state));
+        Position from = summoner.getPosition();
         state.getMap().moveUnit(summoner, destination);
+        state.getEventBus().publish(state, new PostMoveEvent(summoner, from, destination.getPosition()));
 
         state.spendMoves(getMoveCost(state));
         resetToMax();

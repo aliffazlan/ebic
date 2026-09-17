@@ -11,6 +11,7 @@ import com.walnutt.data.AbilityFactory;
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.effect.impl.ManifestationDebuffEffect;
 import com.walnutt.effect.impl.ShadowLifespanEffect;
+import com.walnutt.event.PostMoveEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.map.Tile;
 import com.walnutt.status.Stat;
@@ -78,6 +79,10 @@ public class Manifestation extends Ability {
         Tile vacated = state.getMap().getTile(owner.getPosition());
 
         state.getMap().moveUnit(owner, destination);
+        // A forced relocation, not a chosen Move: no markMoved, no PreMoveEvent (nothing should
+        // be able to cancel it) - but PostMoveEvent still fires so anything tracking this unit's
+        // position (a Feast latch, Cloak's own onMove ambush) sees it, same as an ordinary step.
+        state.getEventBus().publish(state, new PostMoveEvent(owner, vacated.getPosition(), destination.getPosition()));
 
         for (Unit enemy : state.getMap().getAdjacentUnits(owner.getPosition(),
                 u -> u.getTeam() != owner.getTeam() && !u.isDead())) {

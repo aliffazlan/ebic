@@ -10,7 +10,9 @@ import com.walnutt.ability.target.Target;
 import com.walnutt.ability.target.TileTarget;
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.data.AbilityDefinition;
+import com.walnutt.event.PostMoveEvent;
 import com.walnutt.game.GameState;
+import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.unit.Unit;
 
@@ -114,12 +116,18 @@ public class Translocation extends Ability {
         // the subject would be standing on the destination and count as its own partner.
         Unit partner = swaps ? swapPartner(destination, subject) : null;
         Tile vacated = state.getMap().getTile(subject.getPosition());
+        Position partnerFrom = destination.getPosition();
 
-        // A forced relocation, not the subject's own move: no markMoved, and no
-        // Pre/PostMoveEvent - matching Manifestation, Dislocation and Cloak and Dagger.
+        // A forced relocation, not the subject's own move: no markMoved, and no PreMoveEvent
+        // (nothing should be able to cancel it) - matching Manifestation, Dislocation and Cloak
+        // and Dagger. PostMoveEvent still fires for each unit actually displaced, though, so
+        // anything tracking either one's position (a Feast latch, Cloak's own onMove ambush)
+        // sees it, same as an ordinary step.
         state.getMap().moveUnit(subject, destination);
+        state.getEventBus().publish(state, new PostMoveEvent(subject, vacated.getPosition(), destination.getPosition()));
         if (partner != null && vacated != null) {
             state.getMap().moveUnit(partner, vacated);
+            state.getEventBus().publish(state, new PostMoveEvent(partner, partnerFrom, vacated.getPosition()));
         }
 
         state.spendMoves(getMoveCost(state));

@@ -38,7 +38,7 @@
             "It answers a chained attack once, not once per hit."
           ],
           "stats": {
-            "damage_reduction": 0.2
+            "damage_multiplier": 0.8
           },
           "upgraded": false,
           "usedThisTurn": false,

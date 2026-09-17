@@ -1,19 +1,21 @@
 {
     "name": "Counterstrike",
     "type": "passive",
-    "description": "Being hit by an attack provokes an immediate counter-attack, dealing %damage_reduction:pct%% less damage but healing this unit for %lifesteal:pct%% of what it deals.",
+    "description": "Being hit by an attack provokes an immediate counter-attack, dealing %damage_multiplier:pct%% of its attack damage but granting this unit a barrier worth %lifesteal:pct%% of what it deals, lasting %barrier_duration% turns.",
     "stats": {
-        "damage_reduction": 0.2,
-        "lifesteal": 0.25
+        "damage_multiplier": 0.8,
+        "lifesteal": 0.25,
+        "barrier_duration": 3
     },
     "upgrade": {
         "summary": "The counter deals %damage_bonus:pct%% more damage rather than less.",
-        "description": "Being hit by an attack provokes an immediate counter-attack, dealing %damage_bonus:pct%% MORE damage and healing this unit for %lifesteal:pct%% of what it deals.",
+        "description": "Being hit by an attack provokes an immediate counter-attack, dealing %damage_bonus:pct%% MORE damage and granting this unit a barrier worth %lifesteal:pct%% of what it deals, lasting %barrier_duration% turns.",
         "stats": {
             "damage_bonus": 0.2
         },
         "details": [
-            "The penalty is not merely lifted but reversed - a counter now hits harder than the swing that provoked it."
+            "The penalty is not merely lifted but reversed - a counter now hits harder than the swing that provoked it.",
+            "Proccing again adds onto the barrier and refreshes its duration, rather than starting a second one."
         ]
     }
 }

@@ -15,10 +15,10 @@ public class Duel extends Ability {
     private double duelBonus;
     private double duelHealPercent;
     private double winMultiplier;
-    /** Mutual damage amp between duellists - a base-kit effect now, not an upgrade. */
-    private double duelVulnerability;
-    /** Upgrade: the vulnerability applied to the ENEMY (damage they take from Valor) only. 0 until upgraded. */
-    private double duelVulnerabilityUpgraded;
+    /** Mutual total damage multiplier between duellists - a base-kit effect now, not an upgrade. */
+    private double duelDamageMultiplier;
+    /** Upgrade: the multiplier applied to the ENEMY (damage they take from Valor) only. 0 until upgraded. */
+    private double duelDamageMultiplierUpgraded;
 
     public Duel(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), false);
@@ -28,7 +28,7 @@ public class Duel extends Ability {
         this.duelBonus = definition.getDouble("duel_bonus", 10);
         this.duelHealPercent = definition.getDouble("duel_heal", 0.5);
         this.winMultiplier = definition.getDouble("win_multiplier", 3);
-        this.duelVulnerability = definition.getDouble("duel_vulnerability", 1);
+        this.duelDamageMultiplier = definition.getDouble("duel_damage_multiplier", 2);
     }
 
     @Override
@@ -59,9 +59,9 @@ public class Duel extends Ability {
         theirs.linkPartner(mine);
         // "mine" governs damage Valor takes back from the enemy - always the base rate, even
         // upgraded. "theirs" governs damage Valor deals to the enemy - upgraded, that rises to
-        // duelVulnerabilityUpgraded. Only Valor's own half (mine) refreshes this ability on a win.
-        mine.upgradeWith(duelVulnerability, isUpgraded() ? this : null);
-        theirs.upgradeWith(isUpgraded() ? duelVulnerabilityUpgraded : duelVulnerability, null);
+        // duelDamageMultiplierUpgraded. Only Valor's own half (mine) refreshes this ability on a win.
+        mine.upgradeWith(duelDamageMultiplier, isUpgraded() ? this : null);
+        theirs.upgradeWith(isUpgraded() ? duelDamageMultiplierUpgraded : duelDamageMultiplier, null);
 
         owner.addEffect(mine);
         other.addEffect(theirs);
@@ -76,7 +76,7 @@ public class Duel extends Ability {
         this.duelBonus = stat("duel_bonus", duelBonus);
         this.duelHealPercent = stat("duel_heal", duelHealPercent);
         this.winMultiplier = stat("win_multiplier", winMultiplier);
-        this.duelVulnerability = stat("duel_vulnerability", duelVulnerability);
-        this.duelVulnerabilityUpgraded = stat("duel_vulnerability_upgraded", duelVulnerability);
+        this.duelDamageMultiplier = stat("duel_damage_multiplier", duelDamageMultiplier);
+        this.duelDamageMultiplierUpgraded = stat("duel_damage_multiplier_upgraded", duelDamageMultiplier);
     }
 }

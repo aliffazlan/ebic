@@ -9,8 +9,10 @@ import com.walnutt.combat.CombatEngine;
 import com.walnutt.combat.WeightedEncounter;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.event.PostDamageEvent;
+import com.walnutt.event.PostMoveEvent;
 import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
+import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.unit.Unit;
 
@@ -63,7 +65,12 @@ public class Backtrack extends Ability {
     @Override
     public void onUse(GameState state, Target target) {
         Tile destination = ((TileTarget) target).getTile();
+        Position from = owner.getPosition();
         state.getMap().moveUnit(owner, destination);
+        // A forced relocation, not a chosen Move: no markMoved, no PreMoveEvent (nothing should
+        // be able to cancel it) - but PostMoveEvent still fires so anything tracking this unit's
+        // position (a Feast latch, Cloak's own onMove ambush) sees it, same as an ordinary step.
+        state.getEventBus().publish(state, new PostMoveEvent(owner, from, destination.getPosition()));
 
         if (damageTakenLastTurn > 0) {
             owner.heal(state, damageTakenLastTurn);

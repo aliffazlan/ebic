@@ -10,7 +10,7 @@ rather than for the diff: what changed about playing the game, not which classes
 ## [Unreleased] — 0.4.0
 
 A pass across the roster now that a season of 0.3.0 has settled the numbers — ten units
-retuned, three abilities rebuilt outright, and an upgrade that finally reaches the fight
+retuned, five abilities rebuilt outright, and an upgrade that finally reaches the fight
 already in progress.
 
 ### Balance
@@ -29,15 +29,31 @@ already in progress.
 - **Objurgation**: triggers below 40% health (was 50%), converts intelligence to shielding at
   2.5 health per point (was 1), and its barrier now lasts 3 turns (was 4).
 - **Valor**: health 1100 → 1280, strength 60 → 68, agility 50 → 54.
-- **Duel**: the mutual 100% damage amp between duellists is now part of the base ability, not
-  something the upgrade unlocks. Upgraded, it lasts 5 turns (was 3) and the damage Valor
-  deals to his rival rises further, to 200% more — what he takes back in return stays at the
-  base 100%.
+- **Counterstrike**: no longer lifesteals into raw HP. A landed counter now grants a barrier
+  worth the same share of the damage dealt instead, lasting 3 turns — proccing again adds
+  onto the barrier and refreshes its duration rather than stacking a second one. Its
+  description now says the counter deals 80% of attack damage, matching how the rest of the
+  kit is worded, rather than "20% less".
+- **Duel**: the mutual damage amp between duellists — 200% damage, not something the upgrade
+  unlocks — is part of the base ability. Upgraded, it lasts 5 turns (was 3) and the damage
+  Valor deals to his rival rises further, to 300% damage — what he takes back in return
+  stays at the base 200%.
 - **Zenith**: Pylon's own beam now hunts for a target within 2 tiles instead of 1.
 - **Auroth**: Frostbite lasts 3 turns (was 2) and its execute threshold rises to 20% health
   (was 10%); upgraded, its duration is now 6 turns (was 5).
 - **Dirge**: Decay's strength steal drops to 1 (was 2). Soul Rip's damage multiplier drops to
   40% (was 50%).
+- **Grivath**: Feast's upgrade no longer grants a permanent passive. Upgraded, Feast becomes
+  unit-targetable at 2 range — cast it on an enemy and Grivath latches onto them: occupying
+  their tile, untargetable and invulnerable, and automatically following wherever they go for
+  the duration, including through forced relocations (teleports, pulls, swaps). While latched,
+  the free attacks always hit the latched unit, twice a turn instead of once — proccing
+  immediately on cast as well as on each of Grivath's turns — and Grivath himself is disarmed
+  and silenced, unable to attack or cast anything else; moving is the one action left open, and
+  choosing to move away from the latched unit ends the latch early. If the latched unit dies —
+  or simply stops being a valid target, say by imprisoning itself or cloaking away — Grivath
+  pops off and whatever duration remains just acts like the base ability. Cast on himself,
+  upgraded Feast still just acts like the base ability too.
 - **Shawl**: Hidden Potential now costs 14 Insight (was 10), and Shawl starts every match
   already holding 6.
 - **Mercurial**: health 810 → 860, strength 40 → 38, agility 40 → 36. Dispersion's reflect

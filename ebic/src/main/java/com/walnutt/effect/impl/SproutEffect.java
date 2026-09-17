@@ -1,9 +1,11 @@
 package com.walnutt.effect.impl;
 
 import com.walnutt.effect.Effect;
+import com.walnutt.event.PostMoveEvent;
 import com.walnutt.event.TurnStartEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.game.RemovalReason;
+import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.status.EffectCategory;
 import com.walnutt.unit.Unit;
@@ -92,7 +94,12 @@ public class SproutEffect extends Effect {
         if (caster == null || caster.isDead() || destination == null) {
             return;
         }
+        Position from = caster.getPosition();
         state.getMap().moveUnit(caster, destination);
+        // A forced relocation, not a chosen Move: no markMoved, no PreMoveEvent (nothing should
+        // be able to cancel it) - but PostMoveEvent still fires so anything tracking this unit's
+        // position (a Feast latch, Cloak's own onMove ambush) sees it, same as an ordinary step.
+        state.getEventBus().publish(state, new PostMoveEvent(caster, from, destination.getPosition()));
 
         grantBarrier(caster);
         for (Unit ally : state.getMap().getAdjacentUnits(destination.getPosition(),

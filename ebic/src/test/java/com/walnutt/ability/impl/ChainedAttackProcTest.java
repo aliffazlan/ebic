@@ -113,7 +113,7 @@ class ChainedAttackProcTest {
 
         Unit valor = new EliteUnit("Valor", Team.PLAYER_TWO, new UnitStats(0, 0, 40, 5000));
         valor.addAbility(new Counterstrike(new AbilityDefinition("Counterstrike", "passive", "desc", Map.of(
-            "damage_reduction", 0.2, "lifesteal", 0.25))));
+            "damage_multiplier", 0.8, "lifesteal", 0.25))));
 
         GameState state = stateWith(chronos, valor);
         CauseCounter counters = new CauseCounter("Counterstrike");
@@ -138,7 +138,7 @@ class ChainedAttackProcTest {
         wei.addAbility(new EnergyBreak(new AbilityDefinition("Energy Break", "passive", "desc", Map.of(
             "cooldown_increase", 1.0, "bonus_increase", 3.0))));
         wei.addAbility(new Counterstrike(new AbilityDefinition("Counterstrike", "passive", "desc", Map.of(
-            "damage_reduction", 0.2, "lifesteal", 0.25))));
+            "damage_multiplier", 0.8, "lifesteal", 0.25))));
 
         GameState state = stateWith(attacker, wei);
         CauseCounter counters = new CauseCounter("Counterstrike");
