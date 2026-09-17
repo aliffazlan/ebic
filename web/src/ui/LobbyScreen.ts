@@ -2,6 +2,7 @@ import { api, ApiError } from "../net/api";
 import type { AuthUser, BotLevel } from "../types/contract";
 import type { Screen } from "./Screen";
 import { renderLogo } from "./Logo";
+import { showErrorModal } from "./ErrorModal";
 
 /** Difficulties offered in the lobby. Adding one here and server-side is the whole change. */
 const BOT_LEVELS: ReadonlyArray<{ value: BotLevel; label: string }> = [
@@ -23,7 +24,6 @@ export class LobbyScreen implements Screen {
   private user: AuthUser;
   private callbacks: LobbyCallbacks;
   private playIntro: boolean;
-  private isPublic = false;
 
   constructor(root: HTMLElement, user: AuthUser, callbacks: LobbyCallbacks, playIntro = false) {
     this.root = root;
@@ -77,12 +77,8 @@ export class LobbyScreen implements Screen {
     welcome.textContent = `Signed in as ${this.user.username}`;
     card.appendChild(welcome);
 
-    const errorText = document.createElement("div");
-    errorText.className = "error-text";
-    card.appendChild(errorText);
-
     const setError = (err: unknown) => {
-      errorText.textContent = err instanceof ApiError ? err.message : "Something went wrong.";
+      showErrorModal(wrap, err instanceof ApiError ? err.message : "Something went wrong.");
     };
 
     // Play vs the computer - listed first because it is the only option that needs
@@ -109,7 +105,6 @@ export class LobbyScreen implements Screen {
     botBtn.className = "primary";
     botBtn.textContent = "Play vs Bot";
     botBtn.addEventListener("click", async () => {
-      errorText.textContent = "";
       botBtn.disabled = true;
       try {
         const res = await api.createBotMatch(botLevelSelect.value as BotLevel);
@@ -131,31 +126,14 @@ export class LobbyScreen implements Screen {
     createHeading.textContent = "Create a match";
     card.appendChild(createHeading);
 
-    const visibilityRow = document.createElement("div");
-    visibilityRow.className = "codex-filters";
-    const privateBtn = document.createElement("button");
-    privateBtn.textContent = "Private";
-    const publicBtn = document.createElement("button");
-    publicBtn.textContent = "Public";
-    const setVisibility = (isPublic: boolean) => {
-      this.isPublic = isPublic;
-      privateBtn.classList.toggle("primary", !isPublic);
-      publicBtn.classList.toggle("primary", isPublic);
-    };
-    privateBtn.addEventListener("click", () => setVisibility(false));
-    publicBtn.addEventListener("click", () => setVisibility(true));
-    setVisibility(false); // default PRIVATE
-    visibilityRow.append(privateBtn, publicBtn);
-    card.appendChild(visibilityRow);
-
     const createBtn = document.createElement("button");
     createBtn.className = "primary";
     createBtn.textContent = "Create match";
     createBtn.addEventListener("click", async () => {
-      errorText.textContent = "";
       createBtn.disabled = true;
       try {
-        const res = await api.createMatch(this.isPublic);
+        // Every match starts private; visibility can be flipped afterward in the lobby room.
+        const res = await api.createMatch(false);
         this.callbacks.onLobbyCreated(res.matchId, res.joinCode, res.isPublic);
       } catch (err) {
         setError(err);

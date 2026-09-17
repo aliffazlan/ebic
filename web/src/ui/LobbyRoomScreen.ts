@@ -6,6 +6,7 @@
 
 import { api, ApiError } from "../net/api";
 import { renderLogo } from "./Logo";
+import { showErrorModal } from "./ErrorModal";
 import type { Screen } from "./Screen";
 import type { Team } from "../types/contract";
 
@@ -23,19 +24,22 @@ export class LobbyRoomScreen implements Screen {
   private yourTeam: Team;
   /** Only the owner has one to display - a joiner already knows it or came from the browser. */
   private joinCode: string | null;
+  private playerOneName: string;
   private isPublic: boolean;
   private callbacks: LobbyRoomCallbacks;
   private pollHandle: ReturnType<typeof setInterval> | null = null;
 
   private playerTwoRow: HTMLElement | null = null;
+  private visibilityBtn: HTMLButtonElement | null = null;
+  private visibilityHint: HTMLElement | null = null;
   private startBtn: HTMLButtonElement | null = null;
-  private errorText: HTMLElement | null = null;
 
   constructor(
     root: HTMLElement,
     matchId: string,
     yourTeam: Team,
     joinCode: string | null,
+    playerOneName: string,
     isPublic: boolean,
     callbacks: LobbyRoomCallbacks,
   ) {
@@ -43,6 +47,7 @@ export class LobbyRoomScreen implements Screen {
     this.matchId = matchId;
     this.yourTeam = yourTeam;
     this.joinCode = joinCode;
+    this.playerOneName = playerOneName;
     this.isPublic = isPublic;
     this.callbacks = callbacks;
   }
@@ -84,10 +89,18 @@ export class LobbyRoomScreen implements Screen {
     title.textContent = "Match lobby";
     card.appendChild(title);
 
-    const badge = document.createElement("div");
-    badge.className = "hint";
-    badge.textContent = this.isPublic ? "Visibility: PUBLIC" : "Visibility: PRIVATE";
-    card.appendChild(badge);
+    if (isOwner) {
+      // A single button that IS the current state - clicking it flips public/private.
+      this.visibilityBtn = document.createElement("button");
+      this.visibilityBtn.textContent = this.isPublic ? "Public" : "Private";
+      this.visibilityBtn.addEventListener("click", () => void this.toggleVisibility());
+      card.appendChild(this.visibilityBtn);
+    } else {
+      this.visibilityHint = document.createElement("div");
+      this.visibilityHint.className = "hint";
+      this.visibilityHint.textContent = this.isPublic ? "Visibility: PUBLIC" : "Visibility: PRIVATE";
+      card.appendChild(this.visibilityHint);
+    }
 
     if (this.joinCode) {
       const hint = document.createElement("div");
@@ -107,17 +120,13 @@ export class LobbyRoomScreen implements Screen {
 
     const playerOneRow = document.createElement("div");
     playerOneRow.className = "hint";
-    playerOneRow.textContent = isOwner ? "You (host)" : "Host";
+    playerOneRow.textContent = `${this.playerOneName} (host)`;
     card.appendChild(playerOneRow);
 
     this.playerTwoRow = document.createElement("div");
     this.playerTwoRow.className = "hint";
-    this.playerTwoRow.textContent = isOwner ? "Waiting for opponent to join..." : "You";
+    this.playerTwoRow.textContent = "Waiting for opponent to join...";
     card.appendChild(this.playerTwoRow);
-
-    this.errorText = document.createElement("div");
-    this.errorText.className = "error-text";
-    card.appendChild(this.errorText);
 
     if (isOwner) {
       this.startBtn = document.createElement("button");
@@ -147,17 +156,35 @@ export class LobbyRoomScreen implements Screen {
     this.el = wrap;
   }
 
+  private showError(err: unknown): void {
+    if (this.el) {
+      showErrorModal(this.el, err instanceof ApiError ? err.message : "Something went wrong.");
+    }
+  }
+
+  private async toggleVisibility(): Promise<void> {
+    if (!this.visibilityBtn) return;
+    const next = !this.isPublic;
+    this.visibilityBtn.disabled = true;
+    try {
+      const res = await api.setVisibility(this.matchId, next);
+      this.isPublic = res.isPublic;
+      this.visibilityBtn.textContent = this.isPublic ? "Public" : "Private";
+    } catch (err) {
+      this.showError(err);
+    } finally {
+      this.visibilityBtn.disabled = false;
+    }
+  }
+
   private async doStart(): Promise<void> {
-    if (this.errorText) this.errorText.textContent = "";
     if (this.startBtn) this.startBtn.disabled = true;
     try {
       await api.startLobby(this.matchId);
       this.stopPolling();
       this.callbacks.onMatchReady(this.matchId, this.yourTeam);
     } catch (err) {
-      if (this.errorText) {
-        this.errorText.textContent = err instanceof ApiError ? err.message : "Something went wrong.";
-      }
+      this.showError(err);
       if (this.startBtn) this.startBtn.disabled = false;
     }
   }
@@ -171,14 +198,14 @@ export class LobbyRoomScreen implements Screen {
           this.callbacks.onMatchReady(this.matchId, this.yourTeam);
           return;
         }
-        const isOwner = this.yourTeam === "PLAYER_ONE";
-        if (isOwner && this.playerTwoRow) {
-          this.playerTwoRow.textContent = info.playerTwoName
-            ? `${info.playerTwoName} has joined`
-            : "Waiting for opponent to join...";
+        if (this.playerTwoRow) {
+          this.playerTwoRow.textContent = info.playerTwoName ?? "Waiting for opponent to join...";
         }
         if (this.startBtn) {
           this.startBtn.disabled = !info.playerTwoName;
+        }
+        if (this.visibilityHint) {
+          this.visibilityHint.textContent = info.isPublic ? "Visibility: PUBLIC" : "Visibility: PRIVATE";
         }
       } catch {
         // transient network hiccup - keep polling

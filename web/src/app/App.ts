@@ -129,7 +129,8 @@ export class App {
         this.currentUser!,
         {
           onMatchReady: (matchId, yourTeam) => void this.startMatch(matchId, yourTeam),
-          onLobbyCreated: (matchId, joinCode, isPublic) => this.showLobbyRoom(matchId, "PLAYER_ONE", joinCode, isPublic),
+          onLobbyCreated: (matchId, joinCode, isPublic) =>
+            this.showLobbyRoom(matchId, "PLAYER_ONE", joinCode, this.currentUser!.username, isPublic),
           onOpenJoinMatch: () => this.showJoinMatch(),
           onOpenCodex: () => this.showCodex(),
           onOpenSettings: () => this.showSettings(),
@@ -152,7 +153,8 @@ export class App {
     this.setScreen(
       new JoinMatchScreen(this.root, {
         onBack: () => this.showLobby(false, "down"),
-        onJoined: (matchId, yourTeam) => this.showLobbyRoom(matchId, yourTeam, null, false),
+        onJoined: (matchId, yourTeam, playerOneName, isPublic) =>
+          this.showLobbyRoom(matchId, yourTeam, null, playerOneName, isPublic),
       }),
       "up",
     );
@@ -164,9 +166,15 @@ export class App {
    * no START GAME button - only the owner has one). Neither path drops the
    * player into the game until the owner explicitly starts it.
    */
-  private showLobbyRoom(matchId: string, yourTeam: Team, joinCode: string | null, isPublic: boolean): void {
+  private showLobbyRoom(
+    matchId: string,
+    yourTeam: Team,
+    joinCode: string | null,
+    playerOneName: string,
+    isPublic: boolean,
+  ): void {
     this.setScreen(
-      new LobbyRoomScreen(this.root, matchId, yourTeam, joinCode, isPublic, {
+      new LobbyRoomScreen(this.root, matchId, yourTeam, joinCode, playerOneName, isPublic, {
         onBack: () => this.showLobby(false, "down"),
         onMatchReady: (id, team) => void this.startMatch(id, team),
       }),

@@ -221,6 +221,52 @@ public final class MatchService {
     }
 
     /**
+     * Joining from the public lobby browser rather than by typed code. The browser's list can
+     * go stale (the owner flips it back to private, or someone else fills the seat, between
+     * the last refresh and this click), so this re-validates everything at the moment of the
+     * actual join rather than trusting what the client last saw - one "not available" message
+     * covers every reason, since the list UI doesn't need to distinguish them. Unlike
+     * joinMatch, a private lobby is deliberately rejected here even though it still exists.
+     */
+    public MatchSummary joinPublicLobby(long callerUserId, String matchId) {
+        String selectSql = "SELECT join_code, status, player_one_id, player_two_id, is_public FROM matches WHERE id = ?";
+        try (PreparedStatement ps = db.connection().prepareStatement(selectSql)) {
+            ps.setString(1, matchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new ApiException(404, "no such match");
+                }
+                String joinCode = rs.getString("join_code");
+                String status = rs.getString("status");
+                long playerOneId = rs.getLong("player_one_id");
+                Long playerTwoId = rs.getObject("player_two_id") == null ? null : rs.getLong("player_two_id");
+                boolean isPublic = rs.getBoolean("is_public");
+
+                if (playerOneId == callerUserId || (playerTwoId != null && playerTwoId == callerUserId)) {
+                    throw new ApiException(409, "you are already in this match");
+                }
+                if (!isPublic || !Status.LOBBY.name().equals(status) || playerTwoId != null) {
+                    throw new ApiException(409, "this lobby is not available");
+                }
+
+                try (PreparedStatement update = db.connection().prepareStatement(
+                        "UPDATE matches SET player_two_id = ? WHERE id = ? AND player_two_id IS NULL")) {
+                    update.setLong(1, callerUserId);
+                    update.setString(2, matchId);
+                    int rows = update.executeUpdate();
+                    if (rows == 0) {
+                        // Lost a race against another joiner between SELECT and UPDATE.
+                        throw new ApiException(409, "this lobby is not available");
+                    }
+                }
+                return new MatchSummary(matchId, joinCode, Status.LOBBY.name(), isPublic);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to join public lobby", e);
+        }
+    }
+
+    /**
      * Owner-only "START GAME": flips LOBBY -> DRAFTING once both seats are filled. This is
      * now the only place a human match ever writes DRAFTING - GameSession.runMatch() picks
      * up from there and writes IN_PROGRESS itself once draft+placement actually finish.
@@ -264,6 +310,45 @@ public final class MatchService {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to start lobby", e);
+        }
+    }
+
+    /**
+     * Owner-only: flips a lobby's public/private flag while it's still waiting to start.
+     * Locked once drafting/playing begins - changing who can find a match mid-game makes
+     * no sense, and the public browser only ever lists LOBBY/DRAFTING/IN_PROGRESS anyway.
+     */
+    public void setVisibility(long callerUserId, String matchId, boolean isPublic) {
+        String selectSql = "SELECT status, player_one_id, player_two_id FROM matches WHERE id = ?";
+        try (PreparedStatement ps = db.connection().prepareStatement(selectSql)) {
+            ps.setString(1, matchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new ApiException(404, "no such match");
+                }
+                String status = rs.getString("status");
+                long playerOneId = rs.getLong("player_one_id");
+                Long playerTwoId = rs.getObject("player_two_id") == null ? null : rs.getLong("player_two_id");
+                boolean isParticipant = playerOneId == callerUserId || (playerTwoId != null && playerTwoId == callerUserId);
+                if (!isParticipant) {
+                    throw new ApiException(404, "no such match");
+                }
+                if (playerOneId != callerUserId) {
+                    throw new ApiException(403, "only the lobby owner can change visibility");
+                }
+                if (!Status.LOBBY.name().equals(status)) {
+                    throw new ApiException(409, "cannot change visibility once the game has started");
+                }
+            }
+            try (PreparedStatement update = db.connection().prepareStatement(
+                    "UPDATE matches SET is_public = ? WHERE id = ? AND status = ?")) {
+                update.setBoolean(1, isPublic);
+                update.setString(2, matchId);
+                update.setString(3, Status.LOBBY.name());
+                update.executeUpdate();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to change match visibility", e);
         }
     }
 
@@ -440,6 +525,22 @@ public final class MatchService {
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to finish match", e);
+        }
+    }
+
+    /**
+     * Called once at real server startup (see WebServer's constructor) - any non-FINISHED
+     * row is a lobby/match from a previous server process that can never be resumed, since
+     * all in-memory GameSession state died with that process. FINISHED rows are left alone;
+     * history is still worth keeping.
+     */
+    public void purgeStaleMatches() {
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "DELETE FROM matches WHERE status != ?")) {
+            ps.setString(1, Status.FINISHED.name());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to purge stale matches", e);
         }
     }
 

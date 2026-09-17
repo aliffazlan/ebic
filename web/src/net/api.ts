@@ -13,6 +13,7 @@ import type {
   JoinMatchResponse,
   MatchInfo,
   PublicLobbiesResponse,
+  SetVisibilityResponse,
   StartLobbyResponse,
   UnitsResponse,
 } from "../types/contract";
@@ -114,6 +115,14 @@ export const api = {
     });
   },
 
+  /**
+   * Joining a specific lobby picked from the public browser, re-validated server-side at the
+   * moment of the click (the list can go stale - see MatchService.joinPublicLobby).
+   */
+  joinPublicLobby(matchId: string): Promise<JoinMatchResponse> {
+    return request<JoinMatchResponse>(`/matches/${encodeURIComponent(matchId)}/join`, { method: "POST" });
+  },
+
   getMatch(matchId: string): Promise<MatchInfo> {
     return request<MatchInfo>(`/matches/${encodeURIComponent(matchId)}`);
   },
@@ -131,5 +140,13 @@ export const api = {
   /** Open public lobbies for the Join Match browser - manual refresh only, no polling. */
   listPublicLobbies(): Promise<PublicLobbiesResponse> {
     return request<PublicLobbiesResponse>("/matches/public");
+  },
+
+  /** Owner-only, while still in LOBBY: flips public/private. */
+  setVisibility(matchId: string, isPublic: boolean): Promise<SetVisibilityResponse> {
+    return request<SetVisibilityResponse>(`/matches/${encodeURIComponent(matchId)}/visibility`, {
+      method: "POST",
+      body: JSON.stringify({ isPublic }),
+    });
   },
 };

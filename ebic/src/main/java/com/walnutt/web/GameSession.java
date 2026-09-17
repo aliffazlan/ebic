@@ -4,6 +4,9 @@ import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 
 import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import com.google.gson.JsonObject;
 
@@ -44,21 +47,27 @@ public final class GameSession {
     private final Map<Team, String> favourites;
     /** Evicts this session from GameSessionManager's map once the match ends (success or error). */
     private final Runnable onCleanup;
+    /** Shared with all sessions via GameSessionManager; null in the no-scheduler test constructors. */
+    private final ScheduledExecutorService scheduler;
+    /** How long both seats can sit disconnected before the match is torn down as abandoned. */
+    private static final long ABANDON_GRACE_SECONDS = 60;
+    private volatile ScheduledFuture<?> abandonCheck;
 
     private volatile GameState state;
     private Thread thread;
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService) {
-        this(matchId, playerOneUserId, playerTwoUserId, matchService, null, null, Map.of(), () -> { });
+        this(matchId, playerOneUserId, playerTwoUserId, matchService, null, null, Map.of(), () -> { }, null);
     }
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService,
                         Team botTeam, BotConfig botConfig) {
-        this(matchId, playerOneUserId, playerTwoUserId, matchService, botTeam, botConfig, Map.of(), () -> { });
+        this(matchId, playerOneUserId, playerTwoUserId, matchService, botTeam, botConfig, Map.of(), () -> { }, null);
     }
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService,
-                        Team botTeam, BotConfig botConfig, Map<Team, String> favourites, Runnable onCleanup) {
+                        Team botTeam, BotConfig botConfig, Map<Team, String> favourites, Runnable onCleanup,
+                        ScheduledExecutorService scheduler) {
         this.matchId = matchId;
         this.playerOneUserId = playerOneUserId;
         this.playerTwoUserId = playerTwoUserId;
@@ -67,6 +76,7 @@ public final class GameSession {
         this.bot = botTeam == null ? null : new BotHandler(botConfig);
         this.favourites = favourites == null ? Map.of() : Map.copyOf(favourites);
         this.onCleanup = onCleanup == null ? () -> { } : onCleanup;
+        this.scheduler = scheduler;
         this.renderer = new WebRenderer(hub, new GameStateSnapshotMapper(ids), vfx, this::onGameOver);
     }
 
@@ -107,6 +117,7 @@ public final class GameSession {
             } catch (RuntimeException ignored) {
                 // best-effort - the match is already broken, don't compound it with a second failure
             }
+            cancelAbandonCheck();
             onCleanup.run();
         }
     }
@@ -123,15 +134,77 @@ public final class GameSession {
         Player winner = finalState.getWinner();
         Long winnerUserId = winner == null ? null : (winner.getTeam() == Team.PLAYER_ONE ? playerOneUserId : playerTwoUserId);
         matchService.finishMatch(matchId, winnerUserId);
+        cancelAbandonCheck();
         onCleanup.run();
     }
 
     public void registerChannel(Team team, ClientChannel channel) {
         hub.register(team, channel);
+        onPresenceChanged();
     }
 
     public void unregisterChannel(Team team, ClientChannel channel) {
         hub.unregister(team, channel);
+        onPresenceChanged();
+    }
+
+    /**
+     * A bot seat never holds a channel, so it's never counted as "gone" - a bot match's
+     * only relevant seat is its human. Runs after every register/unregister to decide
+     * whether the match now looks abandoned (schedule a grace-period check) or has
+     * someone back (cancel any pending one).
+     */
+    private void onPresenceChanged() {
+        if (everyoneRelevantIsDisconnected()) {
+            scheduleAbandonCheckIfNeeded();
+        } else {
+            cancelAbandonCheck();
+        }
+    }
+
+    private boolean everyoneRelevantIsDisconnected() {
+        boolean playerOneGone = botTeam == Team.PLAYER_ONE || !hub.isConnected(Team.PLAYER_ONE);
+        boolean playerTwoGone = botTeam == Team.PLAYER_TWO || !hub.isConnected(Team.PLAYER_TWO);
+        return playerOneGone && playerTwoGone;
+    }
+
+    private synchronized void scheduleAbandonCheckIfNeeded() {
+        if (scheduler == null || abandonCheck != null) {
+            return;
+        }
+        abandonCheck = scheduler.schedule(this::abandonIfStillEmpty, ABANDON_GRACE_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private synchronized void cancelAbandonCheck() {
+        if (abandonCheck != null) {
+            abandonCheck.cancel(false);
+            abandonCheck = null;
+        }
+    }
+
+    /**
+     * Fires once the grace period elapses with nobody relevant still connected. Re-checks
+     * presence (a reconnect may have raced the timer) and the match's real status (a
+     * legitimate conclusion right before this fired must never be overwritten with a
+     * null-winner FINISHED) before actually tearing anything down.
+     */
+    private void abandonIfStillEmpty() {
+        synchronized (this) {
+            abandonCheck = null;
+        }
+        if (!everyoneRelevantIsDisconnected()) {
+            return;
+        }
+        if (matchService.getRawStatus(matchId) == MatchService.Status.FINISHED) {
+            return;
+        }
+        LOG.log(Level.INFO, "Match " + matchId + " destroyed - both players disconnected and never reconnected");
+        try {
+            matchService.finishMatch(matchId, null);
+        } catch (RuntimeException ignored) {
+            // best-effort - nothing left to fix up if this itself fails
+        }
+        onCleanup.run();
     }
 
     public void handleMessage(Team team, JsonObject message) {

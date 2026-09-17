@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import com.walnutt.ai.BotLevel;
 import com.walnutt.game.Team;
@@ -16,6 +18,12 @@ public final class GameSessionManager {
     private final MatchService matchService;
     private final AuthService auth;
     private final UnitCatalog catalog;
+    /** Shared across every session's "destroy if both sides disconnect" grace-period timer. */
+    private final ScheduledExecutorService abandonScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "match-abandon-scheduler");
+        t.setDaemon(true);
+        return t;
+    });
 
     public GameSessionManager(MatchService matchService, AuthService auth, UnitCatalog catalog) {
         this.matchService = matchService;
@@ -54,7 +62,7 @@ public final class GameSessionManager {
 
             GameSession session = new GameSession(id, participants.playerOneId(), participants.playerTwoId(),
                 matchService, botTeam, level == null ? null : level.config(), favourites(participants, botTeam),
-                () -> sessions.remove(id));
+                () -> sessions.remove(id), abandonScheduler);
             session.start();
             return session;
         });

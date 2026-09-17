@@ -46,14 +46,25 @@ export interface StartLobbyResponse {
   status: "DRAFTING";
 }
 
-/** Coarse status the public lobby browser shows - DRAFTING/IN_PROGRESS both collapse to "IN PROGRESS". */
-export type PublicLobbyDisplayStatus = "LOBBY" | "IN PROGRESS";
+export interface SetVisibilityRequest {
+  isPublic: boolean;
+}
+
+export interface SetVisibilityResponse {
+  matchId: string;
+  isPublic: boolean;
+}
+
+/** Status the public lobby browser shows - each raw match status gets its own distinct label. */
+export type PublicLobbyDisplayStatus = "LOBBY" | "DRAFTING" | "IN PROGRESS";
 
 export interface PublicLobbySummary {
   matchId: string;
   joinCode: string;
   status: PublicLobbyDisplayStatus;
   playerOneName: string;
+  /** True once both seats are filled - a LOBBY that's full isn't joinable even though it hasn't started. */
+  full: boolean;
 }
 
 export interface PublicLobbiesResponse {

@@ -990,6 +990,16 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: var(--glow-modal);
 }
 
+/* A small error popup (see ErrorModal.ts) - deliberately plain, no entrance animation. */
+.error-modal-panel {
+  width: 320px;
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: center;
+}
+
 .draft-columns {
   display: flex;
   gap: 24px;
@@ -1299,6 +1309,12 @@ input[type="range"]::-moz-range-thumb {
   overflow: hidden;
 }
 
+/* Join Match reuses .codex-window's chrome at a narrower width - it has no grid of
+   cards to fill, just a lobby list and a join-by-code box. */
+.join-match-window {
+  width: min(1150px, 92vw);
+}
+
 .codex-toolbar {
   display: flex;
   align-items: center;
@@ -1367,6 +1383,10 @@ input[type="range"]::-moz-range-thumb {
 .public-lobby-row.full:hover {
   border-color: var(--border);
   box-shadow: none;
+}
+.public-lobby-row.selected {
+  outline: 2px solid #facc15;
+  border-color: #facc15;
 }
 
 /* Rendered CHANGELOG.md - see ChangelogScreen.ts. Shares .codex-screen/

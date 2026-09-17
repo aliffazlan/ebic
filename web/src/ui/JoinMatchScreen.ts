@@ -1,15 +1,17 @@
 // Dedicated top-level screen for finding a match to join: a manually-refreshed
-// browser of public lobbies, plus a join-by-code box that works for both
-// public and private lobbies (a public lobby's code stays valid even after
-// it's listed - this box doesn't special-case how the code was found).
+// browser of public lobbies (select a row, then press JOIN LOBBY), plus a
+// join-by-code box that works for both public and private lobbies (a public
+// lobby's code stays valid even after it's listed - this box doesn't
+// special-case how the code was found).
 
 import { api, ApiError } from "../net/api";
+import { showErrorModal } from "./ErrorModal";
 import type { Screen } from "./Screen";
 import type { PublicLobbySummary, Team } from "../types/contract";
 
 export interface JoinMatchCallbacks {
   onBack(): void;
-  onJoined(matchId: string, yourTeam: Team): void;
+  onJoined(matchId: string, yourTeam: Team, playerOneName: string, isPublic: boolean): void;
 }
 
 export class JoinMatchScreen implements Screen {
@@ -17,8 +19,11 @@ export class JoinMatchScreen implements Screen {
   private root: HTMLElement;
   private callbacks: JoinMatchCallbacks;
   private listEl: HTMLElement | null = null;
-  private errorText: HTMLElement | null = null;
   private refreshBtn: HTMLButtonElement | null = null;
+  private joinSelectedBtn: HTMLButtonElement | null = null;
+
+  private selectedLobby: PublicLobbySummary | null = null;
+  private selectedRow: HTMLElement | null = null;
 
   constructor(root: HTMLElement, callbacks: JoinMatchCallbacks) {
     this.root = root;
@@ -39,10 +44,14 @@ export class JoinMatchScreen implements Screen {
     return this.el;
   }
 
-  private setError(err: unknown): void {
-    if (this.errorText) {
-      this.errorText.textContent = err instanceof ApiError ? err.message : "Something went wrong.";
+  private showMessage(message: string, onDismiss?: () => void): void {
+    if (this.el) {
+      showErrorModal(this.el, message, onDismiss);
     }
+  }
+
+  private showError(err: unknown, onDismiss?: () => void): void {
+    this.showMessage(err instanceof ApiError ? err.message : "Something went wrong.", onDismiss);
   }
 
   private render(): void {
@@ -52,7 +61,7 @@ export class JoinMatchScreen implements Screen {
     this.root.appendChild(wrap);
 
     const windowEl = document.createElement("div");
-    windowEl.className = "codex-window";
+    windowEl.className = "codex-window join-match-window";
     wrap.appendChild(windowEl);
 
     const toolbar = document.createElement("div");
@@ -73,10 +82,6 @@ export class JoinMatchScreen implements Screen {
     this.refreshBtn.addEventListener("click", () => void this.refresh());
     toolbar.appendChild(this.refreshBtn);
 
-    this.errorText = document.createElement("div");
-    this.errorText.className = "error-text";
-    windowEl.appendChild(this.errorText);
-
     const listHeading = document.createElement("h2");
     listHeading.textContent = "Public lobbies";
     windowEl.appendChild(listHeading);
@@ -84,6 +89,13 @@ export class JoinMatchScreen implements Screen {
     this.listEl = document.createElement("div");
     this.listEl.className = "public-lobby-list";
     windowEl.appendChild(this.listEl);
+
+    this.joinSelectedBtn = document.createElement("button");
+    this.joinSelectedBtn.className = "primary";
+    this.joinSelectedBtn.textContent = "Join lobby";
+    this.joinSelectedBtn.disabled = true;
+    this.joinSelectedBtn.addEventListener("click", () => void this.doJoinSelected());
+    windowEl.appendChild(this.joinSelectedBtn);
 
     const codeHeading = document.createElement("h2");
     codeHeading.textContent = "Join by code";
@@ -98,22 +110,23 @@ export class JoinMatchScreen implements Screen {
     codeInput.style.textTransform = "uppercase";
     const codeBtn = document.createElement("button");
     codeBtn.className = "primary";
-    codeBtn.textContent = "Join";
+    codeBtn.textContent = "Join with code";
     codeRow.append(codeInput, codeBtn);
     windowEl.appendChild(codeRow);
 
     const doJoinByCode = async () => {
       const code = codeInput.value.trim().toUpperCase();
       if (!code) {
-        if (this.errorText) this.errorText.textContent = "Enter a join code.";
+        this.showMessage("Enter a join code.");
         return;
       }
-      if (this.errorText) this.errorText.textContent = "";
       codeBtn.disabled = true;
       try {
-        await this.doJoin(code);
+        const res = await api.joinMatch(code);
+        const info = await api.getMatch(res.matchId);
+        this.callbacks.onJoined(res.matchId, info.yourTeam, info.playerOneName, info.isPublic);
       } catch (err) {
-        this.setError(err);
+        this.showError(err);
       } finally {
         codeBtn.disabled = false;
       }
@@ -124,15 +137,23 @@ export class JoinMatchScreen implements Screen {
     });
   }
 
+  private clearSelection(): void {
+    this.selectedLobby = null;
+    this.selectedRow?.classList.remove("selected");
+    this.selectedRow = null;
+    if (this.joinSelectedBtn) this.joinSelectedBtn.disabled = true;
+  }
+
   private async refresh(): Promise<void> {
     if (!this.listEl) return;
+    this.clearSelection();
     if (this.refreshBtn) this.refreshBtn.disabled = true;
     this.listEl.replaceChildren(hint("Loading lobbies..."));
     try {
       const res = await api.listPublicLobbies();
       this.renderLobbies(res.lobbies);
     } catch (err) {
-      this.setError(err);
+      this.showError(err);
       this.listEl.replaceChildren(hint("Could not load lobbies."));
     } finally {
       if (this.refreshBtn) this.refreshBtn.disabled = false;
@@ -149,7 +170,7 @@ export class JoinMatchScreen implements Screen {
   }
 
   private renderLobbyRow(lobby: PublicLobbySummary): HTMLElement {
-    const joinable = lobby.status === "LOBBY";
+    const joinable = lobby.status === "LOBBY" && !lobby.full;
 
     const row = document.createElement("div");
     row.className = joinable ? "public-lobby-row" : "public-lobby-row full";
@@ -165,18 +186,32 @@ export class JoinMatchScreen implements Screen {
 
     if (joinable) {
       row.addEventListener("click", () => {
-        if (this.errorText) this.errorText.textContent = "";
-        void this.doJoin(lobby.joinCode).catch((err) => this.setError(err));
+        this.selectedRow?.classList.remove("selected");
+        this.selectedLobby = lobby;
+        this.selectedRow = row;
+        row.classList.add("selected");
+        if (this.joinSelectedBtn) this.joinSelectedBtn.disabled = false;
       });
     }
 
     return row;
   }
 
-  private async doJoin(code: string): Promise<void> {
-    const res = await api.joinMatch(code);
-    const info = await api.getMatch(res.matchId);
-    this.callbacks.onJoined(res.matchId, info.yourTeam);
+  private async doJoinSelected(): Promise<void> {
+    const lobby = this.selectedLobby;
+    if (!lobby || !this.joinSelectedBtn) return;
+    this.joinSelectedBtn.disabled = true;
+    try {
+      const res = await api.joinPublicLobby(lobby.matchId);
+      const info = await api.getMatch(res.matchId);
+      this.callbacks.onJoined(res.matchId, info.yourTeam, info.playerOneName, info.isPublic);
+    } catch (err) {
+      // The list can go stale between a refresh and this click (the owner went private,
+      // someone else filled the seat, etc.) - re-sync the list once the popup is dismissed
+      // rather than leaving a now-wrong row selected and joinable-looking.
+      this.showError(err, () => void this.refresh());
+      this.joinSelectedBtn.disabled = false;
+    }
   }
 }
 

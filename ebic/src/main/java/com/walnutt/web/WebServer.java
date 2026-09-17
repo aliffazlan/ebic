@@ -62,6 +62,7 @@ public final class WebServer {
     public WebServer(Database db) {
         this.auth = new AuthService(db);
         this.matches = new MatchService(db);
+        this.matches.purgeStaleMatches();
         this.sessions = new GameSessionManager(matches, auth, catalog);
         this.app = Javalin.create(cfg -> {
             cfg.showJavalinBanner = false;
@@ -99,6 +100,8 @@ public final class WebServer {
         app.get("/api/matches/{matchId}", this::handleMatchStatus);
         app.post("/api/matches/{matchId}/start", this::handleStartLobby);
         app.post("/api/matches/{matchId}/leave", this::handleLeaveLobby);
+        app.post("/api/matches/{matchId}/visibility", this::handleSetVisibility);
+        app.post("/api/matches/{matchId}/join", this::handleJoinPublicLobby);
 
         app.wsBeforeUpgrade("/ws/matches/{matchId}", this::authorizeWsUpgrade);
         app.ws("/ws/matches/{matchId}", ws -> {
@@ -213,6 +216,34 @@ public final class WebServer {
         ctx.status(204);
     }
 
+    private void handleSetVisibility(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        String matchId = ctx.pathParam("matchId");
+        JsonObject body = readJsonBody(ctx);
+        boolean isPublic = body.has("isPublic") && body.get("isPublic").getAsBoolean();
+        matches.setVisibility(user.userId(), matchId, isPublic);
+        JsonObject payload = new JsonObject();
+        payload.addProperty("matchId", matchId);
+        payload.addProperty("isPublic", isPublic);
+        sendJson(ctx, 200, payload);
+    }
+
+    private void handleJoinPublicLobby(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        String matchId = ctx.pathParam("matchId");
+        MatchService.MatchSummary summary = matches.joinPublicLobby(user.userId(), matchId);
+        JsonObject payload = new JsonObject();
+        payload.addProperty("matchId", summary.matchId());
+        payload.addProperty("status", summary.status());
+        sendJson(ctx, 200, payload);
+    }
+
+    /**
+     * The display label passes the raw status straight through as its own value - LOBBY,
+     * DRAFTING, and IN_PROGRESS (rendered "IN PROGRESS") are all shown distinctly rather than
+     * collapsing DRAFTING into "IN PROGRESS". `full` is reported separately so the client can
+     * grey out a full-but-unstarted LOBBY without mislabeling it as already underway.
+     */
     private void handleListPublicMatches(Context ctx) {
         requireAuth(ctx);
         JsonObject payload = new JsonObject();
@@ -221,9 +252,10 @@ public final class WebServer {
             JsonObject row = new JsonObject();
             row.addProperty("matchId", lobby.matchId());
             row.addProperty("joinCode", lobby.joinCode());
-            boolean joinable = MatchService.Status.LOBBY.name().equals(lobby.status()) && !lobby.full();
-            row.addProperty("status", joinable ? "LOBBY" : "IN PROGRESS");
+            String status = lobby.status();
+            row.addProperty("status", MatchService.Status.IN_PROGRESS.name().equals(status) ? "IN PROGRESS" : status);
             row.addProperty("playerOneName", lobby.playerOneName());
+            row.addProperty("full", lobby.full());
             lobbies.add(row);
         }
         payload.add("lobbies", lobbies);

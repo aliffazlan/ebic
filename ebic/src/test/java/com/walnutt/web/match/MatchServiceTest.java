@@ -200,6 +200,36 @@ class MatchServiceTest {
     }
 
     @Test
+    void setVisibility_ownerCanFlipItWhileInLobby() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+
+        matches.setVisibility(p1UserId, created.matchId(), true);
+        assertTrue(matches.listPublicLobbies().stream().anyMatch(l -> l.matchId().equals(created.matchId())));
+
+        matches.setVisibility(p1UserId, created.matchId(), false);
+        assertTrue(matches.listPublicLobbies().isEmpty());
+    }
+
+    @Test
+    void setVisibility_rejectsNonOwner() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.setVisibility(p2UserId, created.matchId(), true));
+        assertEquals(403, e.getStatus());
+    }
+
+    @Test
+    void setVisibility_rejectsOnceTheGameHasStarted() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+        matches.startLobby(p1UserId, created.matchId());
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.setVisibility(p1UserId, created.matchId(), true));
+        assertEquals(409, e.getStatus());
+    }
+
+    @Test
     void listPublicLobbies_onlyShowsPublicOpenOrOngoingLobbies() {
         MatchService.MatchSummary publicOpen = matches.createMatch(p1UserId, true);
         matches.createMatch(p1UserId, false); // private - must never appear
@@ -218,5 +248,68 @@ class MatchServiceTest {
 
         matches.finishMatch(publicOpen.matchId(), p1UserId);
         assertTrue(matches.listPublicLobbies().isEmpty(), "a finished match must disappear from the browser");
+    }
+
+    @Test
+    void joinPublicLobby_happyPath() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, true);
+
+        MatchService.MatchSummary joined = matches.joinPublicLobby(p2UserId, created.matchId());
+        assertEquals("LOBBY", joined.status());
+        assertTrue(matches.getParticipants(created.matchId()).isPresent());
+    }
+
+    @Test
+    void joinPublicLobby_rejectsAPrivateLobbyEvenThoughItStillExists() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.joinPublicLobby(p2UserId, created.matchId()));
+        assertEquals(409, e.getStatus());
+        assertEquals("this lobby is not available", e.getMessage());
+    }
+
+    @Test
+    void joinPublicLobby_rejectsAFullLobby() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, true);
+        matches.joinMatch(p2UserId, created.joinCode());
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.joinPublicLobby(p3UserId, created.matchId()));
+        assertEquals(409, e.getStatus());
+        assertEquals("this lobby is not available", e.getMessage());
+    }
+
+    @Test
+    void joinPublicLobby_rejectsCallerAlreadyInTheMatch() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, true);
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.joinPublicLobby(p1UserId, created.matchId()));
+        assertEquals(409, e.getStatus());
+        assertEquals("you are already in this match", e.getMessage());
+    }
+
+    @Test
+    void joinPublicLobby_rejectsAStaleReferenceToAGoneLobby() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, true);
+        matches.leaveLobby(p1UserId, created.matchId());
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.joinPublicLobby(p2UserId, created.matchId()));
+        assertEquals(404, e.getStatus());
+    }
+
+    @Test
+    void purgeStaleMatches_removesEverythingExceptFinished() {
+        MatchService.MatchSummary lobby = matches.createMatch(p1UserId, false);
+        MatchService.MatchSummary drafting = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, drafting.joinCode());
+        matches.startLobby(p1UserId, drafting.matchId());
+        MatchService.MatchSummary finished = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, finished.joinCode());
+        matches.finishMatch(finished.matchId(), p1UserId);
+
+        matches.purgeStaleMatches();
+
+        assertThrows(ApiException.class, () -> matches.getStatus(p1UserId, lobby.matchId()));
+        assertThrows(ApiException.class, () -> matches.getStatus(p1UserId, drafting.matchId()));
+        assertEquals("FINISHED", matches.getStatus(p1UserId, finished.matchId()).status());
     }
 }
