@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import com.walnutt.ability.Attack;
 import com.walnutt.ability.Move;
 import com.walnutt.effect.Effect;
+import com.walnutt.effect.impl.BarrierEffect;
 import com.walnutt.effect.impl.HomingMissileEffect;
 import com.walnutt.effect.impl.OrbEffect;
 import com.walnutt.game.GameState;
@@ -195,6 +196,25 @@ class GameStateSnapshotMapperTest {
         EffectSnapshot effectSnap = mapper.toUnitSnapshot(unit).effects().get(0);
 
         assertEquals("Next hit: 12 damage", effectSnap.extraInfo());
+    }
+
+    @Test
+    void aggregatesCurrentAndMaxBarrierHpAcrossEveryBarrierOnTheUnit() {
+        Unit unit = new ChampionUnit("Shielded", Team.PLAYER_ONE, new UnitStats(10, 10, 10, 100));
+        GameStateSnapshotMapper mapper = new GameStateSnapshotMapper(new UnitIdRegistry());
+
+        assertEquals(0, mapper.toUnitSnapshot(unit).currentBarrierHp(), "no barriers yet");
+        assertEquals(0, mapper.toUnitSnapshot(unit).maxBarrierHp(), "no barriers yet");
+
+        unit.addEffect(new BarrierEffect("Shield A", "desc", 5, 40));
+        UnitSnapshot oneBarrier = mapper.toUnitSnapshot(unit);
+        assertEquals(40, oneBarrier.currentBarrierHp());
+        assertEquals(40, oneBarrier.maxBarrierHp());
+
+        unit.addEffect(new BarrierEffect("Shield B", "desc", 5, 30));
+        UnitSnapshot twoBarriers = mapper.toUnitSnapshot(unit);
+        assertEquals(70, twoBarriers.currentBarrierHp(), "sums remaining across both barriers");
+        assertEquals(70, twoBarriers.maxBarrierHp(), "sums max across both barriers");
     }
 
     @Test

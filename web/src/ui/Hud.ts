@@ -65,6 +65,12 @@ function formatRange(unit: UnitSnapshot): string {
   return min > 0 ? `Range ${unit.attackRange} (min ${min})` : `Range ${unit.attackRange}`;
 }
 
+/** "420 / 500 HP", or "420 (+10) / 500 HP" when the unit currently has any barrier. */
+function formatHpText(unit: UnitSnapshot): string {
+  const barrier = unit.currentBarrierHp > 0 ? ` (+${unit.currentBarrierHp})` : "";
+  return `${unit.currentHp}${barrier} / ${unit.maxHp} HP`;
+}
+
 /**
  * Builds the .hp-bar-outer element (fill + darker-green separator ticks at
  * every 100 maxHp) shared by the sidebar unit panel and the encounter card.
@@ -84,6 +90,28 @@ function renderHpBar(unit: UnitSnapshot): HTMLElement {
     hpOuter.appendChild(tick);
   }
   return hpOuter;
+}
+
+/**
+ * Builds the .barrier-bar-outer element (translucent white fill + solid white separator
+ * ticks at every 100 maxBarrierHp), or null if the unit currently has no barrier.
+ */
+function renderBarrierBar(unit: UnitSnapshot): HTMLElement | null {
+  if (unit.maxBarrierHp <= 0) return null;
+  const barrierOuter = document.createElement("div");
+  barrierOuter.className = "barrier-bar-outer";
+  const barrierInner = document.createElement("div");
+  barrierInner.className = "barrier-bar-inner";
+  barrierInner.style.width = `${Math.max(0, (unit.currentBarrierHp / unit.maxBarrierHp) * 100)}%`;
+  barrierOuter.appendChild(barrierInner);
+  for (const threshold of hpSeparatorThresholds(unit.maxBarrierHp)) {
+    if (unit.currentBarrierHp <= threshold) continue;
+    const tick = document.createElement("div");
+    tick.className = "barrier-bar-separator";
+    tick.style.left = `${(threshold / unit.maxBarrierHp) * 100}%`;
+    barrierOuter.appendChild(tick);
+  }
+  return barrierOuter;
 }
 
 // Mirrors com.walnutt.status.StatusFlag's blocksMovement()/blocksAttack()/
@@ -382,12 +410,14 @@ export class Hud {
     sub.textContent = `${unit.unitType} · ${unit.team === state.yourTeam ? "Yours" : "Enemy"}${unit.dead ? " · Dead" : ""}`;
     section.appendChild(sub);
 
+    const barrierBar = renderBarrierBar(unit);
+    if (barrierBar) section.appendChild(barrierBar);
     section.appendChild(renderHpBar(unit));
 
     const hpText = document.createElement("div");
     hpText.className = "hint";
     hpText.style.marginBottom = "8px";
-    hpText.textContent = `${unit.currentHp} / ${unit.maxHp} HP`;
+    hpText.textContent = formatHpText(unit);
     section.appendChild(hpText);
 
     const attrText = document.createElement("div");
@@ -1052,11 +1082,13 @@ export class Hud {
     sub.textContent = `${unit.unitType} · ${unit.team === yourTeam ? "Yours" : "Enemy"}`;
     card.appendChild(sub);
 
+    const cardBarrierBar = renderBarrierBar(unit);
+    if (cardBarrierBar) card.appendChild(cardBarrierBar);
     card.appendChild(renderHpBar(unit));
 
     const hpText = document.createElement("div");
     hpText.className = "hint";
-    hpText.textContent = `${unit.currentHp} / ${unit.maxHp} HP`;
+    hpText.textContent = formatHpText(unit);
     card.appendChild(hpText);
 
     const attrText = document.createElement("div");

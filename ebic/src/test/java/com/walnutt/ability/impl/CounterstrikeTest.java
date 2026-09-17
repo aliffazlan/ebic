@@ -82,6 +82,7 @@ class CounterstrikeTest {
         CounterstrikeBarrierEffect after = counterer.getActiveEffect(CounterstrikeBarrierEffect.class)
             .orElseThrow(() -> new AssertionError("barrier should still be present"));
         assertEquals(20, after.getRemainingBarrierHp(), "10 from each of two procs");
+        assertEquals(20, after.getMaxBarrierHp(), "max grows with each proc too");
         assertEquals(3, after.getRemainingTurns(), "duration refreshed back to full, not left at 1");
     }
 }

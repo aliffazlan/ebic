@@ -6,7 +6,13 @@ import { type AxialCoord, axialToPixel, hexDistance, hexPolygonPoints, mapTiles 
 import { contentBounds } from "./Camera";
 import { CameraController } from "./CameraController";
 import { UnitIconFactory } from "../units/UnitIconFactory";
-import { hpSeparatorThresholds, HP_SEPARATOR_COLOR } from "../units/UnitHp";
+import {
+  hpSeparatorThresholds,
+  HP_SEPARATOR_COLOR,
+  BARRIER_FILL_COLOR,
+  BARRIER_FILL_ALPHA,
+  BARRIER_SEPARATOR_COLOR,
+} from "../units/UnitHp";
 import { GameStateStore, type MatchUiState } from "../state/GameStateStore";
 import { spawnParticleBurst, colorForVfxType } from "../vfx/ParticleBurst";
 import { spawnDamageIndicator } from "../vfx/DamageIndicator";
@@ -1252,6 +1258,8 @@ export class Board {
       r: u.r,
       currentHp: 0,
       maxHp: 0,
+      currentBarrierHp: 0,
+      maxBarrierHp: 0,
       strength: 0,
       agility: 0,
       intelligence: 0,
@@ -1440,6 +1448,25 @@ export class Board {
       }
       separators.stroke({ width: 1, color: HP_SEPARATOR_COLOR });
       container.addChild(separators);
+    }
+    if (unit.maxBarrierHp > 0) {
+      const barrierFraction = Math.max(0, unit.currentBarrierHp / unit.maxBarrierHp);
+      container.addChild(
+        new Graphics().rect(-barWidth / 2, barY, barWidth * barrierFraction, barHeight)
+          .fill({ color: BARRIER_FILL_COLOR, alpha: BARRIER_FILL_ALPHA }),
+      );
+      const visibleBarrierSeparators = hpSeparatorThresholds(unit.maxBarrierHp).filter(
+        (t) => unit.currentBarrierHp > t,
+      );
+      if (visibleBarrierSeparators.length > 0) {
+        const barrierSeparators = new Graphics();
+        for (const threshold of visibleBarrierSeparators) {
+          const x = -barWidth / 2 + barWidth * (threshold / unit.maxBarrierHp);
+          barrierSeparators.moveTo(x, barY).lineTo(x, barY + barHeight);
+        }
+        barrierSeparators.stroke({ width: 1, color: BARRIER_SEPARATOR_COLOR });
+        container.addChild(barrierSeparators);
+      }
     }
 
     container.alpha = 1;

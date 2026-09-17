@@ -10,6 +10,7 @@ import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.UnitDefinition;
 import com.walnutt.effect.Effect;
 import com.walnutt.effect.impl.AcidPoolEffect;
+import com.walnutt.effect.impl.BarrierEffect;
 import com.walnutt.effect.impl.BurningGroundEffect;
 import com.walnutt.effect.impl.DuelEffect;
 import com.walnutt.effect.impl.HomingMissileEffect;
@@ -142,6 +143,14 @@ public final class GameStateSnapshotMapper {
         List<EffectSnapshot> effects = unit.getEffects().stream()
             .map(this::toEffectSnapshot)
             .toList();
+        int currentBarrierHp = unit.getEffects().stream()
+            .filter(e -> !e.isExpired() && e instanceof BarrierEffect)
+            .mapToInt(e -> ((BarrierEffect) e).getRemainingBarrierHp())
+            .sum();
+        int maxBarrierHp = unit.getEffects().stream()
+            .filter(e -> !e.isExpired() && e instanceof BarrierEffect)
+            .mapToInt(e -> ((BarrierEffect) e).getMaxBarrierHp())
+            .sum();
 
         return new UnitSnapshot(
             ids.idFor(unit),
@@ -153,6 +162,8 @@ public final class GameStateSnapshotMapper {
             pos == null ? 0 : pos.getR(),
             unit.getHealth(),
             unit.getMaxHealth(),
+            currentBarrierHp,
+            maxBarrierHp,
             (int) unit.getEffective(Stat.STRENGTH),
             (int) unit.getEffective(Stat.AGILITY),
             (int) unit.getEffective(Stat.INTELLIGENCE),

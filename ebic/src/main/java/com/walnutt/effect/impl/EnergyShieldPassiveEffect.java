@@ -17,15 +17,13 @@ import com.walnutt.game.GameState;
  */
 public class EnergyShieldPassiveEffect extends BarrierEffect {
     private final int regenPerTurn;
-    private final int maxBarrierHp;
 
     public EnergyShieldPassiveEffect(int regenPerTurn, int maxBarrierHp) {
         super("Energy Shield",
             "A self-repairing barrier: regains " + regenPerTurn + " each turn, up to "
                 + maxBarrierHp + ". Separate from the barrier Energy Shield casts.",
-            Effect.PERMANENT, 0);
+            Effect.PERMANENT, 0, maxBarrierHp);
         this.regenPerTurn = regenPerTurn;
-        this.maxBarrierHp = maxBarrierHp;
     }
 
     /**
@@ -38,7 +36,7 @@ public class EnergyShieldPassiveEffect extends BarrierEffect {
             return;
         }
         setRemainingTurns(Effect.PERMANENT);
-        restore(regenPerTurn, maxBarrierHp);
+        restore(regenPerTurn, getMaxBarrierHp());
     }
 
     @Override

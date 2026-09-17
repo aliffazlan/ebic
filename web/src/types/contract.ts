@@ -145,6 +145,8 @@ export interface UnitSnapshot {
   r: number;
   currentHp: number;
   maxHp: number;
+  currentBarrierHp: number;
+  maxBarrierHp: number;
   // Effective (post-modifier) values, for the sidebar unit panel.
   strength: number;
   agility: number;

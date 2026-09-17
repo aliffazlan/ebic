@@ -14,15 +14,30 @@ import com.walnutt.status.EffectCategory;
  */
 public class BarrierEffect extends Effect {
     private int remainingBarrierHp;
+    private int maxBarrierHp;
 
     public BarrierEffect(String name, String description, int duration, int barrierHp) {
+        this(name, description, duration, barrierHp, barrierHp);
+    }
+
+    /**
+     * Lets a barrier start below its own cap (Energy Shield's passive plating begins empty
+     * and mends up to maxBarrierHp) while still recording that cap as the barrier's max.
+     */
+    public BarrierEffect(String name, String description, int duration, int barrierHp, int maxBarrierHp) {
         super(name, description, duration);
         this.remainingBarrierHp = barrierHp;
+        this.maxBarrierHp = maxBarrierHp;
         this.category = EffectCategory.BUFF;
     }
 
     public int getRemainingBarrierHp() {
         return remainingBarrierHp;
+    }
+
+    /** The barrier's own cap - the original amount as applied (or as last refreshed/grown). */
+    public int getMaxBarrierHp() {
+        return maxBarrierHp;
     }
 
     /**
@@ -32,6 +47,7 @@ public class BarrierEffect extends Effect {
      */
     public void refresh(int barrierHp, int duration) {
         this.remainingBarrierHp = barrierHp;
+        this.maxBarrierHp = barrierHp;
         setRemainingTurns(duration);
     }
 
@@ -39,12 +55,26 @@ public class BarrierEffect extends Effect {
      * Tops the pool back up toward {@code max} without touching the duration, for a barrier
      * that mends itself over time (upgraded Holy Shield, upgraded Energy Shield's passive).
      * Distinct from {@link #refresh}, which is a whole new barrier and resets the clock.
+     * Never grows maxBarrierHp - see {@link #addBarrier} for that.
      */
     public void restore(int amount, int max) {
         if (amount <= 0 || remainingBarrierHp >= max) {
             return;
         }
         remainingBarrierHp = Math.min(max, remainingBarrierHp + amount);
+    }
+
+    /**
+     * Adds fresh barrier on top of what remains, growing maxBarrierHp by the same amount -
+     * unlike {@link #restore}, which only tops up toward an existing cap - for reapplications
+     * that grant a genuinely bigger shield (Counterstrike proccing again).
+     */
+    public void addBarrier(int amount) {
+        if (amount <= 0) {
+            return;
+        }
+        maxBarrierHp += amount;
+        remainingBarrierHp += amount;
     }
 
     @Override

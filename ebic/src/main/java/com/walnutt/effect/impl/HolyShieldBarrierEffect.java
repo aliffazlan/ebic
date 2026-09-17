@@ -11,7 +11,6 @@ public class HolyShieldBarrierEffect extends BarrierEffect {
     private final int radius;
     /** Upgrade: HP mended each turn, and whether a barrier that merely faded still erupts. */
     private final int regenPerTurn;
-    private final int fullBarrierHp;
     private final boolean alwaysErupt;
 
     public HolyShieldBarrierEffect(int duration, int barrierHp, int breakDamage, int radius) {
@@ -29,7 +28,6 @@ public class HolyShieldBarrierEffect extends BarrierEffect {
         this.breakDamage = breakDamage;
         this.radius = radius;
         this.regenPerTurn = regenPerTurn;
-        this.fullBarrierHp = barrierHp;
         this.alwaysErupt = alwaysErupt;
     }
 
@@ -39,7 +37,7 @@ public class HolyShieldBarrierEffect extends BarrierEffect {
         if (isExpired() || getOwner() == null || event.team() != getOwner().getTeam()) {
             return;
         }
-        restore(regenPerTurn, fullBarrierHp);
+        restore(regenPerTurn, getMaxBarrierHp());
     }
 
     /**

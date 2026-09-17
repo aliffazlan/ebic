@@ -12,6 +12,8 @@ public record UnitSnapshot(
     int r,
     int currentHp,
     int maxHp,
+    int currentBarrierHp,
+    int maxBarrierHp,
     int strength,
     int agility,
     int intelligence,

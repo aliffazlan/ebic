@@ -13,7 +13,7 @@ function unit(id: string, name: string, team: Team): UnitSnapshot {
     definitionId: name.toLowerCase(),
     unitType: "CHAMPION",
     q: 0, r: 0,
-    currentHp: 100, maxHp: 100,
+    currentHp: 100, maxHp: 100, currentBarrierHp: 0, maxBarrierHp: 0,
     strength: 10, agility: 10, intelligence: 10,
     attackRange: 1, minAttackRange: 0,
     dead: false, hasMovedThisTurn: false, hasAttackedThisTurn: false,

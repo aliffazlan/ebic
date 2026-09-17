@@ -79,7 +79,7 @@ public class Counterstrike extends PassiveAbility {
         if (barrierAmount > 0) {
             getOwner().getActiveEffect(CounterstrikeBarrierEffect.class).ifPresentOrElse(
                 existing -> {
-                    existing.restore(barrierAmount, Integer.MAX_VALUE);
+                    existing.addBarrier(barrierAmount);
                     existing.setRemainingTurns(barrierDuration);
                 },
                 () -> getOwner().addEffect(new CounterstrikeBarrierEffect(barrierAmount, barrierDuration)));

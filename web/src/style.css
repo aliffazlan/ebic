@@ -513,6 +513,27 @@ option, optgroup {
   background: #15803d; /* keep in sync with UnitHp.ts HP_SEPARATOR_COLOR_CSS */
   pointer-events: none;
 }
+.barrier-bar-outer {
+  width: 100%;
+  height: 8px;
+  background: var(--panel-sunken);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+  position: relative;
+}
+.barrier-bar-inner {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.6); /* keep in sync with UnitHp.ts BARRIER_FILL_CSS */
+}
+.barrier-bar-separator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #ffffff; /* keep in sync with UnitHp.ts BARRIER_SEPARATOR_COLOR_CSS */
+  pointer-events: none;
+}
 
 .ability-list {
   display: flex;
@@ -1151,6 +1172,9 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .encounter-card .hp-bar-outer {
+  width: 100%;
+}
+.encounter-card .barrier-bar-outer {
   width: 100%;
 }
 

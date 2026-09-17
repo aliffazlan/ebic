@@ -25,3 +25,14 @@ export function hpSeparatorThresholds(maxHp: number): number[] {
   }
   return thresholds;
 }
+
+/**
+ * Translucent-white barrier bar, drawn as an overlay on the on-board token and a
+ * separate bar above the HP bar in the sidebar/encounter-card panel. Reuses
+ * hpSeparatorThresholds (generic over any max value) for its own separator ticks.
+ */
+export const BARRIER_FILL_COLOR = 0xffffff;
+export const BARRIER_FILL_ALPHA = 0.6;
+export const BARRIER_SEPARATOR_COLOR = 0xffffff;
+export const BARRIER_FILL_CSS = "rgba(255, 255, 255, 0.6)";
+export const BARRIER_SEPARATOR_COLOR_CSS = "#ffffff";
