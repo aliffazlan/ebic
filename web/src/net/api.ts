@@ -12,6 +12,8 @@ import type {
   FavouriteUnitResponse,
   JoinMatchResponse,
   MatchInfo,
+  PublicLobbiesResponse,
+  StartLobbyResponse,
   UnitsResponse,
 } from "../types/contract";
 
@@ -90,8 +92,11 @@ export const api = {
     });
   },
 
-  createMatch(): Promise<CreateMatchResponse> {
-    return request<CreateMatchResponse>("/matches", { method: "POST" });
+  createMatch(isPublic: boolean): Promise<CreateMatchResponse> {
+    return request<CreateMatchResponse>("/matches", {
+      method: "POST",
+      body: JSON.stringify({ isPublic }),
+    });
   },
 
   /** Starts a match against the computer. No join code and nobody to wait for - it is playable immediately. */
@@ -111,5 +116,20 @@ export const api = {
 
   getMatch(matchId: string): Promise<MatchInfo> {
     return request<MatchInfo>(`/matches/${encodeURIComponent(matchId)}`);
+  },
+
+  /** Owner-only: flips a lobby from LOBBY to DRAFTING once both seats are filled. */
+  startLobby(matchId: string): Promise<StartLobbyResponse> {
+    return request<StartLobbyResponse>(`/matches/${encodeURIComponent(matchId)}/start`, { method: "POST" });
+  },
+
+  /** Best-effort: the owner leaving deletes the lobby, a joiner leaving frees their seat. */
+  leaveLobby(matchId: string): Promise<void> {
+    return request<void>(`/matches/${encodeURIComponent(matchId)}/leave`, { method: "POST" });
+  },
+
+  /** Open public lobbies for the Join Match browser - manual refresh only, no polling. */
+  listPublicLobbies(): Promise<PublicLobbiesResponse> {
+    return request<PublicLobbiesResponse>("/matches/public");
   },
 };

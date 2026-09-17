@@ -85,7 +85,7 @@ class BotMatchServiceTest {
     /** A human-versus-human match has no level, and that must not be mistaken for a bot match. */
     @Test
     void anOrdinaryMatchHasNoBotLevelAndNoBotSeat() {
-        String matchId = matches.createMatch(humanUserId).matchId();
+        String matchId = matches.createMatch(humanUserId, false).matchId();
 
         assertNull(matches.getBotLevel(matchId));
         assertFalse(matches.isBot(humanUserId));

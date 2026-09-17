@@ -7,7 +7,9 @@ import { ClickToContinueScreen } from "../ui/ClickToContinueScreen";
 import { CodexScreen } from "../ui/CodexScreen";
 import { FixtureScreen } from "../ui/FixtureScreen";
 import { HotkeysScreen } from "../ui/HotkeysScreen";
+import { JoinMatchScreen } from "../ui/JoinMatchScreen";
 import { LoadingScreen } from "../ui/LoadingScreen";
+import { LobbyRoomScreen } from "../ui/LobbyRoomScreen";
 import { LobbyScreen } from "../ui/LobbyScreen";
 import { MatchScreen } from "../ui/MatchScreen";
 import { SettingsScreen } from "../ui/SettingsScreen";
@@ -127,6 +129,8 @@ export class App {
         this.currentUser!,
         {
           onMatchReady: (matchId, yourTeam) => void this.startMatch(matchId, yourTeam),
+          onLobbyCreated: (matchId, joinCode, isPublic) => this.showLobbyRoom(matchId, "PLAYER_ONE", joinCode, isPublic),
+          onOpenJoinMatch: () => this.showJoinMatch(),
           onOpenCodex: () => this.showCodex(),
           onOpenSettings: () => this.showSettings(),
           onLogout: () => {
@@ -137,6 +141,36 @@ export class App {
         playIntro,
       ),
       direction,
+    );
+  }
+
+  /**
+   * Join Match: same upward slide as creating a match, since both lead into
+   * the same kind of "about to play" moment.
+   */
+  private showJoinMatch(): void {
+    this.setScreen(
+      new JoinMatchScreen(this.root, {
+        onBack: () => this.showLobby(false, "down"),
+        onJoined: (matchId, yourTeam) => this.showLobbyRoom(matchId, yourTeam, null, false),
+      }),
+      "up",
+    );
+  }
+
+  /**
+   * The shared waiting room for a human match, reached either by creating one
+   * (owner, has a join code to show) or by joining one (no code to show, and
+   * no START GAME button - only the owner has one). Neither path drops the
+   * player into the game until the owner explicitly starts it.
+   */
+  private showLobbyRoom(matchId: string, yourTeam: Team, joinCode: string | null, isPublic: boolean): void {
+    this.setScreen(
+      new LobbyRoomScreen(this.root, matchId, yourTeam, joinCode, isPublic, {
+        onBack: () => this.showLobby(false, "down"),
+        onMatchReady: (id, team) => void this.startMatch(id, team),
+      }),
+      "up",
     );
   }
 

@@ -21,13 +21,18 @@ public final class MatchService {
     private static final int JOIN_CODE_LENGTH = 6;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    public enum Status { WAITING, DRAFTING, IN_PROGRESS, FINISHED }
+    public enum Status { LOBBY, DRAFTING, IN_PROGRESS, FINISHED }
 
-    public record MatchSummary(String matchId, String joinCode, String status) {
+    public record MatchSummary(String matchId, String joinCode, String status, boolean isPublic) {
     }
 
     public record MatchStatusView(String matchId, String status, String playerOneName, String playerTwoName,
-                                   String yourTeam, String winnerName) {
+                                   String yourTeam, String winnerName, boolean isPublic) {
+    }
+
+    /** One row in the public lobby browser. */
+    public record PublicLobbySummary(String matchId, String joinCode, String status, String playerOneName,
+                                      boolean full) {
     }
 
     /** Row needed by GameSessionManager to spin up a match's engine session. */
@@ -131,7 +136,7 @@ public final class MatchService {
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to create bot match", e);
         }
-        return new MatchSummary(matchId, null, Status.DRAFTING.name());
+        return new MatchSummary(matchId, null, Status.DRAFTING.name(), false);
     }
 
     /** The difficulty this match was created with, or null for a human-versus-human match. */
@@ -147,31 +152,38 @@ public final class MatchService {
         }
     }
 
-    public MatchSummary createMatch(long callerUserId) {
+    public MatchSummary createMatch(long callerUserId, boolean isPublic) {
         String matchId = UUID.randomUUID().toString();
         String joinCode = generateUniqueJoinCode();
         String sql = """
-            INSERT INTO matches (id, join_code, status, player_one_id, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO matches (id, join_code, status, player_one_id, is_public, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """;
         try (PreparedStatement ps = db.connection().prepareStatement(sql)) {
             ps.setString(1, matchId);
             ps.setString(2, joinCode);
-            ps.setString(3, Status.WAITING.name());
+            ps.setString(3, Status.LOBBY.name());
             ps.setLong(4, callerUserId);
-            ps.setLong(5, System.currentTimeMillis());
+            ps.setBoolean(5, isPublic);
+            ps.setLong(6, System.currentTimeMillis());
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to create match", e);
         }
-        return new MatchSummary(matchId, joinCode, Status.WAITING.name());
+        return new MatchSummary(matchId, joinCode, Status.LOBBY.name(), isPublic);
     }
 
+    /**
+     * Seats the caller as player two, but leaves status at LOBBY - joining no longer starts
+     * the game. The lobby owner explicitly starts it via startLobby() once both seats are
+     * filled. A public lobby's join code stays valid even after it's listed in the browser;
+     * this method doesn't distinguish how the caller found the code.
+     */
     public MatchSummary joinMatch(long callerUserId, String joinCode) {
         if (joinCode == null || joinCode.isBlank()) {
             throw new ApiException(404, "no such match");
         }
-        String selectSql = "SELECT id, status, player_one_id, player_two_id FROM matches WHERE join_code = ?";
+        String selectSql = "SELECT id, status, player_one_id, player_two_id, is_public FROM matches WHERE join_code = ?";
         try (PreparedStatement ps = db.connection().prepareStatement(selectSql)) {
             ps.setString(1, joinCode.trim().toUpperCase());
             try (ResultSet rs = ps.executeQuery()) {
@@ -182,35 +194,162 @@ public final class MatchService {
                 String status = rs.getString("status");
                 long playerOneId = rs.getLong("player_one_id");
                 Long playerTwoId = rs.getObject("player_two_id") == null ? null : rs.getLong("player_two_id");
+                boolean isPublic = rs.getBoolean("is_public");
 
                 if (playerOneId == callerUserId || (playerTwoId != null && playerTwoId == callerUserId)) {
                     throw new ApiException(409, "you are already in this match");
                 }
-                if (!Status.WAITING.name().equals(status) || playerTwoId != null) {
-                    throw new ApiException(409, "match is no longer joinable");
+                if (!Status.LOBBY.name().equals(status) || playerTwoId != null) {
+                    throw new ApiException(409, "lobby is full");
                 }
 
                 try (PreparedStatement update = db.connection().prepareStatement(
-                        "UPDATE matches SET player_two_id = ?, status = ? WHERE id = ? AND player_two_id IS NULL")) {
+                        "UPDATE matches SET player_two_id = ? WHERE id = ? AND player_two_id IS NULL")) {
                     update.setLong(1, callerUserId);
-                    update.setString(2, Status.DRAFTING.name());
-                    update.setString(3, matchId);
+                    update.setString(2, matchId);
                     int rows = update.executeUpdate();
                     if (rows == 0) {
                         // Lost a race against another joiner between SELECT and UPDATE.
-                        throw new ApiException(409, "match is no longer joinable");
+                        throw new ApiException(409, "lobby is full");
                     }
                 }
-                return new MatchSummary(matchId, joinCode, Status.DRAFTING.name());
+                return new MatchSummary(matchId, joinCode, Status.LOBBY.name(), isPublic);
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to join match", e);
         }
     }
 
+    /**
+     * Owner-only "START GAME": flips LOBBY -> DRAFTING once both seats are filled. This is
+     * now the only place a human match ever writes DRAFTING - GameSession.runMatch() picks
+     * up from there and writes IN_PROGRESS itself once draft+placement actually finish.
+     */
+    public MatchSummary startLobby(long callerUserId, String matchId) {
+        String selectSql = "SELECT status, player_one_id, player_two_id, join_code, is_public FROM matches WHERE id = ?";
+        try (PreparedStatement ps = db.connection().prepareStatement(selectSql)) {
+            ps.setString(1, matchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new ApiException(404, "no such match");
+                }
+                String status = rs.getString("status");
+                long playerOneId = rs.getLong("player_one_id");
+                Long playerTwoId = rs.getObject("player_two_id") == null ? null : rs.getLong("player_two_id");
+                String joinCode = rs.getString("join_code");
+                boolean isPublic = rs.getBoolean("is_public");
+
+                boolean isParticipant = playerOneId == callerUserId || (playerTwoId != null && playerTwoId == callerUserId);
+                if (!isParticipant) {
+                    throw new ApiException(404, "no such match");
+                }
+                if (playerOneId != callerUserId) {
+                    throw new ApiException(403, "only the lobby owner can start the game");
+                }
+                if (!Status.LOBBY.name().equals(status) || playerTwoId == null) {
+                    throw new ApiException(409, "lobby is not ready to start");
+                }
+
+                try (PreparedStatement update = db.connection().prepareStatement(
+                        "UPDATE matches SET status = ? WHERE id = ? AND status = ? AND player_two_id IS NOT NULL")) {
+                    update.setString(1, Status.DRAFTING.name());
+                    update.setString(2, matchId);
+                    update.setString(3, Status.LOBBY.name());
+                    int rows = update.executeUpdate();
+                    if (rows == 0) {
+                        throw new ApiException(409, "lobby is not ready to start");
+                    }
+                }
+                return new MatchSummary(matchId, joinCode, Status.DRAFTING.name(), isPublic);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to start lobby", e);
+        }
+    }
+
+    /**
+     * Leaving before the game starts. A joiner leaving just frees their seat so someone
+     * else can take it. An owner leaving abandons a lobby nobody has started yet - there's
+     * nothing worth keeping, so the row is deleted outright rather than left to rot in the
+     * public browser with no way for anyone to close it.
+     */
+    public void leaveLobby(long callerUserId, String matchId) {
+        String selectSql = "SELECT status, player_one_id, player_two_id FROM matches WHERE id = ?";
+        try (PreparedStatement ps = db.connection().prepareStatement(selectSql)) {
+            ps.setString(1, matchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new ApiException(404, "no such match");
+                }
+                String status = rs.getString("status");
+                long playerOneId = rs.getLong("player_one_id");
+                Long playerTwoId = rs.getObject("player_two_id") == null ? null : rs.getLong("player_two_id");
+                boolean isParticipant = playerOneId == callerUserId || (playerTwoId != null && playerTwoId == callerUserId);
+                if (!isParticipant) {
+                    throw new ApiException(404, "no such match");
+                }
+                if (!Status.LOBBY.name().equals(status)) {
+                    throw new ApiException(409, "cannot leave once the game has started");
+                }
+
+                if (playerOneId == callerUserId) {
+                    try (PreparedStatement delete = db.connection().prepareStatement(
+                            "DELETE FROM matches WHERE id = ? AND status = ?")) {
+                        delete.setString(1, matchId);
+                        delete.setString(2, Status.LOBBY.name());
+                        delete.executeUpdate();
+                    }
+                } else {
+                    try (PreparedStatement update = db.connection().prepareStatement(
+                            "UPDATE matches SET player_two_id = NULL WHERE id = ? AND player_two_id = ?")) {
+                        update.setString(1, matchId);
+                        update.setLong(2, callerUserId);
+                        update.executeUpdate();
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to leave lobby", e);
+        }
+    }
+
+    /**
+     * Open public lobbies for the Join Match browser. Deliberately includes DRAFTING and
+     * IN_PROGRESS (not just LOBBY) - a public match already underway should still be
+     * visible (as not-joinable) until it's FINISHED and cleaned up, matching the brief's
+     * "LOBBY or IN PROGRESS" status display. Display-status collapsing happens in the REST
+     * handler; this returns ground truth plus a `full` flag for the seat count.
+     */
+    public java.util.List<PublicLobbySummary> listPublicLobbies() {
+        String sql = """
+            SELECT m.id, m.join_code, m.status, m.player_two_id, p1.username AS p1name
+            FROM matches m
+            JOIN users p1 ON p1.id = m.player_one_id
+            WHERE m.is_public = 1 AND m.status IN (?, ?, ?)
+            ORDER BY m.created_at DESC
+            """;
+        java.util.List<PublicLobbySummary> lobbies = new java.util.ArrayList<>();
+        try (PreparedStatement ps = db.connection().prepareStatement(sql)) {
+            ps.setString(1, Status.LOBBY.name());
+            ps.setString(2, Status.DRAFTING.name());
+            ps.setString(3, Status.IN_PROGRESS.name());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    boolean full = rs.getObject("player_two_id") != null;
+                    lobbies.add(new PublicLobbySummary(
+                        rs.getString("id"), rs.getString("join_code"), rs.getString("status"),
+                        rs.getString("p1name"), full));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to list public lobbies", e);
+        }
+        return lobbies;
+    }
+
     public MatchStatusView getStatus(long callerUserId, String matchId) {
         String sql = """
-            SELECT m.status, m.player_one_id, m.player_two_id, m.winner_id,
+            SELECT m.status, m.player_one_id, m.player_two_id, m.winner_id, m.is_public,
                    p1.username AS p1name, p2.username AS p2name, w.username AS wname
             FROM matches m
             JOIN users p1 ON p1.id = m.player_one_id
@@ -236,7 +375,8 @@ public final class MatchService {
                     rs.getString("p1name"),
                     rs.getString("p2name"),
                     yourTeam,
-                    rs.getString("wname")
+                    rs.getString("wname"),
+                    rs.getBoolean("is_public")
                 );
             }
         } catch (SQLException e) {
@@ -262,6 +402,18 @@ public final class MatchService {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to load match participants", e);
+        }
+    }
+
+    /** For GameSessionManager's zombie-session guard: the match's current status, or null if it doesn't exist. */
+    public Status getRawStatus(String matchId) {
+        try (PreparedStatement ps = db.connection().prepareStatement("SELECT status FROM matches WHERE id = ?")) {
+            ps.setString(1, matchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Status.valueOf(rs.getString("status")) : null;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load match status", e);
         }
     }
 

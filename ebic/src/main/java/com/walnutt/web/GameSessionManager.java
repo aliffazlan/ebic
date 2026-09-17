@@ -31,6 +31,13 @@ public final class GameSessionManager {
      */
     public GameSession getOrCreate(String matchId) {
         return sessions.computeIfAbsent(matchId, id -> {
+            // A finished match's session is evicted once the game ends (see remove()); a
+            // stray reconnect after that must not resurrect it, since the row still exists
+            // in the DB (kept for history) even though there's no game left to rejoin.
+            if (matchService.getRawStatus(id) == MatchService.Status.FINISHED) {
+                throw new ApiException(409, "this match has already finished");
+            }
+
             MatchService.MatchParticipants participants = matchService.getParticipants(id)
                 .orElseThrow(() -> new ApiException(409, "match doesn't have two players yet"));
 
@@ -46,10 +53,16 @@ public final class GameSessionManager {
             }
 
             GameSession session = new GameSession(id, participants.playerOneId(), participants.playerTwoId(),
-                matchService, botTeam, level == null ? null : level.config(), favourites(participants, botTeam));
+                matchService, botTeam, level == null ? null : level.config(), favourites(participants, botTeam),
+                () -> sessions.remove(id));
             session.start();
             return session;
         });
+    }
+
+    /** Drops a finished (or crashed) match's session so it doesn't stay resident forever. */
+    public void remove(String matchId) {
+        sessions.remove(matchId);
     }
 
     /**

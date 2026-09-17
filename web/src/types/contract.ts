@@ -4,7 +4,7 @@
 
 export type Team = "PLAYER_ONE" | "PLAYER_TWO";
 export type UnitType = "CHAMPION" | "ELITE" | "BASIC";
-export type MatchStatus = "WAITING" | "DRAFTING" | "IN_PROGRESS" | "FINISHED";
+export type MatchStatus = "LOBBY" | "DRAFTING" | "IN_PROGRESS" | "FINISHED";
 export type Attribute = "STRENGTH" | "AGILITY" | "INTELLIGENCE";
 
 // ---- HTTP ----
@@ -25,15 +25,39 @@ export interface FavouriteUnitResponse {
   favouriteUnit: string | null;
 }
 
+export interface CreateMatchRequest {
+  isPublic: boolean;
+}
+
 export interface CreateMatchResponse {
   matchId: string;
   joinCode: string;
-  status: "WAITING";
+  status: "LOBBY";
+  isPublic: boolean;
 }
 
 export interface JoinMatchResponse {
   matchId: string;
+  status: "LOBBY";
+}
+
+export interface StartLobbyResponse {
+  matchId: string;
   status: "DRAFTING";
+}
+
+/** Coarse status the public lobby browser shows - DRAFTING/IN_PROGRESS both collapse to "IN PROGRESS". */
+export type PublicLobbyDisplayStatus = "LOBBY" | "IN PROGRESS";
+
+export interface PublicLobbySummary {
+  matchId: string;
+  joinCode: string;
+  status: PublicLobbyDisplayStatus;
+  playerOneName: string;
+}
+
+export interface PublicLobbiesResponse {
+  lobbies: PublicLobbySummary[];
 }
 
 /**
@@ -56,6 +80,7 @@ export interface MatchInfo {
   playerTwoName: string | null;
   yourTeam: Team;
   winnerName: string | null;
+  isPublic: boolean;
 }
 
 export interface ApiErrorBody {

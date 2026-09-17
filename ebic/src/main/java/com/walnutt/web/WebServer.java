@@ -95,7 +95,10 @@ public final class WebServer {
         app.post("/api/matches", this::handleCreateMatch);
         app.post("/api/matches/bot", this::handleCreateBotMatch);
         app.post("/api/matches/join", this::handleJoinMatch);
+        app.get("/api/matches/public", this::handleListPublicMatches);
         app.get("/api/matches/{matchId}", this::handleMatchStatus);
+        app.post("/api/matches/{matchId}/start", this::handleStartLobby);
+        app.post("/api/matches/{matchId}/leave", this::handleLeaveLobby);
 
         app.wsBeforeUpgrade("/ws/matches/{matchId}", this::authorizeWsUpgrade);
         app.ws("/ws/matches/{matchId}", ws -> {
@@ -182,12 +185,49 @@ public final class WebServer {
 
     private void handleCreateMatch(Context ctx) {
         AuthService.AuthedUser user = requireAuth(ctx);
-        MatchService.MatchSummary summary = matches.createMatch(user.userId());
+        JsonObject body = readJsonBody(ctx);
+        boolean isPublic = body.has("isPublic") && body.get("isPublic").getAsBoolean();
+        MatchService.MatchSummary summary = matches.createMatch(user.userId(), isPublic);
         JsonObject payload = new JsonObject();
         payload.addProperty("matchId", summary.matchId());
         payload.addProperty("joinCode", summary.joinCode());
         payload.addProperty("status", summary.status());
+        payload.addProperty("isPublic", summary.isPublic());
         sendJson(ctx, 201, payload);
+    }
+
+    private void handleStartLobby(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        String matchId = ctx.pathParam("matchId");
+        MatchService.MatchSummary summary = matches.startLobby(user.userId(), matchId);
+        JsonObject payload = new JsonObject();
+        payload.addProperty("matchId", summary.matchId());
+        payload.addProperty("status", summary.status());
+        sendJson(ctx, 200, payload);
+    }
+
+    private void handleLeaveLobby(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        String matchId = ctx.pathParam("matchId");
+        matches.leaveLobby(user.userId(), matchId);
+        ctx.status(204);
+    }
+
+    private void handleListPublicMatches(Context ctx) {
+        requireAuth(ctx);
+        JsonObject payload = new JsonObject();
+        com.google.gson.JsonArray lobbies = new com.google.gson.JsonArray();
+        for (MatchService.PublicLobbySummary lobby : matches.listPublicLobbies()) {
+            JsonObject row = new JsonObject();
+            row.addProperty("matchId", lobby.matchId());
+            row.addProperty("joinCode", lobby.joinCode());
+            boolean joinable = MatchService.Status.LOBBY.name().equals(lobby.status()) && !lobby.full();
+            row.addProperty("status", joinable ? "LOBBY" : "IN PROGRESS");
+            row.addProperty("playerOneName", lobby.playerOneName());
+            lobbies.add(row);
+        }
+        payload.add("lobbies", lobbies);
+        sendJson(ctx, 200, payload);
     }
 
     /**
@@ -237,6 +277,7 @@ public final class WebServer {
         payload.addProperty("playerTwoName", view.playerTwoName());
         payload.addProperty("yourTeam", view.yourTeam());
         payload.addProperty("winnerName", view.winnerName());
+        payload.addProperty("isPublic", view.isPublic());
         sendJson(ctx, 200, payload);
     }
 

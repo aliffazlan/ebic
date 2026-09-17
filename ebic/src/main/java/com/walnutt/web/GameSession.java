@@ -42,21 +42,23 @@ public final class GameSession {
     private final BotHandler bot;
     /** Each human seat's favourite hero, guaranteed one of its two options in the matching draft round. */
     private final Map<Team, String> favourites;
+    /** Evicts this session from GameSessionManager's map once the match ends (success or error). */
+    private final Runnable onCleanup;
 
     private volatile GameState state;
     private Thread thread;
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService) {
-        this(matchId, playerOneUserId, playerTwoUserId, matchService, null, null, Map.of());
+        this(matchId, playerOneUserId, playerTwoUserId, matchService, null, null, Map.of(), () -> { });
     }
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService,
                         Team botTeam, BotConfig botConfig) {
-        this(matchId, playerOneUserId, playerTwoUserId, matchService, botTeam, botConfig, Map.of());
+        this(matchId, playerOneUserId, playerTwoUserId, matchService, botTeam, botConfig, Map.of(), () -> { });
     }
 
     public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService,
-                        Team botTeam, BotConfig botConfig, Map<Team, String> favourites) {
+                        Team botTeam, BotConfig botConfig, Map<Team, String> favourites, Runnable onCleanup) {
         this.matchId = matchId;
         this.playerOneUserId = playerOneUserId;
         this.playerTwoUserId = playerTwoUserId;
@@ -64,6 +66,7 @@ public final class GameSession {
         this.botTeam = botTeam;
         this.bot = botTeam == null ? null : new BotHandler(botConfig);
         this.favourites = favourites == null ? Map.of() : Map.copyOf(favourites);
+        this.onCleanup = onCleanup == null ? () -> { } : onCleanup;
         this.renderer = new WebRenderer(hub, new GameStateSnapshotMapper(ids), vfx, this::onGameOver);
     }
 
@@ -104,6 +107,7 @@ public final class GameSession {
             } catch (RuntimeException ignored) {
                 // best-effort - the match is already broken, don't compound it with a second failure
             }
+            onCleanup.run();
         }
     }
 
@@ -119,6 +123,7 @@ public final class GameSession {
         Player winner = finalState.getWinner();
         Long winnerUserId = winner == null ? null : (winner.getTeam() == Team.PLAYER_ONE ? playerOneUserId : playerTwoUserId);
         matchService.finishMatch(matchId, winnerUserId);
+        onCleanup.run();
     }
 
     public void registerChannel(Team team, ClientChannel channel) {

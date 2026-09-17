@@ -1,11 +1,7 @@
 import { api, ApiError } from "../net/api";
-import { getFastTransitions } from "../app/AppSettings";
-import type { AuthUser, BotLevel, Team } from "../types/contract";
+import type { AuthUser, BotLevel } from "../types/contract";
 import type { Screen } from "./Screen";
 import { renderLogo } from "./Logo";
-import { slideScreens, type SlideDirection } from "./ScreenTransition";
-
-const POLL_INTERVAL_MS = 2000;
 
 /** Difficulties offered in the lobby. Adding one here and server-side is the whole change. */
 const BOT_LEVELS: ReadonlyArray<{ value: BotLevel; label: string }> = [
@@ -13,7 +9,9 @@ const BOT_LEVELS: ReadonlyArray<{ value: BotLevel; label: string }> = [
 ];
 
 export interface LobbyCallbacks {
-  onMatchReady(matchId: string, yourTeam: Team): void;
+  onMatchReady(matchId: string, yourTeam: "PLAYER_ONE" | "PLAYER_TWO"): void;
+  onLobbyCreated(matchId: string, joinCode: string, isPublic: boolean): void;
+  onOpenJoinMatch(): void;
   onOpenCodex(): void;
   onOpenSettings(): void;
   onLogout(): void;
@@ -21,12 +19,11 @@ export interface LobbyCallbacks {
 
 export class LobbyScreen implements Screen {
   private el: HTMLElement | null = null;
-  private outgoingEl: HTMLElement | null = null;
-  private pollHandle: ReturnType<typeof setInterval> | null = null;
   private root: HTMLElement;
   private user: AuthUser;
   private callbacks: LobbyCallbacks;
   private playIntro: boolean;
+  private isPublic = false;
 
   constructor(root: HTMLElement, user: AuthUser, callbacks: LobbyCallbacks, playIntro = false) {
     this.root = root;
@@ -40,9 +37,6 @@ export class LobbyScreen implements Screen {
   }
 
   unmount(): void {
-    this.stopPolling();
-    this.outgoingEl?.remove();
-    this.outgoingEl = null;
     this.el?.remove();
     this.el = null;
   }
@@ -51,38 +45,7 @@ export class LobbyScreen implements Screen {
     return this.el;
   }
 
-  private stopPolling(): void {
-    if (this.pollHandle !== null) {
-      clearInterval(this.pollHandle);
-      this.pollHandle = null;
-    }
-  }
-
-  /**
-   * Swaps one lobby sub-view for another. These two views belong to the same
-   * Screen instance, so they never pass through App.setScreen - this is the
-   * local equivalent, using the same shared slide helper and the same Fast
-   * Transitions gate.
-   */
-  private swapView(outgoing: HTMLElement | null, incoming: HTMLElement, direction: SlideDirection): void {
-    if (!outgoing) return; // first mount - nothing to slide away from
-    if (getFastTransitions()) {
-      outgoing.remove();
-      return;
-    }
-    this.outgoingEl = outgoing;
-    slideScreens(outgoing, incoming, direction, () => {
-      outgoing.remove();
-      if (this.outgoingEl === outgoing) this.outgoingEl = null;
-    });
-  }
-
   private renderMenu(): void {
-    this.stopPolling();
-    // Non-null only when coming back from the waiting screen (mount()'s first
-    // call has no previous view) - which is exactly when the DOWN slide applies.
-    const outgoing = this.el;
-
     const wrap = document.createElement("div");
     wrap.className = "centered-screen";
     wrap.appendChild(renderLogo(this.playIntro));
@@ -151,7 +114,7 @@ export class LobbyScreen implements Screen {
       try {
         const res = await api.createBotMatch(botLevelSelect.value as BotLevel);
         // The opponent is already seated, so this goes straight into the match rather
-        // than through the waiting-for-opponent screen the join-code flow needs.
+        // than through the lobby room the human create/join flows need.
         const info = await api.getMatch(res.matchId);
         this.callbacks.onMatchReady(res.matchId, info.yourTeam);
       } catch (err) {
@@ -168,6 +131,23 @@ export class LobbyScreen implements Screen {
     createHeading.textContent = "Create a match";
     card.appendChild(createHeading);
 
+    const visibilityRow = document.createElement("div");
+    visibilityRow.className = "codex-filters";
+    const privateBtn = document.createElement("button");
+    privateBtn.textContent = "Private";
+    const publicBtn = document.createElement("button");
+    publicBtn.textContent = "Public";
+    const setVisibility = (isPublic: boolean) => {
+      this.isPublic = isPublic;
+      privateBtn.classList.toggle("primary", !isPublic);
+      publicBtn.classList.toggle("primary", isPublic);
+    };
+    privateBtn.addEventListener("click", () => setVisibility(false));
+    publicBtn.addEventListener("click", () => setVisibility(true));
+    setVisibility(false); // default PRIVATE
+    visibilityRow.append(privateBtn, publicBtn);
+    card.appendChild(visibilityRow);
+
     const createBtn = document.createElement("button");
     createBtn.className = "primary";
     createBtn.textContent = "Create match";
@@ -175,8 +155,8 @@ export class LobbyScreen implements Screen {
       errorText.textContent = "";
       createBtn.disabled = true;
       try {
-        const res = await api.createMatch();
-        this.renderWaitingForOpponent(res.matchId, res.joinCode);
+        const res = await api.createMatch(this.isPublic);
+        this.callbacks.onLobbyCreated(res.matchId, res.joinCode, res.isPublic);
       } catch (err) {
         setError(err);
         createBtn.disabled = false;
@@ -184,104 +164,19 @@ export class LobbyScreen implements Screen {
     });
     card.appendChild(createBtn);
 
-    // Join match
+    // Join match - a dedicated screen with a public lobby browser and a join-by-code box.
     const joinHeading = document.createElement("h2");
     joinHeading.textContent = "Join a match";
     card.appendChild(joinHeading);
 
-    const joinRow = document.createElement("div");
-    joinRow.className = "row";
-    const joinInput = document.createElement("input");
-    joinInput.placeholder = "JOIN CODE";
-    joinInput.maxLength = 12;
-    joinInput.style.flex = "1";
-    joinInput.style.textTransform = "uppercase";
     const joinBtn = document.createElement("button");
-    joinBtn.textContent = "Join";
-    joinRow.append(joinInput, joinBtn);
-    card.appendChild(joinRow);
-
-    const doJoin = async () => {
-      const code = joinInput.value.trim().toUpperCase();
-      if (!code) {
-        errorText.textContent = "Enter a join code.";
-        return;
-      }
-      errorText.textContent = "";
-      joinBtn.disabled = true;
-      try {
-        const res = await api.joinMatch(code);
-        const info = await api.getMatch(res.matchId);
-        this.callbacks.onMatchReady(res.matchId, info.yourTeam);
-      } catch (err) {
-        setError(err);
-        joinBtn.disabled = false;
-      }
-    };
-    joinBtn.addEventListener("click", () => void doJoin());
-    joinInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") void doJoin();
-    });
+    joinBtn.textContent = "Join match";
+    joinBtn.addEventListener("click", () => this.callbacks.onOpenJoinMatch());
+    card.appendChild(joinBtn);
 
     this.root.appendChild(wrap);
     this.el = wrap;
-    // Consumed after one render - the waiting-screen's Back button below
-    // calls renderMenu() again, and that re-render must never replay the intro.
+    // Consumed after one render - each LobbyScreen instance is only ever mounted once.
     this.playIntro = false;
-    this.swapView(outgoing, wrap, "down");
-  }
-
-  private renderWaitingForOpponent(matchId: string, joinCode: string): void {
-    // Only ever reached from the Create Match button inside a rendered menu,
-    // so this is always the menu's wrap.
-    const outgoing = this.el;
-
-    const wrap = document.createElement("div");
-    wrap.className = "centered-screen";
-    wrap.appendChild(renderLogo());
-
-    const card = document.createElement("div");
-    card.className = "card";
-    wrap.appendChild(card);
-
-    const title = document.createElement("h1");
-    title.textContent = "Match created";
-    card.appendChild(title);
-
-    const hint = document.createElement("div");
-    hint.className = "hint";
-    hint.textContent = "Share this join code with your opponent:";
-    card.appendChild(hint);
-
-    const codeEl = document.createElement("div");
-    codeEl.className = "join-code";
-    codeEl.textContent = joinCode;
-    card.appendChild(codeEl);
-
-    const status = document.createElement("div");
-    status.className = "hint";
-    status.textContent = "Waiting for opponent to join...";
-    card.appendChild(status);
-
-    const cancelBtn = document.createElement("button");
-    cancelBtn.textContent = "Back";
-    cancelBtn.addEventListener("click", () => this.renderMenu());
-    card.appendChild(cancelBtn);
-
-    this.root.appendChild(wrap);
-    this.el = wrap;
-    this.swapView(outgoing, wrap, "up");
-
-    this.pollHandle = setInterval(async () => {
-      try {
-        const info = await api.getMatch(matchId);
-        if (info.status !== "WAITING") {
-          this.stopPolling();
-          this.callbacks.onMatchReady(matchId, info.yourTeam);
-        }
-      } catch {
-        // transient network hiccup - keep polling
-      }
-    }, POLL_INTERVAL_MS);
   }
 }

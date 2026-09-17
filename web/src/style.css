@@ -1332,6 +1332,43 @@ input[type="range"]::-moz-range-thumb {
   padding-bottom: 20px;
 }
 
+/* ---- public lobby browser (Join Match screen) ---- */
+
+.public-lobby-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+}
+
+.public-lobby-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 12px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.public-lobby-row:hover {
+  border-color: var(--ember-bright);
+  box-shadow: var(--glow-hover);
+}
+.public-lobby-row.full {
+  cursor: default;
+  opacity: 0.55;
+}
+.public-lobby-row.full:hover {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
 /* Rendered CHANGELOG.md - see ChangelogScreen.ts. Shares .codex-screen/
    .codex-window/.codex-toolbar with the unit-info window; this is the
    scrollable body plus typography for marked's HTML output. */

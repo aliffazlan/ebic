@@ -1,6 +1,7 @@
 package com.walnutt.web.match;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,14 +45,23 @@ class MatchServiceTest {
     }
 
     @Test
-    void createThenJoin_flipsStatusToDrafting() {
-        MatchService.MatchSummary created = matches.createMatch(p1UserId);
-        assertEquals("WAITING", created.status());
+    void createMatch_defaultsAreRespected() {
+        MatchService.MatchSummary privateMatch = matches.createMatch(p1UserId, false);
+        assertFalse(privateMatch.isPublic());
+
+        MatchService.MatchSummary publicMatch = matches.createMatch(p1UserId, true);
+        assertTrue(publicMatch.isPublic());
+    }
+
+    @Test
+    void createThenJoin_staysInLobbyUntilOwnerStarts() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        assertEquals("LOBBY", created.status());
         assertEquals(6, created.joinCode().length());
 
         MatchService.MatchSummary joined = matches.joinMatch(p2UserId, created.joinCode());
         assertEquals(created.matchId(), joined.matchId());
-        assertEquals("DRAFTING", joined.status());
+        assertEquals("LOBBY", joined.status(), "joining seats the player but does not start the game");
     }
 
     @Test
@@ -62,23 +72,24 @@ class MatchServiceTest {
 
     @Test
     void joinRejectsASecondJoinerOnceMatchIsFull() {
-        MatchService.MatchSummary created = matches.createMatch(p1UserId);
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
         matches.joinMatch(p2UserId, created.joinCode());
 
         ApiException e = assertThrows(ApiException.class, () -> matches.joinMatch(p3UserId, created.joinCode()));
         assertEquals(409, e.getStatus());
+        assertEquals("lobby is full", e.getMessage());
     }
 
     @Test
     void joinRejectsTheCreatorJoiningTheirOwnMatch() {
-        MatchService.MatchSummary created = matches.createMatch(p1UserId);
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
         ApiException e = assertThrows(ApiException.class, () -> matches.joinMatch(p1UserId, created.joinCode()));
         assertEquals(409, e.getStatus());
     }
 
     @Test
     void getStatus_reportsYourTeamCorrectlyForBothParticipants() {
-        MatchService.MatchSummary created = matches.createMatch(p1UserId);
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
         matches.joinMatch(p2UserId, created.joinCode());
 
         MatchService.MatchStatusView asHost = matches.getStatus(p1UserId, created.matchId());
@@ -92,7 +103,7 @@ class MatchServiceTest {
 
     @Test
     void getStatus_rejectsANonParticipant() {
-        MatchService.MatchSummary created = matches.createMatch(p1UserId);
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
         matches.joinMatch(p2UserId, created.joinCode());
 
         ApiException e = assertThrows(ApiException.class, () -> matches.getStatus(p3UserId, created.matchId()));
@@ -101,7 +112,7 @@ class MatchServiceTest {
 
     @Test
     void getParticipants_emptyUntilBothPlayersHaveJoined() {
-        MatchService.MatchSummary created = matches.createMatch(p1UserId);
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
         assertTrue(matches.getParticipants(created.matchId()).isEmpty());
 
         matches.joinMatch(p2UserId, created.joinCode());
@@ -110,12 +121,102 @@ class MatchServiceTest {
 
     @Test
     void finishMatch_setsStatusAndWinner() {
-        MatchService.MatchSummary created = matches.createMatch(p1UserId);
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
         matches.joinMatch(p2UserId, created.joinCode());
 
         matches.finishMatch(created.matchId(), p1UserId);
         MatchService.MatchStatusView status = matches.getStatus(p1UserId, created.matchId());
         assertEquals("FINISHED", status.status());
         assertEquals("hostplayer", status.winnerName());
+    }
+
+    @Test
+    void startLobby_ownerCanStartOnceBothSeated() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+
+        MatchService.MatchSummary started = matches.startLobby(p1UserId, created.matchId());
+        assertEquals("DRAFTING", started.status());
+    }
+
+    @Test
+    void startLobby_rejectsNonOwner() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.startLobby(p2UserId, created.matchId()));
+        assertEquals(403, e.getStatus());
+    }
+
+    @Test
+    void startLobby_rejectsWhenOnlyOnePlayerSeated() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.startLobby(p1UserId, created.matchId()));
+        assertEquals(409, e.getStatus());
+    }
+
+    @Test
+    void startLobby_rejectsWhenAlreadyStarted() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+        matches.startLobby(p1UserId, created.matchId());
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.startLobby(p1UserId, created.matchId()));
+        assertEquals(409, e.getStatus());
+    }
+
+    @Test
+    void leaveLobby_joinerLeavingFreesTheSeat() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+
+        matches.leaveLobby(p2UserId, created.matchId());
+        assertTrue(matches.getParticipants(created.matchId()).isEmpty());
+
+        // A new joiner can now take the freed seat.
+        MatchService.MatchSummary rejoined = matches.joinMatch(p3UserId, created.joinCode());
+        assertEquals("LOBBY", rejoined.status());
+    }
+
+    @Test
+    void leaveLobby_ownerLeavingDeletesTheLobby() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+
+        matches.leaveLobby(p1UserId, created.matchId());
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.joinMatch(p2UserId, created.joinCode()));
+        assertEquals(404, e.getStatus());
+    }
+
+    @Test
+    void leaveLobby_rejectsOnceTheGameHasStarted() {
+        MatchService.MatchSummary created = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, created.joinCode());
+        matches.startLobby(p1UserId, created.matchId());
+
+        ApiException e = assertThrows(ApiException.class, () -> matches.leaveLobby(p2UserId, created.matchId()));
+        assertEquals(409, e.getStatus());
+    }
+
+    @Test
+    void listPublicLobbies_onlyShowsPublicOpenOrOngoingLobbies() {
+        MatchService.MatchSummary publicOpen = matches.createMatch(p1UserId, true);
+        matches.createMatch(p1UserId, false); // private - must never appear
+
+        java.util.List<MatchService.PublicLobbySummary> before = matches.listPublicLobbies();
+        assertEquals(1, before.size());
+        assertEquals(publicOpen.matchId(), before.get(0).matchId());
+        assertFalse(before.get(0).full());
+
+        matches.joinMatch(p2UserId, publicOpen.joinCode());
+        matches.startLobby(p1UserId, publicOpen.matchId());
+
+        java.util.List<MatchService.PublicLobbySummary> afterStart = matches.listPublicLobbies();
+        assertEquals(1, afterStart.size(), "a drafting public match should still be listed, just not joinable");
+        assertEquals("DRAFTING", afterStart.get(0).status());
+
+        matches.finishMatch(publicOpen.matchId(), p1UserId);
+        assertTrue(matches.listPublicLobbies().isEmpty(), "a finished match must disappear from the browser");
     }
 }
