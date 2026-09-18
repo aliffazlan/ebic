@@ -8,10 +8,10 @@
 export type SlideDirection = "up" | "down" | "left" | "right";
 
 /** Keep in sync with the animation durations in style.css. */
-export const SLIDE_MS = 800;
+export const SLIDE_MS = 1000;
 /** Game-start / match-end fade-to-black, and the black hold between them. */
-export const FADE_MS = 2000;
-export const HOLD_MS = 1000;
+export const FADE_MS = 1800;
+export const HOLD_MS = 200;
 /** Match-end's reveal is a quick hand-off to the logo intro, not a 2s fade. */
 export const REVEAL_MS = 500;
 

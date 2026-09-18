@@ -200,11 +200,11 @@ optgroup {
 }
 
 .app-logo.intro-reveal {
-  animation: logo-reveal 3s ease-out both;
+  animation: logo-reveal 4s ease-out both;
 }
 
 .card.intro-reveal {
-  animation: menu-reveal 1s ease-out 3s both;
+  animation: menu-reveal 2s ease-out 2.2s both;
 }
 
 @keyframes logo-reveal {
