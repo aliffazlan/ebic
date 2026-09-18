@@ -3,10 +3,14 @@
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* surfaces - warm near-blacks, not pure #000, so glow/borders read */
-  --void: #050404; /* page + canvas backdrop - keep in sync with index.html:11 */
-  --panel-sunken: #080606; /* inset wells: unit/choice/encounter cards, hp track */
-  --panel: #0e0b0b; /* cards, modals, settings panel */
-  --panel-raised: #141010; /* hud-host, log-host, footer, chips, inputs */
+  --void: #050404;
+  /* page + canvas backdrop - keep in sync with index.html:11 */
+  --panel-sunken: #080606;
+  /* inset wells: unit/choice/encounter cards, hp track */
+  --panel: #0e0b0b;
+  /* cards, modals, settings panel */
+  --panel-raised: #141010;
+  /* hud-host, log-host, footer, chips, inputs */
 
   /* borders - blood red, brightening on hover */
   --border: #3a1414;
@@ -38,7 +42,9 @@
   box-sizing: border-box;
 }
 
-html, body, #app {
+html,
+body,
+#app {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -83,11 +89,13 @@ button.primary {
   border-color: var(--ember-bright);
   box-shadow: var(--glow-primary);
 }
+
 button.primary:hover:not(:disabled) {
   background: var(--ember-bright);
 }
 
-input, select {
+input,
+select {
   font-family: inherit;
   background: var(--panel-sunken);
   color: var(--text);
@@ -97,13 +105,15 @@ input, select {
   font-size: 14px;
 }
 
-input:focus, select:focus {
+input:focus,
+select:focus {
   outline: none;
   border-color: var(--ember-bright);
   box-shadow: var(--glow-hover);
 }
 
-option, optgroup {
+option,
+optgroup {
   background: var(--panel-raised);
   color: var(--text);
 }
@@ -171,12 +181,10 @@ option, optgroup {
   width: 130%;
   height: 150%;
   transform: translate(-50%, -50%);
-  background: radial-gradient(
-    ellipse at center,
-    rgba(249, 115, 22, 0.22) 0%,
-    rgba(185, 28, 28, 0.14) 45%,
-    rgba(185, 28, 28, 0) 72%
-  );
+  background: radial-gradient(ellipse at center,
+      rgba(249, 115, 22, 0.22) 0%,
+      rgba(185, 28, 28, 0.14) 45%,
+      rgba(185, 28, 28, 0) 72%);
   filter: blur(8px);
   pointer-events: none;
   z-index: 0;
@@ -191,35 +199,122 @@ option, optgroup {
   object-fit: contain;
 }
 
-.app-logo.intro-reveal { animation: logo-reveal 3s ease-out both; }
-.card.intro-reveal     { animation: menu-reveal 1s ease-out 3s both; }
+.app-logo.intro-reveal {
+  animation: logo-reveal 3s ease-out both;
+}
+
+.card.intro-reveal {
+  animation: menu-reveal 1s ease-out 3s both;
+}
 
 @keyframes logo-reveal {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 /* visibility:hidden keeps the card unclickable during the 3s delay; `both`
    holds the from-state through it so the card's layout space (and the
    logo's final position) is reserved from frame one - no jump when it fades in. */
 @keyframes menu-reveal {
-  from { opacity: 0; visibility: hidden; }
-  to { opacity: 1; visibility: visible; }
+  from {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  to {
+    opacity: 1;
+    visibility: visible;
+  }
 }
 
 /* ---- screen transitions (opt-in per navigation; skipped when Fast
    Transitions is on). Direction names the direction of movement: "up" means
    the outgoing screen leaves through the top. ---- */
 
-@keyframes slide-out-up    { from { transform: translateY(0); }  to { transform: translateY(-100%); } }
-@keyframes slide-out-down  { from { transform: translateY(0); }  to { transform: translateY(100%); } }
-@keyframes slide-out-left  { from { transform: translateX(0); }  to { transform: translateX(-100%); } }
-@keyframes slide-out-right { from { transform: translateX(0); }  to { transform: translateX(100%); } }
+@keyframes slide-out-up {
+  from {
+    transform: translateY(0);
+  }
 
-@keyframes slide-in-from-bottom { from { transform: translateY(100%); }  to { transform: translateY(0); } }
-@keyframes slide-in-from-top    { from { transform: translateY(-100%); } to { transform: translateY(0); } }
-@keyframes slide-in-from-right  { from { transform: translateX(100%); }  to { transform: translateX(0); } }
-@keyframes slide-in-from-left   { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+  to {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes slide-out-down {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes slide-out-left {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slide-out-right {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slide-in-from-bottom {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-from-top {
+  from {
+    transform: translateY(-100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-from-right {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-from-left {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
 
 /* pointer-events: none for the full animation - guards against clicking
    something on the screen sliding away, or on the incoming one before it's
@@ -241,14 +336,37 @@ option, optgroup {
   pointer-events: none;
 }
 
-.screen-slide-out-up    { animation-name: slide-out-up; }
-.screen-slide-out-down  { animation-name: slide-out-down; }
-.screen-slide-out-left  { animation-name: slide-out-left; }
-.screen-slide-out-right { animation-name: slide-out-right; }
-.screen-slide-in-from-bottom { animation-name: slide-in-from-bottom; }
-.screen-slide-in-from-top    { animation-name: slide-in-from-top; }
-.screen-slide-in-from-right  { animation-name: slide-in-from-right; }
-.screen-slide-in-from-left   { animation-name: slide-in-from-left; }
+.screen-slide-out-up {
+  animation-name: slide-out-up;
+}
+
+.screen-slide-out-down {
+  animation-name: slide-out-down;
+}
+
+.screen-slide-out-left {
+  animation-name: slide-out-left;
+}
+
+.screen-slide-out-right {
+  animation-name: slide-out-right;
+}
+
+.screen-slide-in-from-bottom {
+  animation-name: slide-in-from-bottom;
+}
+
+.screen-slide-in-from-top {
+  animation-name: slide-in-from-top;
+}
+
+.screen-slide-in-from-right {
+  animation-name: slide-in-from-right;
+}
+
+.screen-slide-in-from-left {
+  animation-name: slide-in-from-left;
+}
 
 /* ---- game-start / match-end fade to black ----
    Above .hover-tooltip (z-index 1000, also on document.body) and everything
@@ -262,12 +380,37 @@ option, optgroup {
   z-index: 2000;
 }
 
-.fade-overlay-in        { animation: fade-overlay-in 2000ms ease-in-out forwards; }
-.fade-overlay-out       { animation: fade-overlay-out 2000ms ease-in-out forwards; }
-.fade-overlay-out-quick { animation: fade-overlay-out 500ms linear forwards; }
+.fade-overlay-in {
+  animation: fade-overlay-in 2000ms ease-in-out forwards;
+}
 
-@keyframes fade-overlay-in  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes fade-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+.fade-overlay-out {
+  animation: fade-overlay-out 2000ms ease-in-out forwards;
+}
+
+.fade-overlay-out-quick {
+  animation: fade-overlay-out 500ms linear forwards;
+}
+
+@keyframes fade-overlay-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-overlay-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
 
 .field {
   display: flex;
@@ -288,6 +431,7 @@ option, optgroup {
   font-size: 13px;
   text-decoration: underline;
 }
+
 .link-btn:hover {
   background: none;
   color: #fdba74;
@@ -439,10 +583,26 @@ option, optgroup {
   font-size: 11px;
   font-weight: 600;
 }
-.badge.team-one { background: #1d4ed8; color: white; }
-.badge.team-two { background: #b91c1c; color: white; }
-.badge.turn-yours { background: #16a34a; color: white; }
-.badge.turn-theirs { background: #64748b; color: white; }
+
+.badge.team-one {
+  background: #1d4ed8;
+  color: white;
+}
+
+.badge.team-two {
+  background: #b91c1c;
+  color: white;
+}
+
+.badge.turn-yours {
+  background: #16a34a;
+  color: white;
+}
+
+.badge.turn-theirs {
+  background: #64748b;
+  color: white;
+}
 
 .waiting-banner {
   background: #78350f;
@@ -486,6 +646,7 @@ option, optgroup {
   font-weight: 600;
   font-size: 14px;
 }
+
 .unit-panel-sub {
   font-size: 12px;
   color: var(--text-muted);
@@ -501,18 +662,22 @@ option, optgroup {
   margin-bottom: 8px;
   position: relative;
 }
+
 .hp-bar-inner {
   height: 100%;
   background: #22c55e;
 }
+
 .hp-bar-separator {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 1px;
-  background: #15803d; /* keep in sync with UnitHp.ts HP_SEPARATOR_COLOR_CSS */
+  background: #15803d;
+  /* keep in sync with UnitHp.ts HP_SEPARATOR_COLOR_CSS */
   pointer-events: none;
 }
+
 .barrier-bar-outer {
   width: 100%;
   height: 8px;
@@ -522,16 +687,20 @@ option, optgroup {
   margin-bottom: 4px;
   position: relative;
 }
+
 .barrier-bar-inner {
   height: 100%;
-  background: rgba(255, 255, 255, 0.6); /* keep in sync with UnitHp.ts BARRIER_FILL_CSS */
+  background: rgba(255, 255, 255, 0.6);
+  /* keep in sync with UnitHp.ts BARRIER_FILL_CSS */
 }
+
 .barrier-bar-separator {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 1px;
-  background: #ffffff; /* keep in sync with UnitHp.ts BARRIER_SEPARATOR_COLOR_CSS */
+  background: #ffffff;
+  /* keep in sync with UnitHp.ts BARRIER_SEPARATOR_COLOR_CSS */
   pointer-events: none;
 }
 
@@ -548,9 +717,11 @@ option, optgroup {
   text-align: left;
   width: 100%;
 }
+
 .ability-btn.selected {
   outline: 2px solid #facc15;
 }
+
 /*
  * Unlocked by Shawl's Hidden Potential. Gold, and deliberately visible to BOTH players -
  * an upgraded ability is public information, and its tooltip already reads differently, so
@@ -560,15 +731,19 @@ option, optgroup {
   border-color: #d4a72c;
   background: linear-gradient(180deg, #2a2110 0%, var(--panel-raised) 100%);
 }
-.ability-btn.upgraded > span:first-child {
+
+.ability-btn.upgraded>span:first-child {
   color: #fcd34d;
 }
+
 .hover-tooltip.upgraded {
   border-color: #d4a72c;
 }
+
 .hover-tooltip.upgraded .hover-tooltip-title {
   color: #fcd34d;
 }
+
 .ability-btn-right {
   display: flex;
   align-items: center;
@@ -614,16 +789,19 @@ option, optgroup {
   cursor: help;
   border: 1px solid transparent;
 }
+
 .effect-chip.effect-buff {
   background: #052e1c;
   color: #4ade80;
   border-color: #166534;
 }
+
 .effect-chip.effect-debuff {
   background: #450a0a;
   color: #f87171;
   border-color: #991b1b;
 }
+
 .effect-chip.effect-neutral {
   background: var(--panel-raised);
   color: var(--text-muted);
@@ -650,6 +828,7 @@ option, optgroup {
   visibility: hidden;
   transition: opacity 0.1s ease;
 }
+
 .hover-tooltip.visible {
   opacity: 1;
   visibility: visible;
@@ -750,6 +929,7 @@ option, optgroup {
   justify-content: space-between;
   margin-bottom: 8px;
 }
+
 .combat-log-header h3 {
   margin: 0;
 }
@@ -759,11 +939,13 @@ option, optgroup {
   align-items: center;
   gap: 6px;
 }
+
 .combat-log-pager button {
   padding: 2px 8px;
   font-size: 12px;
   line-height: 1.2;
 }
+
 .combat-log-pager .hint {
   white-space: nowrap;
 }
@@ -806,10 +988,12 @@ option, optgroup {
   font-size: 12px;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
+
 .placement-unit-row:hover {
   border-color: var(--ember-bright);
   box-shadow: var(--glow-hover);
 }
+
 .placement-unit-row.selected {
   outline: 2px solid #facc15;
   border-color: #facc15;
@@ -874,8 +1058,15 @@ option, optgroup {
 }
 
 @keyframes click-to-continue-pulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
+
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 /* ---- settings screen ---- */
@@ -1038,6 +1229,7 @@ input[type="range"]::-moz-range-thumb {
 .unit-card.clickable {
   cursor: pointer;
 }
+
 .unit-card.clickable:hover {
   border-color: var(--ember-bright);
   box-shadow: var(--glow-hover);
@@ -1118,6 +1310,7 @@ input[type="range"]::-moz-range-thumb {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
 .choice-card-disabled:hover {
   border-color: var(--border);
   box-shadow: none;
@@ -1184,6 +1377,7 @@ input[type="range"]::-moz-range-thumb {
 .encounter-card .hp-bar-outer {
   width: 100%;
 }
+
 .encounter-card .barrier-bar-outer {
   width: 100%;
 }
@@ -1265,6 +1459,7 @@ input[type="range"]::-moz-range-thumb {
   gap: 12px;
   margin-top: 16px;
 }
+
 .attribute-buttons button {
   flex: 1;
   padding: 14px;
@@ -1274,6 +1469,7 @@ input[type="range"]::-moz-range-thumb {
 .game-over-panel {
   text-align: center;
 }
+
 .game-over-panel h2 {
   font-size: 22px;
   margin-bottom: 8px;
@@ -1312,7 +1508,7 @@ input[type="range"]::-moz-range-thumb {
 /* Join Match reuses .codex-window's chrome at a narrower width - it has no grid of
    cards to fill, just a lobby list and a join-by-code box. */
 .join-match-window {
-  width: min(1150px, 92vw);
+  width: min(450px, 92vw);
 }
 
 .codex-toolbar {
@@ -1372,27 +1568,33 @@ input[type="range"]::-moz-range-thumb {
   font-size: 12px;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
+
 .public-lobby-row:hover {
   border-color: var(--ember-bright);
   box-shadow: var(--glow-hover);
 }
+
 .public-lobby-row.full {
   cursor: default;
   opacity: 0.55;
 }
+
 .public-lobby-row.full:hover {
   border-color: var(--border);
   box-shadow: none;
 }
+
 .public-lobby-row.selected {
   outline: 2px solid #facc15;
   border-color: #facc15;
 }
+
 /* IN PROGRESS rows are selectable to spectate (not to join) - a distinct accent from the
    plain joinable state so the list reads at a glance which action a row leads to. */
 .public-lobby-row.spectatable {
   border-color: #38bdf8;
 }
+
 .public-lobby-row.spectatable:hover {
   border-color: #38bdf8;
   box-shadow: 0 0 0 1px #38bdf8;
@@ -1406,23 +1608,32 @@ input[type="range"]::-moz-range-thumb {
   overflow-y: auto;
   padding-right: 8px;
 }
-.changelog-body h1, .changelog-body h2, .changelog-body h3 {
+
+.changelog-body h1,
+.changelog-body h2,
+.changelog-body h3 {
   color: var(--ember-bright);
   margin: 16px 0 6px;
 }
+
 .changelog-body h1:first-child {
   margin-top: 0;
 }
-.changelog-body p, .changelog-body li {
+
+.changelog-body p,
+.changelog-body li {
   color: var(--text-muted);
   line-height: 1.5;
 }
+
 .changelog-body ul {
   padding-left: 20px;
 }
+
 .changelog-body strong {
   color: var(--text);
 }
+
 .changelog-body a {
   color: var(--ember-bright);
 }
@@ -1454,9 +1665,27 @@ input[type="range"]::-moz-range-thumb {
 }
 
 @keyframes turn-banner-flash {
-  0% { opacity: 0; transform: scale(0.85); }
-  12% { opacity: 1; transform: scale(1.03); }
-  20% { transform: scale(1); }
-  70% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1); }
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+
+  12% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+
+  20% {
+    transform: scale(1);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
 }

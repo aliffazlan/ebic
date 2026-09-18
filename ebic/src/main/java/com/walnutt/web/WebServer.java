@@ -97,6 +97,7 @@ public final class WebServer {
         app.post("/api/matches/bot", this::handleCreateBotMatch);
         app.post("/api/matches/join", this::handleJoinMatch);
         app.get("/api/matches/public", this::handleListPublicMatches);
+        app.get("/api/matches/rejoinable", this::handleListRejoinableMatches);
         app.get("/api/matches/{matchId}", this::handleMatchStatus);
         app.post("/api/matches/{matchId}/start", this::handleStartLobby);
         app.post("/api/matches/{matchId}/leave", this::handleLeaveLobby);
@@ -285,6 +286,35 @@ public final class WebServer {
             lobbies.add(row);
         }
         payload.add("lobbies", lobbies);
+        sendJson(ctx, 200, payload);
+    }
+
+    /**
+     * The "REJOIN MATCH" list: every non-finished match the caller is seated in, plus whether
+     * their own seat is currently connected elsewhere (a live GameSession/ChannelHub channel) -
+     * the client greys the button out rather than offering to rejoin a match it's already
+     * connected to in another tab. `connected` defaults false when no in-memory session exists
+     * yet (e.g. DRAFTING just started and nobody has opened the WS for it yet).
+     */
+    private void handleListRejoinableMatches(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        JsonObject payload = new JsonObject();
+        com.google.gson.JsonArray matchesArray = new com.google.gson.JsonArray();
+        for (MatchService.RejoinableMatchSummary rejoinable : matches.listRejoinableMatches(user.userId())) {
+            Team team = Team.valueOf(rejoinable.team());
+            boolean connected = sessions.get(rejoinable.matchId())
+                    .map(session -> session.isTeamConnected(team))
+                    .orElse(false);
+            JsonObject row = new JsonObject();
+            row.addProperty("matchId", rejoinable.matchId());
+            String status = rejoinable.status();
+            row.addProperty("status", MatchService.Status.IN_PROGRESS.name().equals(status) ? "IN PROGRESS" : status);
+            row.addProperty("team", rejoinable.team());
+            row.addProperty("opponentName", rejoinable.opponentName());
+            row.addProperty("connected", connected);
+            matchesArray.add(row);
+        }
+        payload.add("matches", matchesArray);
         sendJson(ctx, 200, payload);
     }
 

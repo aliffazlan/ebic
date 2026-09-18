@@ -7,7 +7,7 @@
 import { api, ApiError } from "../net/api";
 import { showErrorModal } from "./ErrorModal";
 import type { Screen } from "./Screen";
-import type { PublicLobbySummary, Team } from "../types/contract";
+import type { PublicLobbySummary, RejoinableMatchSummary, Team } from "../types/contract";
 
 export interface JoinMatchCallbacks {
   onBack(): void;
@@ -15,6 +15,9 @@ export interface JoinMatchCallbacks {
   /** joinCode is only set for a private match spectated by code - the WS connection needs
    * it to prove eligibility, since a spectator is never a seated participant. */
   onSpectate(matchId: string, playerOneName: string, playerTwoName: string, joinCode?: string): void;
+  /** Reconnecting to a match already in DRAFTING/IN_PROGRESS - skips the lobby room
+   * entirely, same as resuming a match that never actually ended. */
+  onRejoin(matchId: string, yourTeam: Team): void;
 }
 
 export class JoinMatchScreen implements Screen {
@@ -24,9 +27,12 @@ export class JoinMatchScreen implements Screen {
   private listEl: HTMLElement | null = null;
   private refreshBtn: HTMLButtonElement | null = null;
   private joinSelectedBtn: HTMLButtonElement | null = null;
+  private rejoinBtn: HTMLButtonElement | null = null;
+  private rejoinListEl: HTMLElement | null = null;
 
   private selectedLobby: PublicLobbySummary | null = null;
   private selectedRow: HTMLElement | null = null;
+  private rejoinable: RejoinableMatchSummary[] = [];
 
   constructor(root: HTMLElement, callbacks: JoinMatchCallbacks) {
     this.root = root;
@@ -151,6 +157,23 @@ export class JoinMatchScreen implements Screen {
     codeInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") void doJoinByCode();
     });
+
+    const rejoinHeading = document.createElement("h2");
+    rejoinHeading.textContent = "Rejoin match";
+    windowEl.appendChild(rejoinHeading);
+
+    this.rejoinBtn = document.createElement("button");
+    this.rejoinBtn.className = "primary";
+    this.rejoinBtn.textContent = "Rejoin match";
+    this.rejoinBtn.disabled = true;
+    this.rejoinBtn.title = "No matches to rejoin.";
+    this.rejoinBtn.addEventListener("click", () => this.onRejoinClicked());
+    windowEl.appendChild(this.rejoinBtn);
+
+    this.rejoinListEl = document.createElement("div");
+    this.rejoinListEl.className = "public-lobby-list";
+    this.rejoinListEl.style.display = "none";
+    windowEl.appendChild(this.rejoinListEl);
   }
 
   private clearSelection(): void {
@@ -176,6 +199,103 @@ export class JoinMatchScreen implements Screen {
       this.listEl.replaceChildren(hint("Could not load lobbies."));
     } finally {
       if (this.refreshBtn) this.refreshBtn.disabled = false;
+    }
+    // Best-effort, separate from the public lobby fetch above so one failing doesn't
+    // block the other - a broken rejoin check shouldn't stop the browser from loading.
+    try {
+      const res = await api.getRejoinableMatches();
+      this.rejoinable = res.matches;
+    } catch {
+      this.rejoinable = [];
+    }
+    this.renderRejoinButton();
+  }
+
+  /**
+   * Reflects the current rejoinable list on the button: disabled with a reason when there's
+   * nothing to rejoin (none at all, or the only candidate(s) are already connected elsewhere -
+   * see RejoinableMatchSummary.connected), otherwise enabled and ready for onRejoinClicked.
+   */
+  private renderRejoinButton(): void {
+    if (!this.rejoinBtn || !this.rejoinListEl) return;
+    this.rejoinListEl.replaceChildren();
+    this.rejoinListEl.style.display = "none";
+
+    const available = this.rejoinable.filter((m) => !m.connected);
+
+    if (this.rejoinable.length === 0) {
+      this.rejoinBtn.disabled = true;
+      this.rejoinBtn.title = "No matches to rejoin.";
+      this.rejoinBtn.textContent = "Rejoin match";
+      return;
+    }
+    if (available.length === 0) {
+      this.rejoinBtn.disabled = true;
+      this.rejoinBtn.title = "You're already connected to that match in another tab.";
+      this.rejoinBtn.textContent = "Rejoin match";
+      return;
+    }
+
+    this.rejoinBtn.disabled = false;
+    this.rejoinBtn.title = "";
+    this.rejoinBtn.textContent = available.length === 1 ? `Rejoin vs ${available[0].opponentName}` : "Rejoin match";
+  }
+
+  /** A single candidate rejoins immediately; more than one opens a small picker instead of
+   * guessing which match the player meant. */
+  private onRejoinClicked(): void {
+    const available = this.rejoinable.filter((m) => !m.connected);
+    if (available.length === 0) return;
+    if (available.length === 1) {
+      void this.confirmAndRejoin(available[0].matchId, available[0].team);
+      return;
+    }
+    if (!this.rejoinListEl) return;
+    const isOpen = this.rejoinListEl.style.display !== "none";
+    if (isOpen) {
+      this.rejoinListEl.style.display = "none";
+      return;
+    }
+    this.rejoinListEl.replaceChildren(...available.map((m) => this.renderRejoinRow(m)));
+    this.rejoinListEl.style.display = "";
+  }
+
+  private renderRejoinRow(match: RejoinableMatchSummary): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "public-lobby-row";
+
+    const name = document.createElement("span");
+    name.textContent = `vs ${match.opponentName}`;
+    row.appendChild(name);
+
+    const status = document.createElement("span");
+    status.className = "hint";
+    status.textContent = match.status;
+    row.appendChild(status);
+
+    row.addEventListener("click", () => void this.confirmAndRejoin(match.matchId, match.team));
+    return row;
+  }
+
+  /**
+   * The rejoinable list can go stale just by sitting on this screen (the match gets
+   * abandoned and destroyed - GameSession.abandonIfStillEmpty - while the user hasn't
+   * clicked yet). Re-checks against a fresh fetch right before actually connecting, rather
+   * than trusting whatever this.rejoinable last held, so a since-destroyed match surfaces as
+   * a clear error instead of the socket connecting into a dead match and hanging.
+   */
+  private async confirmAndRejoin(matchId: string, team: Team): Promise<void> {
+    if (this.rejoinBtn) this.rejoinBtn.disabled = true;
+    try {
+      const res = await api.getRejoinableMatches();
+      const stillValid = res.matches.some((m) => m.matchId === matchId && !m.connected);
+      if (!stillValid) {
+        this.showMessage("That match is no longer available to rejoin.", () => void this.refresh());
+        return;
+      }
+      this.callbacks.onRejoin(matchId, team);
+    } catch (err) {
+      this.showError(err, () => void this.refresh());
     }
   }
 

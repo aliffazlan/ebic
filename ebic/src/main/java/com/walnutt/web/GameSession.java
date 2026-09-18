@@ -121,6 +121,10 @@ public final class GameSession {
             renderer.setAbilityDefinitions(state.getAbilityDefinitions());
             state.getEventBus().addGlobalListener(vfx);
             matchService.setStatus(matchId, MatchService.Status.IN_PROGRESS);
+            // Draft+placement are permanently over for every team the moment combat starts -
+            // stop caching (and thus wrongly replaying) their last-sent payloads to anyone who
+            // reconnects from here on. See ChannelHub.clearDraftAndPlacementCaches.
+            hub.clearDraftAndPlacementCaches();
             game.start();
         } catch (Exception e) {
             LOG.log(Level.ERROR, "Match " + matchId + " aborted due to an internal error", e);
@@ -153,6 +157,12 @@ public final class GameSession {
 
     public void registerChannel(Team team, ClientChannel channel) {
         boolean isReconnect = !everConnected.add(team);
+        // Replayed before register()'s own sends so the frontend's round-rollover detection
+        // (GameStateStore.commitCombatLog) starts fresh against the history, the same order
+        // registerSpectator already uses - see ChannelHub.replayCombatLogTo.
+        if (isReconnect) {
+            hub.replayCombatLogTo(channel);
+        }
         hub.register(team, channel);
         if (isReconnect && matchService.getRawStatus(matchId) == MatchService.Status.IN_PROGRESS) {
             hub.broadcast(JsonSupport.messageEnvelope(usernameFor(team) + " reconnected to the game."));
@@ -247,6 +257,12 @@ public final class GameSession {
 
     public void handleMessage(Team team, JsonObject message) {
         input.offer(team, message);
+    }
+
+    /** Whether a seat currently has a live channel - used by the "rejoin match" list to tell
+     * "still connected somewhere else" apart from "safe to rejoin". */
+    public boolean isTeamConnected(Team team) {
+        return hub.isConnected(team);
     }
 
     public Team teamFor(long userId) {

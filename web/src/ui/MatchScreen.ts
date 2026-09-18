@@ -4,6 +4,7 @@ import { GameStateStore } from "../state/GameStateStore";
 import { GameSocket } from "../net/GameSocket";
 import { Hud } from "./Hud";
 import { TurnBanner } from "./TurnBanner";
+import { showErrorModal } from "./ErrorModal";
 import { IndicatorScheduler } from "../vfx/IndicatorScheduler";
 import { scheduleVfxBatch } from "../vfx/ScheduleVfxBatch";
 import type { AxialCoord } from "../hex/HexMath";
@@ -105,6 +106,7 @@ export class MatchScreen implements Screen, MatchActions {
             this.store.pushMessage("Connection lost, attempting to reconnect...");
           }
         },
+        onFatalClose: (reason) => this.handleFatalDisconnect(reason),
       },
       spectateCode,
     );
@@ -155,6 +157,21 @@ export class MatchScreen implements Screen, MatchActions {
 
   getElement(): HTMLElement | null {
     return this.container;
+  }
+
+  /**
+   * The server closed the socket with an application-level rejection (match finished/gone,
+   * or we're no longer a valid participant - see GameSocket's FATAL_CLOSE_CODE_MIN) rather
+   * than an ordinary drop. Retrying would just loop forever against the same rejection, so
+   * explain why and return to the lobby instead of leaving the player staring at a stuck
+   * "Reconnecting..." badge.
+   */
+  private handleFatalDisconnect(reason: string): void {
+    if (this.container) {
+      showErrorModal(this.container, reason, () => this.onExit());
+    } else {
+      this.onExit();
+    }
   }
 
   private async initPixi(canvasHost: HTMLDivElement): Promise<void> {

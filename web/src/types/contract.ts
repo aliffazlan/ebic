@@ -71,6 +71,24 @@ export interface PublicLobbiesResponse {
   lobbies: PublicLobbySummary[];
 }
 
+/** Status the rejoin list shows - LOBBY is deliberately excluded, since leaving a
+ * not-yet-started lobby already has its own explicit leave flow. */
+export type RejoinableMatchDisplayStatus = "DRAFTING" | "IN PROGRESS";
+
+export interface RejoinableMatchSummary {
+  matchId: string;
+  status: RejoinableMatchDisplayStatus;
+  team: Team;
+  opponentName: string;
+  /** True if this seat currently has a live connection elsewhere (e.g. another tab) -
+   * the client should not offer to rejoin a match it's already connected to. */
+  connected: boolean;
+}
+
+export interface RejoinableMatchesResponse {
+  matches: RejoinableMatchSummary[];
+}
+
 /**
  * Bot difficulty. Only one level exists today, but it travels through the API and is
  * stored on the match, so adding another is a server-side BotConfig entry rather than a

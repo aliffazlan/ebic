@@ -43,6 +43,10 @@ public final class MatchService {
     public record SpectateInfo(String matchId, String status, String playerOneName, String playerTwoName) {
     }
 
+    /** One row in the "rejoin match" list - a non-finished match the caller is seated in. */
+    public record RejoinableMatchSummary(String matchId, String status, String team, String opponentName) {
+    }
+
     /**
      * WS-layer-only lookup for authorizeWsUpgrade/onWsConnect to decide participant vs.
      * spectator vs. reject in one query. Deliberately separate from MatchParticipants, which
@@ -549,6 +553,44 @@ public final class MatchService {
             throw new IllegalStateException("Failed to list public lobbies", e);
         }
         return lobbies;
+    }
+
+    /**
+     * Non-finished matches the caller is seated in (as a player, not a spectator) - what
+     * backs the "REJOIN MATCH" button. Deliberately LOBBY-exclusive: leaving a not-yet-started
+     * lobby already has its own explicit flow (leaveLobby), which frees/deletes the seat
+     * outright rather than leaving it rejoinable.
+     */
+    public java.util.List<RejoinableMatchSummary> listRejoinableMatches(long callerUserId) {
+        String sql = """
+            SELECT m.id, m.status, m.player_one_id, m.player_two_id,
+                   p1.username AS p1name, p2.username AS p2name
+            FROM matches m
+            JOIN users p1 ON p1.id = m.player_one_id
+            LEFT JOIN users p2 ON p2.id = m.player_two_id
+            WHERE (m.player_one_id = ? OR m.player_two_id = ?) AND m.status IN (?, ?)
+            ORDER BY m.created_at DESC
+            """;
+        java.util.List<RejoinableMatchSummary> rejoinable = new java.util.ArrayList<>();
+        try (PreparedStatement ps = db.connection().prepareStatement(sql)) {
+            ps.setLong(1, callerUserId);
+            ps.setLong(2, callerUserId);
+            ps.setString(3, Status.DRAFTING.name());
+            ps.setString(4, Status.IN_PROGRESS.name());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    long playerOneId = rs.getLong("player_one_id");
+                    boolean isPlayerOne = playerOneId == callerUserId;
+                    String team = isPlayerOne ? "PLAYER_ONE" : "PLAYER_TWO";
+                    String opponentName = isPlayerOne ? rs.getString("p2name") : rs.getString("p1name");
+                    rejoinable.add(new RejoinableMatchSummary(
+                        rs.getString("id"), rs.getString("status"), team, opponentName));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to list rejoinable matches", e);
+        }
+        return rejoinable;
     }
 
     public MatchStatusView getStatus(long callerUserId, String matchId) {

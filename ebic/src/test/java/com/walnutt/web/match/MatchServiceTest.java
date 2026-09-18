@@ -420,4 +420,51 @@ class MatchServiceTest {
         assertThrows(ApiException.class, () -> matches.getStatus(p1UserId, drafting.matchId()));
         assertEquals("FINISHED", matches.getStatus(p1UserId, finished.matchId()).status());
     }
+
+    @Test
+    void listRejoinableMatches_emptyForAUserWithNoMatches() {
+        assertTrue(matches.listRejoinableMatches(p1UserId).isEmpty());
+    }
+
+    @Test
+    void listRejoinableMatches_includesDraftingAndInProgressForBothSeats() {
+        MatchService.MatchSummary drafting = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, drafting.joinCode());
+        matches.startLobby(p1UserId, drafting.matchId());
+
+        java.util.List<MatchService.RejoinableMatchSummary> asHost = matches.listRejoinableMatches(p1UserId);
+        assertEquals(1, asHost.size());
+        assertEquals(drafting.matchId(), asHost.get(0).matchId());
+        assertEquals("DRAFTING", asHost.get(0).status());
+        assertEquals("PLAYER_ONE", asHost.get(0).team());
+        assertEquals("guestplayer", asHost.get(0).opponentName());
+
+        java.util.List<MatchService.RejoinableMatchSummary> asGuest = matches.listRejoinableMatches(p2UserId);
+        assertEquals(1, asGuest.size());
+        assertEquals("PLAYER_TWO", asGuest.get(0).team());
+        assertEquals("hostplayer", asGuest.get(0).opponentName());
+
+        matches.setStatus(drafting.matchId(), MatchService.Status.IN_PROGRESS);
+        java.util.List<MatchService.RejoinableMatchSummary> inProgress = matches.listRejoinableMatches(p1UserId);
+        assertEquals(1, inProgress.size());
+        assertEquals("IN_PROGRESS", inProgress.get(0).status());
+    }
+
+    @Test
+    void listRejoinableMatches_excludesLobbyAndFinishedAndNonParticipants() {
+        MatchService.MatchSummary lobby = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, lobby.joinCode());
+        assertTrue(matches.listRejoinableMatches(p1UserId).isEmpty(), "still LOBBY - has its own leave flow");
+
+        MatchService.MatchSummary finished = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, finished.joinCode());
+        matches.startLobby(p1UserId, finished.matchId());
+        matches.finishMatch(finished.matchId(), p1UserId);
+        assertTrue(matches.listRejoinableMatches(p1UserId).isEmpty(), "finished matches are not rejoinable");
+
+        MatchService.MatchSummary drafting = matches.createMatch(p1UserId, false);
+        matches.joinMatch(p2UserId, drafting.joinCode());
+        matches.startLobby(p1UserId, drafting.matchId());
+        assertTrue(matches.listRejoinableMatches(p3UserId).isEmpty(), "a non-participant has nothing to rejoin");
+    }
 }

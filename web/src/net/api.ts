@@ -13,6 +13,7 @@ import type {
   JoinMatchResponse,
   MatchInfo,
   PublicLobbiesResponse,
+  RejoinableMatchesResponse,
   SetVisibilityResponse,
   SpectateInfo,
   StartLobbyResponse,
@@ -141,6 +142,11 @@ export const api = {
   /** Open public lobbies for the Join Match browser - manual refresh only, no polling. */
   listPublicLobbies(): Promise<PublicLobbiesResponse> {
     return request<PublicLobbiesResponse>("/matches/public");
+  },
+
+  /** Non-finished matches the caller is seated in - what backs the "REJOIN MATCH" button. */
+  getRejoinableMatches(): Promise<RejoinableMatchesResponse> {
+    return request<RejoinableMatchesResponse>("/matches/rejoinable");
   },
 
   /** Owner-only, while still in LOBBY: flips public/private. */

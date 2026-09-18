@@ -99,6 +99,43 @@ class ChannelHubTest {
     }
 
     @Test
+    void replayCombatLogToSendsHistoryInOrderToAnyChannel() {
+        ChannelHub hub = new ChannelHub();
+        hub.recordCombatLogBatch("{\"type\":\"combat_log_batch\",\"tick\":1}");
+        hub.recordCombatLogBatch("{\"type\":\"combat_log_batch\",\"tick\":2}");
+        hub.cacheState("{\"type\":\"state\",\"round\":3}");
+
+        // Mirrors GameSession.registerChannel's reconnect path: history replayed explicitly
+        // before the channel is registered, so it lands before register()'s own state send.
+        RecordingChannel reconnecting = new RecordingChannel();
+        hub.replayCombatLogTo(reconnecting);
+        hub.register(Team.PLAYER_ONE, reconnecting);
+
+        assertEquals(
+            java.util.List.of(
+                "{\"type\":\"combat_log_batch\",\"tick\":1}",
+                "{\"type\":\"combat_log_batch\",\"tick\":2}",
+                "{\"type\":\"state\",\"round\":3}"),
+            reconnecting.getSent());
+    }
+
+    @Test
+    void clearDraftAndPlacementCachesStopsThemFromBeingReplayed() {
+        ChannelHub hub = new ChannelHub();
+        hub.cacheDraftRound(Team.PLAYER_ONE, "{\"type\":\"draft_round\"}");
+        hub.cachePlacementState(Team.PLAYER_ONE, "{\"type\":\"placement_state\"}");
+        hub.cacheState("{\"type\":\"state\",\"round\":5}");
+
+        hub.clearDraftAndPlacementCaches();
+
+        RecordingChannel p1 = new RecordingChannel();
+        hub.register(Team.PLAYER_ONE, p1);
+
+        assertEquals(java.util.List.of("{\"type\":\"state\",\"round\":5}"), p1.getSent(),
+            "a stale draft_round/placement_state must never be replayed once combat has started");
+    }
+
+    @Test
     void unregisterSpectatorStopsFurtherBroadcasts() {
         ChannelHub hub = new ChannelHub();
         RecordingChannel spectator = new RecordingChannel();

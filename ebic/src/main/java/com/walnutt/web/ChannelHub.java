@@ -83,9 +83,7 @@ public final class ChannelHub {
         spectatorChannels.add(channel);
         // Replays the whole combat log history first so it's already in place by the time the
         // live board (lastStateJson, below) shows up - see recordCombatLogBatch().
-        for (String batchJson : combatLogHistory) {
-            channel.send(batchJson);
-        }
+        replayCombatLogTo(channel);
         if (lastStateJson != null) {
             channel.send(lastStateJson);
         }
@@ -93,6 +91,15 @@ public final class ChannelHub {
 
     public void unregisterSpectator(ClientChannel channel) {
         spectatorChannels.remove(channel);
+    }
+
+    /** Replays the full combat-log history to one channel, in order - used both for a fresh
+     * spectator (registerSpectator, above) and a reconnecting seated player (see GameSession.
+     * registerChannel), so either can rebuild an accurate combat log instead of starting empty. */
+    public void replayCombatLogTo(ClientChannel channel) {
+        for (String batchJson : combatLogHistory) {
+            channel.send(batchJson);
+        }
     }
 
     /** Appends one render tick's combat-log envelope to the replay history - see the field's own doc comment. */
@@ -111,6 +118,14 @@ public final class ChannelHub {
     /** Same reconnect-replay rationale as cacheDraftRound - see register(). */
     public void cachePlacementState(Team team, String json) {
         lastPlacementStateJson.put(team, json);
+    }
+
+    /** Called once combat begins (draft+placement are permanently over for every team) - the
+     * last-sent draft_round/placement_state payloads would otherwise stay cached forever and
+     * get wrongly replayed to a player who reconnects mid-combat. See register(). */
+    public void clearDraftAndPlacementCaches() {
+        lastDraftRoundJson.clear();
+        lastPlacementStateJson.clear();
     }
 
     public void cachePrompt(Team team, String json) {

@@ -27,7 +27,17 @@ export interface GameSocketHandlers {
   onError?(event: Event): void;
   /** Fired each time a reconnect attempt is scheduled after an unexpected close. */
   onReconnecting?(attempt: number, delayMs: number): void;
+  /** Fired instead of onClose+reconnect when the server closes with an application-level
+   * code (see FATAL_CLOSE_CODE_MIN below) - the match is gone or we're no longer a valid
+   * participant, so retrying would just loop forever against the same rejection. */
+  onFatalClose?(reason: string): void;
 }
+
+/** WebServer's own closeSession(...) calls (match finished/gone, not a participant - see
+ * WebServer.java's onWsConnect/authorizeWsUpgrade) use codes >=4000, the range reserved for
+ * private/application use; every other close (idle timeout, network blip, tab sleep) uses an
+ * ordinary <4000 code and is exactly what auto-reconnect exists to recover from. */
+const FATAL_CLOSE_CODE_MIN = 4000;
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const RECONNECT_BASE_DELAY_MS = 1_000;
@@ -72,6 +82,10 @@ export class GameSocket {
     };
     ws.onclose = (event) => {
       this.stopHeartbeat();
+      if (!this.intentionalClose && event.code >= FATAL_CLOSE_CODE_MIN) {
+        this.handlers.onFatalClose?.(event.reason || "This match is no longer available.");
+        return;
+      }
       this.handlers.onClose?.(event);
       if (!this.intentionalClose) {
         this.scheduleReconnect();

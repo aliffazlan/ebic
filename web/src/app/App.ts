@@ -157,6 +157,9 @@ export class App {
           this.showLobbyRoom(matchId, yourTeam, null, playerOneName, isPublic),
         onSpectate: (matchId, playerOneName, playerTwoName, joinCode) =>
           void this.startSpectate(matchId, playerOneName, playerTwoName, joinCode),
+        // Already DRAFTING/IN_PROGRESS - skip the lobby room and go straight back into the
+        // match, same entry point a fresh join/create eventually lands on.
+        onRejoin: (matchId, yourTeam) => void this.startMatch(matchId, yourTeam),
       }),
       "up",
     );
