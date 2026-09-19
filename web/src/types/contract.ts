@@ -381,6 +381,12 @@ export interface PlacementStateSnapshot {
   units: PlacementUnitSnapshot[];
   confirmed: boolean;
   legalTiles: { q: number; r: number }[];
+  // Real matches never set these (the server's placement map is always its
+  // fixed default shape) - only a client driving its own local map, like the
+  // scripted tutorial, needs to override Board's PLACEMENT_MAP_RADIUS/
+  // PLACEMENT_MAP_ROW_LIMIT fallback.
+  mapRadius?: number;
+  mapRowLimit?: number;
 }
 
 // One render tick's vfx batch (possibly empty) paired with the currentTeam its "state"

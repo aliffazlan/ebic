@@ -13,6 +13,7 @@ import { LobbyRoomScreen } from "../ui/LobbyRoomScreen";
 import { LobbyScreen } from "../ui/LobbyScreen";
 import { MatchScreen } from "../ui/MatchScreen";
 import { SettingsScreen } from "../ui/SettingsScreen";
+import { TutorialScreen } from "../ui/TutorialScreen";
 import {
   createFadeOverlay,
   delay,
@@ -132,6 +133,7 @@ export class App {
           onLobbyCreated: (matchId, joinCode, isPublic) =>
             this.showLobbyRoom(matchId, "PLAYER_ONE", joinCode, this.currentUser!.username, isPublic),
           onOpenJoinMatch: () => this.showJoinMatch(),
+          onOpenTutorial: () => void this.startTutorial(),
           onOpenCodex: () => this.showCodex(),
           onOpenSettings: () => this.showSettings(),
           onLogout: () => {
@@ -217,6 +219,37 @@ export class App {
 
   private showChangelog(): void {
     this.setScreen(new ChangelogScreen(this.root, () => this.showSettings("right")), "left");
+  }
+
+  private showTutorial(): void {
+    this.setScreen(new TutorialScreen(this.root, this.currentUser?.username ?? "You", () => void this.endMatch()));
+  }
+
+  /**
+   * Same fade-to-black choreography as startMatch, since this is the same kind of
+   * "about to play" moment - just with no matchId/team to fetch first, and no backend
+   * involved at all (see TutorialScreen).
+   */
+  private async startTutorial(): Promise<void> {
+    if (this.navBusy) return;
+    if (getFastTransitions()) {
+      this.showTutorial();
+      return;
+    }
+    this.navBusy = true;
+    const overlay = createFadeOverlay();
+    try {
+      await runOverlayFade(overlay, "fade-overlay-in", FADE_MS);
+      overlay.style.opacity = "1";
+      overlay.classList.remove("fade-overlay-in");
+      await delay(HOLD_MS);
+      this.showTutorial(); // instant swap, hidden behind the black
+      await nextFrames(2); // let Pixi/board paint before the overlay clears
+      await runOverlayFade(overlay, "fade-overlay-out", FADE_MS);
+    } finally {
+      overlay.remove();
+      this.navBusy = false;
+    }
   }
 
   private async showMatch(matchId: string, yourTeam: Team): Promise<void> {

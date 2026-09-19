@@ -27,7 +27,7 @@ import type { IndicatorSpec } from "../vfx/VfxIndicators";
 import { castAnimationFor, type AttackAnimationSpec } from "../vfx/AttackAnimations";
 import type {
   GameStateSnapshot,
-  PlacementUnitSnapshot,
+  PlacementStateSnapshot,
   TileEffectSnapshot,
   UnitSnapshot,
   UnitType,
@@ -177,12 +177,14 @@ const SNOW_BLAST_PULSE_RADIUS_PX = HEX_SIZE * 2;
 const SNOW_BLAST_PULSE_COUNT = 5;
 const SNOW_BLAST_PULSE_TOTAL_FRAMES = 45; // ~0.75s, ~5 pulses at Homing Missile's own ~80ms-per-pulse cadence
 
-// PlacementStateSnapshot carries no map radius (see API_CONTRACT.md) -
-// placement always happens before the first real GameStateSnapshot, which is
-// the only message that carries the authoritative one. Assume this radius
-// (matches Game.newFullDraftMatch()'s radius 8, per CLAUDE.md) until then;
-// ensureMap() will correct it automatically the moment a real snapshot
-// arrives with a different value.
+// Real matches' PlacementStateSnapshot carries no map radius (see
+// API_CONTRACT.md) - placement always happens before the first real
+// GameStateSnapshot, which is the only message that carries the authoritative
+// one. Assume this radius (matches Game.FULL_MATCH_MAP_RADIUS/ROW_LIMIT)
+// until then; ensureMap() will correct it automatically the moment a real
+// snapshot arrives with a different value. A client driving its own local
+// map (the scripted tutorial) instead sets PlacementStateSnapshot's own
+// optional mapRadius/mapRowLimit, which applyPlacementSnapshot prefers.
 const PLACEMENT_MAP_RADIUS = 7;
 const PLACEMENT_MAP_ROW_LIMIT = 5;
 
@@ -450,7 +452,7 @@ export class Board {
       if (state.snapshot) {
         void this.applySnapshot(state.snapshot);
       } else if (state.placementState) {
-        this.applyPlacementSnapshot(state.placementState.units);
+        this.applyPlacementSnapshot(state.placementState);
       }
       this.refreshHighlights(state);
     });
@@ -1271,12 +1273,12 @@ export class Board {
    * so hp is left at 0/0 (draws as an empty sliver rather than a misleading
    * full bar) instead of guessing.
    */
-  private applyPlacementSnapshot(units: PlacementUnitSnapshot[]): void {
+  private applyPlacementSnapshot(placement: PlacementStateSnapshot): void {
     // A spectator's yourTeam is null, but placement_state is never sent to a spectator -
     // spectators only ever connect once a match is IN_PROGRESS, after placement is done -
     // so this fallback is unreachable in practice; it exists purely to satisfy the type.
     const yourTeam = this.store.getState().yourTeam ?? "PLAYER_ONE";
-    const synthetic: UnitSnapshot[] = units.map((u) => ({
+    const synthetic: UnitSnapshot[] = placement.units.map((u) => ({
       id: u.unitId,
       name: u.name,
       definitionId: u.definitionId,
@@ -1303,8 +1305,8 @@ export class Board {
       effects: [],
     }));
     void this.applySnapshot({
-      mapRadius: PLACEMENT_MAP_RADIUS,
-      mapRowLimit: PLACEMENT_MAP_ROW_LIMIT,
+      mapRadius: placement.mapRadius ?? PLACEMENT_MAP_RADIUS,
+      mapRowLimit: placement.mapRowLimit ?? PLACEMENT_MAP_ROW_LIMIT,
       units: synthetic,
     });
   }

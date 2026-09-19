@@ -13,6 +13,7 @@ export interface LobbyCallbacks {
   onMatchReady(matchId: string, yourTeam: "PLAYER_ONE" | "PLAYER_TWO"): void;
   onLobbyCreated(matchId: string, joinCode: string, isPublic: boolean): void;
   onOpenJoinMatch(): void;
+  onOpenTutorial(): void;
   onOpenCodex(): void;
   onOpenSettings(): void;
   onLogout(): void;
@@ -80,6 +81,18 @@ export class LobbyScreen implements Screen {
     const setError = (err: unknown) => {
       showErrorModal(wrap, err instanceof ApiError ? err.message : "Something went wrong.");
     };
+
+    // Tutorial - listed first: the only option that needs no opponent AND explains the
+    // rules, so it's where a brand-new player should land before anything else.
+    const tutorialHeading = document.createElement("h2");
+    tutorialHeading.textContent = "New here?";
+    card.appendChild(tutorialHeading);
+
+    const tutorialBtn = document.createElement("button");
+    tutorialBtn.className = "primary";
+    tutorialBtn.textContent = "Tutorial";
+    tutorialBtn.addEventListener("click", () => this.callbacks.onOpenTutorial());
+    card.appendChild(tutorialBtn);
 
     // Play vs the computer - listed first because it is the only option that needs
     // nobody else: no join code to share, no waiting for an opponent to connect.
