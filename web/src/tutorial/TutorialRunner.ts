@@ -9,10 +9,8 @@ import { computePlacementLegalTiles } from "./data/placement";
 import { buildActionPrompt } from "./legalTargets";
 import type { TutorialGate, TutorialStep, TutorialHost } from "./types";
 import type { Attribute } from "../types/contract";
-import type { GameStateSnapshot, PlacementStateSnapshot, PromptPayload, VfxEvent } from "../types/contract";
+import type { EffectSnapshot, GameStateSnapshot, PlacementStateSnapshot, PromptPayload, VfxEvent } from "../types/contract";
 import type { MatchActions } from "../ui/MatchActions";
-
-const HEAL_AMOUNT = 30;
 
 export class TutorialRunner implements MatchActions {
   private stepIndex = 0;
@@ -63,6 +61,7 @@ export class TutorialRunner implements MatchActions {
   }
 
   private async completeGate(): Promise<void> {
+    this.host.setObjective(null);
     const step = this.current;
     if (step.onAdvance) await step.onAdvance({ host: this.host });
     if (this.stepIndex >= this.steps.length - 1) return;
@@ -117,7 +116,7 @@ export class TutorialRunner implements MatchActions {
       abilityId === gate.abilityId &&
       target.unitId === gate.targetId
     ) {
-      this.applyHeal(unitId, abilityId, target.unitId);
+      this.applyColdEmbrace(unitId, abilityId, target.unitId);
       void this.completeGate();
       return;
     }
@@ -235,17 +234,27 @@ export class TutorialRunner implements MatchActions {
     void this.completeGate();
   }
 
-  private applyHeal(casterId: string, abilityId: string, targetId: string): void {
+  private applyColdEmbrace(casterId: string, abilityId: string, targetId: string): void {
     const snapshot = this.host.store.getState().snapshot!;
     const next = structuredClone(snapshot);
     const caster = next.units.find((u) => u.id === casterId)!;
     const target = next.units.find((u) => u.id === targetId)!;
-    target.currentHp = Math.min(target.maxHp, target.currentHp + HEAL_AMOUNT);
+    const effect: EffectSnapshot = {
+      name: "Cold Embrace",
+      description: "Sealed in ice - healed for 30 at the start of each of the next 3 turns.",
+      category: "BUFF",
+      permanent: false,
+      remainingTurns: 3,
+      statusFlags: [],
+      extraInfo: null,
+      partnerUnitId: null,
+    };
+    target.effects.push(effect);
     const ability = caster.abilities.find((a) => a.id === abilityId);
     next.remainingMoves = Math.max(0, next.remainingMoves - (ability?.moveCost ?? 1));
     if (ability) ability.currentCooldown = ability.maxCooldown;
     this.host.playVfxBatch(
-      [{ type: "heal", abilityId, sourceUnitId: casterId, targetUnitId: targetId, amount: HEAL_AMOUNT, causeLabel: null }],
+      [{ type: "status_applied", abilityId, sourceUnitId: casterId, targetUnitId: targetId, amount: null, causeLabel: null }],
       next.currentTeam,
     );
     this.pushSnapshot(next);

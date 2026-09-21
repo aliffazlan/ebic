@@ -182,17 +182,28 @@ export const TUTORIAL_SCRIPT: TutorialStep[] = [
       const current = host.store.getState().snapshot;
       if (!current) return;
       const advanced = enemyAdvancedPositions();
-      const advancing = structuredClone(current);
+      let advancing = structuredClone(current);
       advancing.currentTeam = "PLAYER_TWO";
-      for (const unit of advancing.units) {
-        const pos = advanced[unit.id];
-        if (pos) {
-          unit.q = pos.q;
-          unit.r = pos.r;
-        }
+
+      // Move one enemy unit at a time with a short gap between each, rather than
+      // teleporting all 14 units to their advanced tiles simultaneously. Sorted by
+      // ascending current q (not roster order): every advance is a q-1 step toward the
+      // player, so whichever unit is already furthest forward (smallest q) must clear
+      // its tile before a unit behind it (larger q) can move into that space - this
+      // order guarantees a unit's destination is always already vacated by the time it
+      // gets there, instead of momentarily overlapping a still-stationary unit ahead of it.
+      const moverIds = advancing.units
+        .filter((u) => advanced[u.id])
+        .sort((a, b) => a.q - b.q)
+        .map((u) => u.id);
+      for (const unitId of moverIds) {
+        const next = structuredClone(advancing);
+        const unit = next.units.find((u) => u.id === unitId)!;
+        Object.assign(unit, advanced[unitId]);
+        advancing = next;
+        host.store.setState({ snapshot: advancing, prompt: { kind: "action", team: "PLAYER_TWO", legalTargets: {} } });
+        await host.delay(200);
       }
-      host.store.setState({ snapshot: advancing, prompt: { kind: "action", team: "PLAYER_TWO", legalTargets: {} } });
-      await host.delay(1100);
 
       const backToPlayer = structuredClone(advancing);
       backToPlayer.currentTeam = "PLAYER_ONE";

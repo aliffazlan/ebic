@@ -24,7 +24,7 @@ export const UNIT_STATS: Record<string, StatBlock> = {
   grivath: { maxHp: 750, strength: 60, agility: 54, intelligence: 48, attackRange: 1 },
   dirge: { maxHp: 750, strength: 60, agility: 20, intelligence: 45, attackRange: 1 },
   discharge: { maxHp: 900, strength: 30, agility: 40, intelligence: 10, attackRange: 1 },
-  basic: { maxHp: 30, strength: 10, agility: 10, intelligence: 10, attackRange: 1 },
+  basic: { maxHp: 200, strength: 10, agility: 10, intelligence: 10, attackRange: 1 },
 };
 
 function moveAbility(moveCost: number): AbilitySnapshot {

@@ -55,16 +55,22 @@ export function initialPlacement(): PlacementStateSnapshot {
     pu("u-thaddeus", "Thaddeus", "thaddeus", "ELITE", -6, 0),
     pu("u-evayne", "Evayne", "evayne", "ELITE", -6, -1),
     pu("u-auroth", "Auroth", "auroth", "ELITE", -7, 1),
+    // The 10 nearest on-map tiles to the anchor by hex distance, matching the real
+    // DefaultArrangement.nextFreePositions ring-by-ring expansion exactly (verified via
+    // a faithful reimplementation of GameMap.getTilesInRadius/getAdjacentTiles): all 5
+    // distance-2 tiles, then the first 5 (of 7) distance-3 tiles. Order within is
+    // arbitrary (basics are visually identical), same as the real algorithm's own roster-
+    // order tie-break.
     pu("u-basic-1", "Basic", "basic", "BASIC", -7, 2),
-    pu("u-basic-2", "Basic", "basic", "BASIC", -7, 3),
-    pu("u-basic-3", "Basic", "basic", "BASIC", -7, 4),
-    pu("u-basic-4", "Basic", "basic", "BASIC", -7, 5),
-    pu("u-basic-5", "Basic", "basic", "BASIC", -6, 1),
-    pu("u-basic-6", "Basic", "basic", "BASIC", -6, 2),
-    pu("u-basic-7", "Basic", "basic", "BASIC", -6, 3),
-    pu("u-basic-8", "Basic", "basic", "BASIC", -6, 4),
-    pu("u-basic-9", "Basic", "basic", "BASIC", -6, 5),
-    pu("u-basic-10", "Basic", "basic", "BASIC", -5, -2),
+    pu("u-basic-2", "Basic", "basic", "BASIC", -6, 1),
+    pu("u-basic-3", "Basic", "basic", "BASIC", -5, -2),
+    pu("u-basic-4", "Basic", "basic", "BASIC", -5, -1),
+    pu("u-basic-5", "Basic", "basic", "BASIC", -5, 0),
+    pu("u-basic-6", "Basic", "basic", "BASIC", -7, 3),
+    pu("u-basic-7", "Basic", "basic", "BASIC", -6, 2),
+    pu("u-basic-8", "Basic", "basic", "BASIC", -5, 1),
+    pu("u-basic-9", "Basic", "basic", "BASIC", -4, -3),
+    pu("u-basic-10", "Basic", "basic", "BASIC", -4, -2),
   ];
   return {
     confirmed: false,
