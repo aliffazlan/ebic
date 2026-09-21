@@ -36,6 +36,13 @@ import type {
 
 export const HEX_SIZE = 34;
 
+// Tutorial pointer arrow (see setObjectiveArrows) - bright gold, matches the
+// existing objective-banner/highlight accent color used elsewhere in the tutorial.
+const ARROW_COLOR = 0xfacc15;
+const ARROW_HOVER_OFFSET = 34;
+const ARROW_BOUNCE_AMPLITUDE = 5;
+const ARROW_BOUNCE_PERIOD_MS = 900;
+
 // Unit tokens are drawn a little larger than a hex. The face art inside a token
 // is ringed in team and type colours (see UnitIconFactory), and those rings eat
 // into the visible art, so this is a touch more generous than the bare
@@ -255,6 +262,9 @@ export class Board {
   // band or a stack picker could paint over would defeat the point of drawing it.
   // Like vfxLayer it survives refreshHighlights()'s uiLayer wipe.
   readonly indicatorLayer = new Container();
+  // Bouncing tutorial pointer arrows (see TutorialArrows.ts). Above even
+  // indicatorLayer so an arrow is never painted over by a floating damage number.
+  readonly arrowLayer = new Container();
 
   private iconFactory: UnitIconFactory;
   // Pan/zoom. Camera state lives here rather than in GameStateStore on
@@ -300,6 +310,10 @@ export class Board {
   // leak one more orphaned ticker callback per active effect. See
   // renderUnitStatusEffects/clearStatusEffectTicks.
   private activeStatusEffectTicks = new Map<string, (() => void)[]>();
+  // Currently-active tutorial pointer arrows' ticker callbacks - cleared and
+  // rebuilt wholesale on every setObjectiveArrows call, same reasoning as
+  // activePairEffectTicks (arrowLayer itself is never partially wiped).
+  private activeArrowTicks: (() => void)[] = [];
   // Static Link's jittering lightning ticks, cleared and rebuilt wholesale
   // each renderPairEffects call (same reasoning as activeStatusEffectTicks,
   // just not keyed per-unit since pairEffectLayer itself is wiped every time).
@@ -416,6 +430,7 @@ export class Board {
       this.stackPickerLayer,
       this.graveyardLayer,
       this.indicatorLayer,
+      this.arrowLayer,
     );
     // Lets stacked-unit tokens paint in priority order (see UNIT_Z_* / applyRenderPriority)
     // instead of plain insertion order - Pixi re-sorts automatically whenever a child's
@@ -501,6 +516,8 @@ export class Board {
     this.activeVfxOneShotTicks.clear();
     for (const charge of this.sanityEclipseCharges.values()) Ticker.shared.remove(charge.tick);
     this.sanityEclipseCharges.clear();
+    for (const tick of this.activeArrowTicks) Ticker.shared.remove(tick);
+    this.activeArrowTicks = [];
     this.root.destroy({ children: true });
   }
 
@@ -735,6 +752,44 @@ export class Board {
     if (!ticks) return;
     for (const tick of ticks) Ticker.shared.remove(tick);
     this.activeStatusEffectTicks.delete(unitId);
+  }
+
+  /**
+   * Replaces the full set of bouncing tutorial pointer arrows (see TutorialArrows.ts),
+   * each pointing down at a unit's current token position or a fixed tile. Re-resolves
+   * the target's position fresh every frame (rather than once at spawn) so an arrow
+   * tracks a unit through its move tween and survives Board's per-snapshot token
+   * rebuilds with no extra invalidation logic - same reasoning as the status-effect
+   * overlays' wall-clock-phased ticks.
+   */
+  setObjectiveArrows(targets: Array<{ kind: "unit"; unitId: string } | { kind: "tile"; q: number; r: number }>): void {
+    this.clearObjectiveArrows();
+    for (const target of targets) {
+      const arrow = new Graphics();
+      arrow
+        .moveTo(-12, -18)
+        .lineTo(12, -18)
+        .lineTo(0, 9)
+        .closePath()
+        .fill({ color: ARROW_COLOR });
+      this.arrowLayer.addChild(arrow);
+      const tick = safeTick(() => {
+        const base =
+          target.kind === "unit" ? this.unitSprites.get(target.unitId)?.position : axialToPixel({ q: target.q, r: target.r }, HEX_SIZE);
+        if (!base) return;
+        const bounce = Math.sin((performance.now() / ARROW_BOUNCE_PERIOD_MS) * Math.PI * 2) * ARROW_BOUNCE_AMPLITUDE;
+        arrow.position.set(base.x, base.y - ARROW_HOVER_OFFSET + bounce);
+      });
+      Ticker.shared.add(tick);
+      this.activeArrowTicks.push(tick);
+    }
+  }
+
+  /** Stops and removes every currently-active tutorial pointer arrow. */
+  private clearObjectiveArrows(): void {
+    for (const tick of this.activeArrowTicks) Ticker.shared.remove(tick);
+    this.activeArrowTicks = [];
+    this.arrowLayer.removeChildren();
   }
 
   /** Re-renders one unit's token from the current truth (position, team, name, ...) but *displayed* hp/dead. */

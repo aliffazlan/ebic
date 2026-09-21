@@ -539,7 +539,7 @@ export class Hud {
    */
   private renderEndTurnButton(state: MatchUiState, isYourTurn: boolean): HTMLElement {
     const btn = document.createElement("button");
-    btn.className = "primary";
+    btn.className = "primary end-turn-btn";
     btn.style.width = "100%";
     btn.textContent = "End Turn";
     btn.disabled = !isYourTurn || state.prompt?.kind === "attribute" || !!state.gameOver;
@@ -568,6 +568,9 @@ export class Hud {
     btn.className = "ability-btn";
     if (state.selectedAbilityId === ability.id) btn.classList.add("selected");
     if (ability.upgraded) btn.classList.add("upgraded");
+    // Stable selector for the tutorial's pointer-arrow overlay (see TutorialArrows.ts),
+    // since slot-based data-hotkey-slot only covers move/attack/ability1-3 positionally.
+    btn.dataset.abilityId = ability.id;
     // Set regardless of passive/disabled - onKeyDown forwards a click here, and a
     // disabled button already no-ops that click, which is exactly the desired
     // "hotkey does nothing on a passive ability" behaviour with no extra check.

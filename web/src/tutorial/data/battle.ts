@@ -15,7 +15,7 @@
 // a hex corner's near columns have an asymmetric r-range (e.g. q=-6 only allows r>=-1,
 // not r>=-radius), so positions can't just be eyeballed against the radius alone.
 
-import { coldEmbraceAbility, makeUnit } from "./units";
+import { extraAbilitiesFor, makeUnit } from "./units";
 import type { GameStateSnapshot, PlacementUnitSnapshot, UnitSnapshot } from "../../types/contract";
 
 export const MAP_RADIUS = 7;
@@ -23,10 +23,10 @@ export const MAP_ROW_LIMIT = 5;
 
 function enemyStartUnits(): UnitSnapshot[] {
   return [
-    makeUnit({ id: "e-harbinger", name: "Harbinger", definitionId: "harbinger", team: "PLAYER_TWO", unitType: "CHAMPION", q: 7, r: 0 }),
-    makeUnit({ id: "e-dirge", name: "Dirge", definitionId: "dirge", team: "PLAYER_TWO", unitType: "ELITE", q: 6, r: 0 }),
-    makeUnit({ id: "e-grivath", name: "Grivath", definitionId: "grivath", team: "PLAYER_TWO", unitType: "ELITE", q: 6, r: 1 }),
-    makeUnit({ id: "e-discharge", name: "Discharge", definitionId: "discharge", team: "PLAYER_TWO", unitType: "ELITE", q: 7, r: -1 }),
+    makeUnit({ id: "e-harbinger", name: "Harbinger", definitionId: "harbinger", team: "PLAYER_TWO", unitType: "CHAMPION", q: 7, r: 0, extraAbilities: extraAbilitiesFor("e-harbinger") }),
+    makeUnit({ id: "e-dirge", name: "Dirge", definitionId: "dirge", team: "PLAYER_TWO", unitType: "ELITE", q: 6, r: 0, extraAbilities: extraAbilitiesFor("e-dirge") }),
+    makeUnit({ id: "e-grivath", name: "Grivath", definitionId: "grivath", team: "PLAYER_TWO", unitType: "ELITE", q: 6, r: 1, extraAbilities: extraAbilitiesFor("e-grivath") }),
+    makeUnit({ id: "e-discharge", name: "Discharge", definitionId: "discharge", team: "PLAYER_TWO", unitType: "ELITE", q: 7, r: -1, extraAbilities: extraAbilitiesFor("e-discharge") }),
     // 180-degree mirror ((q,r) -> (-q,-r)) of placement.ts's corrected nearest-tile-first
     // basics - see that file for the derivation against the real DefaultArrangement algorithm.
     makeUnit({ id: "e-basic-1", name: "Basic", definitionId: "basic", team: "PLAYER_TWO", unitType: "BASIC", q: 7, r: -2 }),
@@ -51,9 +51,9 @@ export function battleStartSnapshot(): GameStateSnapshot {
     mapRowLimit: MAP_ROW_LIMIT,
     tileEffects: [],
     units: [
-      makeUnit({ id: "u-valor", name: "Valor", definitionId: "valor", team: "PLAYER_ONE", unitType: "CHAMPION", q: -7, r: 0 }),
-      makeUnit({ id: "u-thaddeus", name: "Thaddeus", definitionId: "thaddeus", team: "PLAYER_ONE", unitType: "ELITE", q: -6, r: 0 }),
-      makeUnit({ id: "u-evayne", name: "Evayne", definitionId: "evayne", team: "PLAYER_ONE", unitType: "ELITE", q: -6, r: -1 }),
+      makeUnit({ id: "u-valor", name: "Valor", definitionId: "valor", team: "PLAYER_ONE", unitType: "CHAMPION", q: -7, r: 0, extraAbilities: extraAbilitiesFor("u-valor") }),
+      makeUnit({ id: "u-thaddeus", name: "Thaddeus", definitionId: "thaddeus", team: "PLAYER_ONE", unitType: "ELITE", q: -6, r: 0, extraAbilities: extraAbilitiesFor("u-thaddeus") }),
+      makeUnit({ id: "u-evayne", name: "Evayne", definitionId: "evayne", team: "PLAYER_ONE", unitType: "ELITE", q: -6, r: -1, extraAbilities: extraAbilitiesFor("u-evayne") }),
       makeUnit({
         id: "u-auroth",
         name: "Auroth",
@@ -62,7 +62,7 @@ export function battleStartSnapshot(): GameStateSnapshot {
         unitType: "ELITE",
         q: -7,
         r: 1,
-        extraAbilities: [coldEmbraceAbility()],
+        extraAbilities: extraAbilitiesFor("u-auroth"),
       }),
       // Nearest-tile-first fill matching placement.ts's initialPlacement() exactly - see
       // that file's comment for the derivation against the real DefaultArrangement algorithm.
@@ -102,7 +102,7 @@ export function battleSnapshotFromPlacement(placementUnits: PlacementUnitSnapsho
           unitType: u.unitType,
           q: u.q,
           r: u.r,
-          extraAbilities: u.unitId === "u-auroth" ? [coldEmbraceAbility()] : undefined,
+          extraAbilities: extraAbilitiesFor(u.unitId),
         }),
       ),
       ...enemyStartUnits(),

@@ -7,6 +7,7 @@
 
 import { computePlacementLegalTiles } from "./data/placement";
 import { buildActionPrompt } from "./legalTargets";
+import { computeStepArrows } from "./TutorialArrows";
 import type { TutorialGate, TutorialStep, TutorialHost } from "./types";
 import type { Attribute } from "../types/contract";
 import type { EffectSnapshot, GameStateSnapshot, PlacementStateSnapshot, PromptPayload, VfxEvent } from "../types/contract";
@@ -16,6 +17,7 @@ export class TutorialRunner implements MatchActions {
   private stepIndex = 0;
   private movedBasics = new Set<string>();
   private actedUnits = new Set<string>();
+  private placementMovedUnits = new Set<string>();
   private awaitingAttribute = false;
   private busy = false;
 
@@ -48,20 +50,36 @@ export class TutorialRunner implements MatchActions {
     this.busy = true;
     this.movedBasics.clear();
     this.actedUnits.clear();
+    this.placementMovedUnits.clear();
     this.awaitingAttribute = false;
     const step = this.current;
     if (step.onEnter) await step.onEnter({ host: this.host });
     if (step.dialogue && step.dialogue.length > 0) await this.host.showDialogue(step.dialogue);
     this.host.setObjective(step.objective ?? null);
     this.busy = false;
+    this.updateArrows();
 
     if (step.gate.kind === "none") {
       await this.completeGate();
     }
   }
 
+  private updateArrows(): void {
+    const state = this.host.store.getState();
+    this.host.setArrows(
+      computeStepArrows(this.current.id, {
+        selectedUnitId: state.selectedUnitId,
+        selectedAbilityId: state.selectedAbilityId,
+        awaitingAttribute: this.awaitingAttribute,
+        actedUnits: this.actedUnits,
+        placementMovedUnits: this.placementMovedUnits,
+      }),
+    );
+  }
+
   private async completeGate(): Promise<void> {
     this.host.setObjective(null);
+    this.host.setArrows([]);
     const step = this.current;
     if (step.onAdvance) await step.onAdvance({ host: this.host });
     if (this.stepIndex >= this.steps.length - 1) return;
@@ -82,11 +100,13 @@ export class TutorialRunner implements MatchActions {
   selectUnit(unitId: string | null): void {
     if (this.busy) return;
     this.host.store.setState({ selectedUnitId: unitId, selectedAbilityId: null });
+    this.updateArrows();
   }
 
   selectAbility(abilityId: string | null): void {
     if (this.busy) return;
     this.host.store.setState({ selectedAbilityId: abilityId });
+    this.updateArrows();
   }
 
   castAbility(targetKind: "unit" | "tile" | "none", target?: { unitId?: string; q?: number; r?: number }): void {
@@ -136,6 +156,7 @@ export class TutorialRunner implements MatchActions {
       }
       this.applyMove(snapshot, unitId, q, r);
       this.movedBasics.add(unitId);
+      this.updateArrows();
       if (this.movedBasics.size >= gate.atLeast) void this.completeGate();
       return;
     }
@@ -153,6 +174,7 @@ export class TutorialRunner implements MatchActions {
       }
       this.applyMove(snapshot, unitId, q, r);
       this.actedUnits.add(unitId);
+      this.updateArrows();
       if (this.actedUnits.size >= gate.unitIds.length) void this.completeGate();
       return;
     }
@@ -185,6 +207,7 @@ export class TutorialRunner implements MatchActions {
       selectableAttributes: ["STRENGTH", "AGILITY", "INTELLIGENCE"],
     };
     this.host.store.setState({ prompt, attributeSubmitted: false });
+    this.updateArrows();
   }
 
   endTurn(): void {
@@ -299,6 +322,8 @@ export class TutorialRunner implements MatchActions {
     }
     next.legalTiles = computePlacementLegalTiles(next.units);
     this.host.store.setState({ placementState: next, selectedUnitId: null });
+    this.placementMovedUnits.add(unitId).add(targetUnitId);
+    this.updateArrows();
   }
 
   sendPlacementMove(unitId: string, q: number, r: number): void {
@@ -336,6 +361,8 @@ export class TutorialRunner implements MatchActions {
     }
     next.legalTiles = computePlacementLegalTiles(next.units);
     this.host.store.setState({ placementState: next, selectedUnitId: null });
+    this.placementMovedUnits.add(unitId);
+    this.updateArrows();
   }
 
   confirmPlacement(): void {

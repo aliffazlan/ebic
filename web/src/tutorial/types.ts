@@ -37,6 +37,13 @@ export interface TutorialStepContext {
   host: TutorialHost;
 }
 
+/** A bouncing pointer arrow's target: a unit/tile on the Pixi board (always points
+ * down), or a DOM element in Hud/the draft screen (points down or sideways). */
+export type ArrowTarget =
+  | { kind: "unit"; unitId: string }
+  | { kind: "tile"; q: number; r: number }
+  | { kind: "dom"; selector: string; direction: "down" | "side" };
+
 export interface TutorialStep {
   id: string;
   /** A stable index dev-only `?tutorialStep=N` jumps to; omitted for steps with nothing worth jumping to directly. */
@@ -56,6 +63,8 @@ export interface TutorialHost {
   showDialogue(lines: DialogueLine[]): Promise<void>;
   /** Updates (or, with null, hides) the persistent on-screen objective reminder. */
   setObjective(text: string | null): void;
+  /** Replaces the full set of active bouncing pointer arrows (empty array hides them all). */
+  setArrows(targets: ArrowTarget[]): void;
   /** Fires the small, non-blocking, interrupt-and-replace rejection toast. */
   showWrongMove(speaker: Speaker, text: string): void;
   /** Runs a vfx batch through the same combat-log + animation pipeline a live match uses. */

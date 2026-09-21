@@ -5,7 +5,7 @@
 //   Valor(0,0)-Harbinger(1,0) = 1        Evayne(1,-1)-Grivath(2,-1) = 1
 //   Auroth(1,-3)-Evayne(1,-1) = 2        u-basic-1(-2,0)-e-basic-1(-2,-1) = 1
 
-import { coldEmbraceAbility, makeUnit } from "./units";
+import { extraAbilitiesFor, makeUnit } from "./units";
 import { MAP_RADIUS, MAP_ROW_LIMIT } from "./battle";
 import type { GameStateSnapshot } from "../../types/contract";
 
@@ -18,9 +18,9 @@ export function midBattleSnapshot(): GameStateSnapshot {
     mapRowLimit: MAP_ROW_LIMIT,
     tileEffects: [],
     units: [
-      makeUnit({ id: "u-valor", name: "Valor", definitionId: "valor", team: "PLAYER_ONE", unitType: "CHAMPION", q: 0, r: 0, currentHp: 90 }),
-      makeUnit({ id: "u-thaddeus", name: "Thaddeus", definitionId: "thaddeus", team: "PLAYER_ONE", unitType: "ELITE", q: -1, r: 0, currentHp: 380 }),
-      makeUnit({ id: "u-evayne", name: "Evayne", definitionId: "evayne", team: "PLAYER_ONE", unitType: "ELITE", q: 1, r: -1, currentHp: 22 }),
+      makeUnit({ id: "u-valor", name: "Valor", definitionId: "valor", team: "PLAYER_ONE", unitType: "CHAMPION", q: 0, r: 0, currentHp: 90, extraAbilities: extraAbilitiesFor("u-valor") }),
+      makeUnit({ id: "u-thaddeus", name: "Thaddeus", definitionId: "thaddeus", team: "PLAYER_ONE", unitType: "ELITE", q: -1, r: 0, currentHp: 380, extraAbilities: extraAbilitiesFor("u-thaddeus") }),
+      makeUnit({ id: "u-evayne", name: "Evayne", definitionId: "evayne", team: "PLAYER_ONE", unitType: "ELITE", q: 1, r: -1, currentHp: 22, extraAbilities: extraAbilitiesFor("u-evayne") }),
       makeUnit({
         id: "u-auroth",
         name: "Auroth",
@@ -30,7 +30,7 @@ export function midBattleSnapshot(): GameStateSnapshot {
         q: 1,
         r: -3,
         currentHp: 480,
-        extraAbilities: [coldEmbraceAbility()],
+        extraAbilities: extraAbilitiesFor("u-auroth"),
       }),
       makeUnit({ id: "u-basic-1", name: "Basic", definitionId: "basic", team: "PLAYER_ONE", unitType: "BASIC", q: -2, r: 0, currentHp: 12 }),
       makeUnit({ id: "u-basic-2", name: "Basic", definitionId: "basic", team: "PLAYER_ONE", unitType: "BASIC", q: -1, r: 1, currentHp: 18 }),
@@ -48,10 +48,10 @@ export function midBattleSnapshot(): GameStateSnapshot {
       // displayed damage (TutorialRunner.resolveAttribute reports the defender's
       // pre-attack currentHp as the damage dealt) reads as a plausible single-attribute
       // hit, not an implausible one-shot on a much higher HP pool.
-      makeUnit({ id: "e-harbinger", name: "Harbinger", definitionId: "harbinger", team: "PLAYER_TWO", unitType: "CHAMPION", q: 1, r: 0, currentHp: 50 }),
-      makeUnit({ id: "e-grivath", name: "Grivath", definitionId: "grivath", team: "PLAYER_TWO", unitType: "ELITE", q: 2, r: -1, currentHp: 150 }),
-      makeUnit({ id: "e-dirge", name: "Dirge", definitionId: "dirge", team: "PLAYER_TWO", unitType: "ELITE", q: 0, r: -1, currentHp: 300 }),
-      makeUnit({ id: "e-discharge", name: "Discharge", definitionId: "discharge", team: "PLAYER_TWO", unitType: "ELITE", q: 2, r: 1, currentHp: 400 }),
+      makeUnit({ id: "e-harbinger", name: "Harbinger", definitionId: "harbinger", team: "PLAYER_TWO", unitType: "CHAMPION", q: 1, r: 0, currentHp: 50, extraAbilities: extraAbilitiesFor("e-harbinger") }),
+      makeUnit({ id: "e-grivath", name: "Grivath", definitionId: "grivath", team: "PLAYER_TWO", unitType: "ELITE", q: 2, r: -1, currentHp: 150, extraAbilities: extraAbilitiesFor("e-grivath") }),
+      makeUnit({ id: "e-dirge", name: "Dirge", definitionId: "dirge", team: "PLAYER_TWO", unitType: "ELITE", q: 0, r: -1, currentHp: 300, extraAbilities: extraAbilitiesFor("e-dirge") }),
+      makeUnit({ id: "e-discharge", name: "Discharge", definitionId: "discharge", team: "PLAYER_TWO", unitType: "ELITE", q: 2, r: 1, currentHp: 400, extraAbilities: extraAbilitiesFor("e-discharge") }),
       makeUnit({ id: "e-basic-1", name: "Basic", definitionId: "basic", team: "PLAYER_TWO", unitType: "BASIC", q: -2, r: -1, currentHp: 10 }),
       makeUnit({ id: "e-basic-2", name: "Basic", definitionId: "basic", team: "PLAYER_TWO", unitType: "BASIC", q: 0, r: 1, currentHp: 15 }),
       makeUnit({ id: "e-basic-3", name: "Basic", definitionId: "basic", team: "PLAYER_TWO", unitType: "BASIC", q: 5, r: -2, currentHp: 0, dead: true }),

@@ -24,6 +24,7 @@ export function renderUnitCard(
 ): HTMLElement {
   const card = document.createElement("div");
   card.className = onClick ? "unit-card clickable" : "unit-card";
+  card.dataset.definitionId = def.definitionId;
 
   card.appendChild(
     renderUnitFullBody(

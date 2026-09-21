@@ -1841,3 +1841,47 @@ input[type="range"]::-moz-range-thumb {
 .tutorial-objective.visible {
   display: flex;
 }
+
+/* ---- tutorial pointer arrows ----
+   Bouncing indicators pointing at whatever the current task wants clicked next
+   (see TutorialArrows.ts). DOM targets (draft cards, Hud buttons) render here;
+   board targets (units/tiles) render as Pixi Graphics instead (Board.arrowLayer).
+   Positioned every frame by TutorialArrowOverlay via getBoundingClientRect, so
+   only left/top are set inline - everything else (shape, bounce) is pure CSS. */
+
+.tutorial-arrow {
+  position: absolute;
+  display: none;
+  z-index: 30; /* above .modal-backdrop (10) and .tutorial-objective (20) */
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+/* Exact tip position is computed in TutorialArrowOverlay.tick() from these
+   dimensions (must match DOWN_HALF_WIDTH/DOWN_HEIGHT there) - no transform/margin
+   fudging here, the border-triangle's point already lands where JS puts it. */
+.tutorial-arrow--down {
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-top: 24px solid #facc15;
+  animation: tutorial-arrow-bounce-y 0.9s ease-in-out infinite;
+}
+
+/* Must match SIDE_WIDTH/SIDE_HALF_HEIGHT in TutorialArrowOverlay.tick(). */
+.tutorial-arrow--side {
+  border-top: 15px solid transparent;
+  border-bottom: 15px solid transparent;
+  border-left: 24px solid #facc15;
+  animation: tutorial-arrow-bounce-x 0.9s ease-in-out infinite;
+}
+
+@keyframes tutorial-arrow-bounce-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+
+@keyframes tutorial-arrow-bounce-x {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(8px); }
+}

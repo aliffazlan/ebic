@@ -10,13 +10,14 @@ import type { AxialCoord } from "../hex/HexMath";
 import { GameStateStore } from "../state/GameStateStore";
 import { TutorialRunner } from "../tutorial/TutorialRunner";
 import { TUTORIAL_SCRIPT } from "../tutorial/TutorialScript";
-import type { DialogueLine, Speaker, TutorialHost } from "../tutorial/types";
+import type { ArrowTarget, DialogueLine, Speaker, TutorialHost } from "../tutorial/types";
 import type { Attribute, Team, UnitSnapshot, VfxEvent } from "../types/contract";
 import { IndicatorScheduler } from "../vfx/IndicatorScheduler";
 import { scheduleVfxBatch } from "../vfx/ScheduleVfxBatch";
 import { CHROME_VOID_HEX } from "./Colors";
 import { DialogueBox } from "./DialogueBox";
 import { ObjectiveBanner } from "./ObjectiveBanner";
+import { TutorialArrowOverlay } from "./TutorialArrowOverlay";
 import { createFadeOverlay, delay, FADE_MS, HOLD_MS, nextFrames, runOverlayFade } from "./ScreenTransition";
 import { Hud } from "./Hud";
 import type { MatchActions } from "./MatchActions";
@@ -36,6 +37,11 @@ export class TutorialScreen implements Screen, MatchActions, TutorialHost {
   private hud: Hud | null = null;
   private turnBanner: TurnBanner | null = null;
   private objectiveBanner: ObjectiveBanner | null = null;
+  private arrowOverlay: TutorialArrowOverlay | null = null;
+  // setArrows can fire (via a ?tutorialStep= dev-jump) before initPixi's async
+  // app.init() resolves and this.board exists - cached so initPixi can replay the
+  // board-side targets the instant Board is actually constructed.
+  private lastArrowTargets: ArrowTarget[] = [];
   private dialogueBox: DialogueBox | null = null;
   private wrongMoveToast: WrongMoveToast | null = null;
   private indicators = new IndicatorScheduler();
@@ -65,6 +71,7 @@ export class TutorialScreen implements Screen, MatchActions, TutorialHost {
 
     this.turnBanner = new TurnBanner(canvasHost);
     this.objectiveBanner = new ObjectiveBanner(canvasHost);
+    this.arrowOverlay = new TutorialArrowOverlay(canvasHost);
     void this.initPixi(canvasHost);
     this.hud = new Hud(hudHost, logHost, "tutorial", this.store, this);
     this.dialogueBox = new DialogueBox(container);
@@ -88,6 +95,8 @@ export class TutorialScreen implements Screen, MatchActions, TutorialHost {
     this.turnBanner = null;
     this.objectiveBanner?.destroy();
     this.objectiveBanner = null;
+    this.arrowOverlay?.destroy();
+    this.arrowOverlay = null;
     this.hud?.destroy();
     this.board?.destroy();
     this.app?.destroy(true, { children: true });
@@ -111,6 +120,9 @@ export class TutorialScreen implements Screen, MatchActions, TutorialHost {
       onUnitClick: (unit) => this.handleUnitClick(unit),
     });
     app.stage.addChild(this.board.root);
+    this.board.setObjectiveArrows(
+      this.lastArrowTargets.filter((t): t is Extract<ArrowTarget, { kind: "unit" | "tile" }> => t.kind !== "dom"),
+    );
   }
 
   // ---- Board click routing (mirrors MatchScreen.ts, minus multi-stage casts - unused here) ----
@@ -224,6 +236,18 @@ export class TutorialScreen implements Screen, MatchActions, TutorialHost {
 
   setObjective(text: string | null): void {
     this.objectiveBanner?.setText(text);
+  }
+
+  setArrows(targets: ArrowTarget[]): void {
+    this.lastArrowTargets = targets;
+    const boardTargets = targets.filter(
+      (t): t is Extract<ArrowTarget, { kind: "unit" | "tile" }> => t.kind !== "dom",
+    );
+    const domTargets = targets
+      .filter((t): t is Extract<ArrowTarget, { kind: "dom" }> => t.kind === "dom")
+      .map((t) => ({ selector: t.selector, direction: t.direction }));
+    this.board?.setObjectiveArrows(boardTargets);
+    this.arrowOverlay?.setTargets(domTargets);
   }
 
   showWrongMove(speaker: Speaker, text: string): void {
