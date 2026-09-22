@@ -1,0 +1,21 @@
+{
+    "name": "Sanguine",
+    "type": "passive",
+    "description": "Every percentage point of health the target is missing adds %bonus_pct_damage:pct%% to this unit's attack damage, rewarding strikes against the wounded.",
+    "details": [
+        "Killing a target with an attack heals this unit for %max_hp_heal:pct%% of the target's max HP."
+    ],
+    "stats": {
+        "bonus_pct_damage": 0.015,
+        "max_hp_heal": 0.4
+    },
+    "upgrade": {
+        "summary": "Attacks also deal %current_hp_damage:pct%% of the target's current HP as bonus damage.",
+        "stats": {
+            "current_hp_damage": 0.2
+        },
+        "details": [
+            "This bonus is added before the missing-HP amplifier above applies, so it gets amplified right along with the rest of the attack."
+        ]
+    }
+}

@@ -22,7 +22,7 @@ public class Move extends Ability {
      */
     @Override
     public int getMoveCost(GameState state) {
-        return owner != null && owner.getUnitType() == UnitType.BASIC ? 0 : 1;
+        return owner != null && (owner.getUnitType() == UnitType.BASIC || owner.hasFreeMove()) ? 0 : 1;
     }
 
     /**

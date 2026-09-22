@@ -41,8 +41,8 @@ public abstract class Unit {
     private final List<Ability> abilities = new ArrayList<>();
     private final List<Effect> effects = new ArrayList<>();
     private final List<StatModifier> permanentModifiers = new ArrayList<>();
-    private boolean hasMovedThisTurn;
-    private boolean hasAttackedThisTurn;
+    private int movesUsedThisTurn;
+    private int attacksUsedThisTurn;
 
     protected Unit(String name, Team team, UnitType unitType, UnitStats baseStats) {
         this(name, team, unitType, baseStats, new HealthPool(baseStats.maxHealth()));
@@ -98,24 +98,52 @@ public abstract class Unit {
     }
 
     public void resetTurnFlags() {
-        hasMovedThisTurn = false;
-        hasAttackedThisTurn = false;
+        movesUsedThisTurn = 0;
+        attacksUsedThisTurn = 0;
     }
 
+    /**
+     * True once this unit has used up its move allowance for the turn - normally one
+     * move, or more while an active effect grants bonus move actions (Noctis's
+     * Bloodwake) - see {@link #bonusMoveActions()}.
+     */
     public boolean hasMovedThisTurn() {
-        return hasMovedThisTurn;
+        return movesUsedThisTurn >= 1 + bonusMoveActions();
     }
 
+    /** As {@link #hasMovedThisTurn()}, for attacks - see {@link #bonusAttackActions()}. */
     public boolean hasAttackedThisTurn() {
-        return hasAttackedThisTurn;
+        return attacksUsedThisTurn >= 1 + bonusAttackActions();
     }
 
     public void markMoved() {
-        hasMovedThisTurn = true;
+        movesUsedThisTurn++;
     }
 
     public void markAttacked() {
-        hasAttackedThisTurn = true;
+        attacksUsedThisTurn++;
+    }
+
+    /** Sum of every active effect's {@link Effect#bonusMoveActions()}. */
+    private int bonusMoveActions() {
+        int total = 0;
+        for (Effect effect : effects) {
+            if (!effect.isExpired()) {
+                total += effect.bonusMoveActions();
+            }
+        }
+        return total;
+    }
+
+    /** As {@link #bonusMoveActions()}, for attacks. */
+    private int bonusAttackActions() {
+        int total = 0;
+        for (Effect effect : effects) {
+            if (!effect.isExpired()) {
+                total += effect.bonusAttackActions();
+            }
+        }
+        return total;
     }
 
     public void addAbility(Ability ability) {
@@ -352,6 +380,26 @@ public abstract class Unit {
     public boolean hasFreeCastCharge() {
         for (Effect effect : effects) {
             if (!effect.isExpired() && effect.freeCastCharges() > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** True while some active effect will pay for the owner's Move in place of a move point. */
+    public boolean hasFreeMove() {
+        for (Effect effect : effects) {
+            if (!effect.isExpired() && effect.grantsFreeMove()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** As {@link #hasFreeMove()}, for Attack. */
+    public boolean hasFreeAttack() {
+        for (Effect effect : effects) {
+            if (!effect.isExpired() && effect.grantsFreeAttack()) {
                 return true;
             }
         }

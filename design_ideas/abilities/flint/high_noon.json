@@ -1,0 +1,26 @@
+{
+    "name": "High Noon",
+    "type": "passive",
+    "description": "On attack, has a %chance% % chance to mark the target enemy. Attacks on a marked enemy do not consume an action. Attacking a marked enemy causes it to take %crit_damage% % damage, and consumes the mark.",
+    "details": [
+        "Only the unit who caused the mark can consume the mark.",
+        "Failed attacks do not consume the mark."
+    ],
+    "stats": {
+        "duration": 3,
+        "chance": 0.4,
+        "crit_damage": 2.5
+    },
+    "upgrade": {
+        "summary": "Gains an active component. Unleashes a flurry of bullets at the target.",
+        "description": "On cast, attacks %count% times at the targetted unit. If a mark is consumed during these attacks, an additional attack is added.",
+        "stats": {
+            "cooldown": 5,
+            "cast_range": 2,
+            "count": 5
+        },
+        "details": [
+
+        ]
+    }
+}

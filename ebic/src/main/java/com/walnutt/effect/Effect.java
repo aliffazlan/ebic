@@ -207,6 +207,40 @@ public abstract class Effect extends TriggerHandler {
     }
 
     /**
+     * True while this effect makes the owner's Move ability cost no move point (Noctis's
+     * Bloodwake). Default false, so no existing effect changes behaviour.
+     *
+     * Read directly by Move.getMoveCost rather than going through freeCastCharges/
+     * hasFreeCastCharge: Move overrides getMoveCost outright and so sits outside that
+     * mechanism by construction - see the comment on freeCastCharges.
+     */
+    public boolean grantsFreeMove() {
+        return false;
+    }
+
+    /** As {@link #grantsFreeMove()}, for the owner's Attack ability. Default false. */
+    public boolean grantsFreeAttack() {
+        return false;
+    }
+
+    /**
+     * Extra move actions beyond the normal one-per-turn allowance this effect grants its
+     * owner while it's active (Noctis's Bloodwake lets him move twice). Default 0.
+     *
+     * Aggregated by Unit.hasMovedThisTurn the same way getMinAttackRange is aggregated -
+     * by summing every active effect's contribution - so a unit's move allowance is
+     * "1 + however much its effects grant" rather than a plain boolean.
+     */
+    public int bonusMoveActions() {
+        return 0;
+    }
+
+    /** As {@link #bonusMoveActions()}, for the owner's Attack ability. Default 0. */
+    public int bonusAttackActions() {
+        return 0;
+    }
+
+    /**
      * True if this effect forbids its owner from using one SPECIFIC ability right now,
      * as opposed to a StatusFlag's blanket "no abilities at all". Default false, so no
      * existing effect changes behaviour.

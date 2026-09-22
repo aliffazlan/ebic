@@ -1,0 +1,12 @@
+{
+    "name": "Noctis",
+    "type": "elite",
+    "max_hp": 630,
+    "strength": 48,
+    "agility": 78,
+    "intelligence" : 43,
+    "attack_range": 1,
+    "abilities": [
+        "bloodwake", "sanguine"
+    ]
+}

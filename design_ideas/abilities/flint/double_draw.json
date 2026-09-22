@@ -1,0 +1,22 @@
+{
+    "name": "Double Draw",
+    "type": "passive",
+    "description": "On a successful attack, a secondary shot is fired at a random target within attack range.",
+    "details": [
+        "Damage is based off one of the the unused attributes selected during the encounter.",
+        "The original target can be attacked by the secondary attack too.",
+        "The secondary attack counts as a normal attack.",
+        "Secondary attacks do not proc more secondary attacks."
+    ],
+    "stats": {
+
+    },
+    "upgrade": {
+        "summary": "Failed attacks still trigger a secondary attack with reduced damage",
+        "stats": {
+            "damage": 0.4
+        },
+        "details": [
+        ]
+    }
+}

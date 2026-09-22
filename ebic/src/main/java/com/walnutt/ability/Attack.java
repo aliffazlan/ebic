@@ -50,7 +50,7 @@ public class Attack extends Ability {
 
     @Override
     public int getMoveCost(GameState state) {
-        return owner != null && owner.getUnitType() == UnitType.BASIC ? 0 : 1;
+        return owner != null && (owner.getUnitType() == UnitType.BASIC || owner.hasFreeAttack()) ? 0 : 1;
     }
 
     /** Attack ignores the base `range` field entirely - its reach is the owner's stat. */

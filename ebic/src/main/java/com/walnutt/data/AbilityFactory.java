@@ -10,6 +10,7 @@ import com.walnutt.ability.impl.Backstab;
 import com.walnutt.ability.impl.Backtrack;
 import com.walnutt.ability.impl.Blizzard;
 import com.walnutt.ability.impl.BlizzardFist;
+import com.walnutt.ability.impl.Bloodwake;
 import com.walnutt.ability.impl.BranchlingAura;
 import com.walnutt.ability.impl.CapacitorBank;
 import com.walnutt.ability.impl.CloakAndDagger;
@@ -57,6 +58,7 @@ import com.walnutt.ability.impl.PylonOrbitalBeam;
 import com.walnutt.ability.impl.Recall;
 import com.walnutt.ability.impl.Refraction;
 import com.walnutt.ability.impl.Reload;
+import com.walnutt.ability.impl.Sanguine;
 import com.walnutt.ability.impl.SanityEclipse;
 import com.walnutt.ability.impl.Selfless;
 import com.walnutt.ability.impl.ShrinkRay;
@@ -117,6 +119,8 @@ public final class AbilityFactory {
         Map.entry("timeless_strike", TimelessStrike::new),
         Map.entry("feast", Feast::new),
         Map.entry("cripple", Cripple::new),
+        Map.entry("bloodwake", Bloodwake::new),
+        Map.entry("sanguine", Sanguine::new),
         Map.entry("static_link", StaticLink::new),
         Map.entry("eye_of_the_storm", EyeOfTheStorm::new),
         Map.entry("overheat", Overheat::new),
@@ -206,6 +210,7 @@ public final class AbilityFactory {
         // Rules hung off the combat hooks.
         "backstab",             // a defended attack keeps a share of the bonus
         "cripple",              // the full toll even from an attack that fails
+        "sanguine",             // attacks also bite for a slice of current HP
         "cloak_and_dagger",     // a landed ambush roots and silences
         "timeless_strike",      // the first chain gets another roll
         "duel",                 // mutual vulnerability, and a refresh on a win
@@ -231,6 +236,7 @@ public final class AbilityFactory {
         // Reshapes: the ability is a different thing afterwards.
         "steady_focus",         // a toggle rather than a timer
         "feast",                // the hunger never lifts
+        "bloodwake",            // attacks join in free, and a refresh extends instead of resetting
         "translocation",        // reaches anywhere, and swaps
         "psychic_projection",   // indefinite, and no longer stunning
         "mimic",                // copies kept for good, and upgraded

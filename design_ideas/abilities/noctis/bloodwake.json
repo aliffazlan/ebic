@@ -1,0 +1,22 @@
+{
+    "name": "Bloodwake",
+    "type": "active",
+    "description": "Awakens a bloodlust for %duration% turns, gaining %bonus_damage% bonus damage each turn it remains active. While it lasts, this unit's move actions are free and it may move twice per turn.",
+    "details": [
+        "Landing a kill during the effect refreshes its duration, and recasting Bloodwake while it's already active does the same.",
+        "The bonus damage keeps accumulating regardless - refreshing the duration doesn't reset it."
+    ],
+    "stats": {
+        "cooldown": 7,
+        "duration": 3,
+        "bonus_damage": 30
+    },
+    "upgrade": {
+        "summary": "Attacks also become free and can be made twice a turn, and refreshing the duration now extends it instead of resetting it.",
+        "description": "While active, this unit's move and attack actions are both free, and it may take each of them twice per turn.",
+        "details": [
+            "Landing a kill or recasting Bloodwake while it's active still refreshes it, but now adds %duration% turns onto what's left instead of resetting the clock.",
+            "The bonus damage still accumulates and carries over exactly as before."
+        ]
+    }
+}
