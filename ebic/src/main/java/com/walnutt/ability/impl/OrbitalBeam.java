@@ -2,7 +2,6 @@ package com.walnutt.ability.impl;
 
 import com.walnutt.ability.Ability;
 import com.walnutt.ability.target.Target;
-import com.walnutt.ability.target.TileTarget;
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.event.DamageEvent;
@@ -14,7 +13,7 @@ import com.walnutt.unit.Unit;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Zenith - flat-damage ranged beam; can target a unit or an empty tile (a "miss" cast, e.g. to trigger Pylons). */
+/** Zenith - flat-damage ranged beam; must target an enemy unit. */
 public class OrbitalBeam extends Ability {
     private int damage;
     /** Upgrade: one extra global beam per pylon standing. */
@@ -67,9 +66,6 @@ public class OrbitalBeam extends Ability {
     private Position resolvePosition(Target target) {
         if (target instanceof UnitTarget unitTarget) {
             return unitTarget.getUnit().getPosition();
-        }
-        if (target instanceof TileTarget tileTarget) {
-            return tileTarget.getTile().getPosition();
         }
         return null;
     }

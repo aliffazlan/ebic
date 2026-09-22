@@ -8,8 +8,8 @@
     "stats": {
         "cooldown": 5,
         "radius": 3,
-        "diff_dmg": 16,
-        "diff_heal": 16
+        "diff_dmg": 30,
+        "diff_heal": 30
     },
     "upgrade": {
         "summary": "Gains a passive: every attack this unit makes scales with who has the numbers, board-wide.",

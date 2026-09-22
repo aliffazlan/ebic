@@ -343,8 +343,8 @@ function def(o: DefOpts): UnitDefinitionSnapshot {
 
 const DEF_VALOR = def({ definitionId: "valor", name: "Valor", type: "CHAMPION", maxHp: 1280, strength: 68, agility: 54, intelligence: 60, attackRange: 1, abilityIds: ["counterstrike", "overwhelming_odds", "duel"] });
 const DEF_EMBER = def({ definitionId: "ember", name: "Ember", type: "CHAMPION", maxHp: 960, strength: 35, agility: 50, intelligence: 88, attackRange: 1, abilityIds: ["overheat", "fireblast", "eruption"] });
-const DEF_HARBINGER = def({ definitionId: "harbinger", name: "Harbinger", type: "CHAMPION", maxHp: 1200, strength: 66, agility: 30, intelligence: 86, attackRange: 2, abilityIds: ["oblivion_confinement", "sanity_eclipse", "objurgation"] });
-const DEF_CHRONOS = def({ definitionId: "chronos", name: "Chronos", type: "CHAMPION", maxHp: 1200, strength: 70, agility: 110, intelligence: 60, attackRange: 1, abilityIds: ["backtrack", "dilation", "timeless_strike"] });
+const DEF_HARBINGER = def({ definitionId: "harbinger", name: "Harbinger", type: "CHAMPION", maxHp: 1080, strength: 66, agility: 30, intelligence: 86, attackRange: 2, abilityIds: ["oblivion_confinement", "sanity_eclipse", "objurgation"] });
+const DEF_CHRONOS = def({ definitionId: "chronos", name: "Chronos", type: "CHAMPION", maxHp: 1140, strength: 58, agility: 104, intelligence: 46, attackRange: 1, abilityIds: ["backtrack", "dilation", "timeless_strike"] });
 
 const DEF_AUROTH = def({ definitionId: "auroth", name: "Auroth", type: "ELITE", maxHp: 530, strength: 20, agility: 30, intelligence: 70, attackRange: 2, abilityIds: ["cold_embrace", "frostbite"] });
 const DEF_LANAYA = def({ definitionId: "lanaya", name: "Lanaya", type: "ELITE", maxHp: 600, strength: 30, agility: 120, intelligence: 70, attackRange: 1, abilityIds: ["psychic_projection", "refraction"] });
@@ -356,10 +356,10 @@ const DEF_MAXWELL = def({ definitionId: "maxwell", name: "Maxwell", type: "ELITE
 const DEF_SPITTER = def({ definitionId: "spitter", name: "Spitter", type: "ELITE", maxHp: 600, strength: 30, agility: 35, intelligence: 60, attackRange: 2, abilityIds: ["poison_sting", "poison_bloom"] });
 const DEF_DISCHARGE = def({ definitionId: "discharge", name: "Discharge", type: "ELITE", maxHp: 900, strength: 30, agility: 40, intelligence: 10, attackRange: 1, abilityIds: ["static_link", "eye_of_the_storm"] });
 
-const DEF_THADDEUS = def({ definitionId: "thaddeus", name: "Thaddeus", type: "ELITE", maxHp: 850, strength: 30, agility: 9, intelligence: 20, attackRange: 1, abilityIds: ["holy_shield", "selfless"] });
+const DEF_THADDEUS = def({ definitionId: "thaddeus", name: "Thaddeus", type: "ELITE", maxHp: 920, strength: 30, agility: 9, intelligence: 20, attackRange: 1, abilityIds: ["holy_shield", "selfless"] });
 const DEF_YUKI = def({ definitionId: "yuki", name: "Yuki", type: "ELITE", maxHp: 440, strength: 15, agility: 20, intelligence: 40, attackRange: 2, abilityIds: ["blizzard", "snow_golem"] });
 const DEF_WEI = def({ definitionId: "wei", name: "Wei", type: "ELITE", maxHp: 710, strength: 36, agility: 84, intelligence: 20, attackRange: 1, abilityIds: ["energy_break", "implosion"] });
-const DEF_GRIVATH = def({ definitionId: "grivath", name: "Grivath", type: "ELITE", maxHp: 750, strength: 60, agility: 54, intelligence: 48, attackRange: 1, abilityIds: ["feast", "cripple"] });
+const DEF_GRIVATH = def({ definitionId: "grivath", name: "Grivath", type: "ELITE", maxHp: 680, strength: 56, agility: 48, intelligence: 42, attackRange: 1, abilityIds: ["feast", "cripple"] });
 
 export const DRAFT_ROUNDS: DraftRoundSnapshot[] = [
   { roundLabel: "Champion", options: [DEF_VALOR, DEF_EMBER], opponentOptions: [DEF_HARBINGER, DEF_CHRONOS] },

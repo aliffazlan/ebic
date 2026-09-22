@@ -1,10 +1,10 @@
 {
     "name": "Grivath",
     "type": "elite",
-    "max_hp": 750,
-    "strength": 60,
-    "agility": 54,
-    "intelligence" : 48,
+    "max_hp": 680,
+    "strength": 56,
+    "agility": 48,
+    "intelligence" : 42,
     "attack_range": 1,
     "abilities": [
         "feast", "cripple"

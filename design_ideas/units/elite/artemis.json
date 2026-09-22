@@ -1,7 +1,7 @@
 {
     "name": "Artemis",
     "type": "elite",
-    "max_hp": 440,
+    "max_hp": 390,
     "strength": 28,
     "agility": 55,
     "intelligence" : 50,

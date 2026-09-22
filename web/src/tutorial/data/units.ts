@@ -19,11 +19,11 @@ interface StatBlock {
 
 export const UNIT_STATS: Record<string, StatBlock> = {
   valor: { maxHp: 1280, strength: 68, agility: 54, intelligence: 60, attackRange: 1 },
-  harbinger: { maxHp: 1200, strength: 66, agility: 30, intelligence: 86, attackRange: 2 },
+  harbinger: { maxHp: 1080, strength: 66, agility: 30, intelligence: 86, attackRange: 2 },
   auroth: { maxHp: 530, strength: 20, agility: 30, intelligence: 70, attackRange: 2 },
   evayne: { maxHp: 480, strength: 15, agility: 120, intelligence: 30, attackRange: 1 },
-  thaddeus: { maxHp: 850, strength: 30, agility: 9, intelligence: 20, attackRange: 1 },
-  grivath: { maxHp: 750, strength: 60, agility: 54, intelligence: 48, attackRange: 1 },
+  thaddeus: { maxHp: 920, strength: 30, agility: 9, intelligence: 20, attackRange: 1 },
+  grivath: { maxHp: 680, strength: 56, agility: 48, intelligence: 42, attackRange: 1 },
   dirge: { maxHp: 750, strength: 60, agility: 20, intelligence: 45, attackRange: 1 },
   discharge: { maxHp: 900, strength: 30, agility: 40, intelligence: 10, attackRange: 1 },
   basic: { maxHp: 200, strength: 10, agility: 10, intelligence: 10, attackRange: 1 },
@@ -73,9 +73,9 @@ export function coldEmbraceAbility(): AbilitySnapshot {
     id: "cold_embrace",
     name: "Cold Embrace",
     description:
-      "Seals a unit within 4 tiles in ice for 3 turns. Each turn the ice heals an ally, or damages an enemy, for 30.",
+      "Seals a unit within 3 tiles in ice for 2 turns. Each turn the ice heals an ally, or damages an enemy, for 40.",
     details: [],
-    stats: { cooldown: 6, cast_range: 4, duration: 3, dmg_heal: 30 },
+    stats: { cooldown: 6, cast_range: 3, duration: 2, dmg_heal: 40 },
     passive: false,
     upgraded: false,
     ready: true,
@@ -83,7 +83,7 @@ export function coldEmbraceAbility(): AbilitySnapshot {
     currentCooldown: 0,
     maxCooldown: 6,
     moveCost: 1,
-    range: 4,
+    range: 3,
     minRange: 0,
   };
 }
@@ -140,8 +140,8 @@ function overwhelmingOddsAbility(): AbilitySnapshot {
     id: "overwhelming_odds",
     name: "Overwhelming Odds",
     description:
-      "Counts allies against enemies within 3 tiles. Outnumbering them deals 16 damage per unit of advantage; being outnumbered instead heals allies in the area 16 per unit of deficit.",
-    stats: { cooldown: 5, radius: 3, diff_dmg: 16, diff_heal: 16 },
+      "Counts allies against enemies within 3 tiles. Outnumbering them deals 30 damage per unit of advantage; being outnumbered instead heals allies in the area 30 per unit of deficit.",
+    stats: { cooldown: 5, radius: 3, diff_dmg: 30, diff_heal: 30 },
     passive: false,
     maxCooldown: 5,
     range: 3,
@@ -153,13 +153,13 @@ function duelAbility(): AbilitySnapshot {
     id: "duel",
     name: "Duel",
     description:
-      "Locks an adjacent enemy into single combat for 3 turns - neither may act, and each is forced to attack the other at turn's end. The survivor permanently gains 20 to every attribute and heals 50% of its max health.",
+      "Locks an adjacent enemy into single combat for 3 turns - neither may act, and each is forced to attack the other at turn's end. The survivor permanently gains 20 to every attribute; beating anything more than a basic unit also heals 30% of max health.",
     stats: {
       cooldown: 6,
       cast_range: 1,
       duration: 3,
       duel_bonus: 20,
-      duel_heal: 0.5,
+      duel_heal: 0.3,
       win_multiplier: 2.5,
       duel_damage_multiplier: 2,
     },
@@ -175,8 +175,8 @@ function holyShieldAbility(): AbilitySnapshot {
     id: "holy_shield",
     name: "Holy Shield",
     description:
-      "Wraps an ally within 2 tiles in a 50-health barrier for 3 turns. If it breaks early, it erupts, clearing debuffs and dealing 50 damage to enemies within 1 tile.",
-    stats: { cooldown: 4, cast_range: 2, duration: 3, barrier_hp: 50, damage: 50, radius: 1 },
+      "Wraps an ally within 2 tiles in a 80-health barrier for 3 turns. If it breaks early, it erupts, clearing debuffs and dealing 50 damage to enemies within 1 tile.",
+    stats: { cooldown: 4, cast_range: 2, duration: 3, barrier_hp: 80, damage: 50, radius: 1 },
     passive: false,
     maxCooldown: 4,
     range: 2,
@@ -240,10 +240,10 @@ function sanityEclipseAbility(): AbilitySnapshot {
     id: "sanity_eclipse",
     name: "Sanity's Eclipse",
     description:
-      "Hurls a psionic orb at a tile within 4 tiles. After 1 turn it detonates, dealing 1.5 damage to every enemy within 1 tile for each point of intelligence this unit has over them.",
-    stats: { cooldown: 9, cast_range: 4, duration: 1, delay: 1, radius: 1, int_diff_dmg: 1.5 },
+      "Hurls a psionic orb at a tile within 4 tiles. After 1 turn it detonates, dealing 1.8 damage to every enemy within 1 tile for each point of intelligence this unit has over them.",
+    stats: { cooldown: 8, cast_range: 4, duration: 1, delay: 1, radius: 1, int_diff_dmg: 1.8 },
     passive: false,
-    maxCooldown: 9,
+    maxCooldown: 8,
     range: 4,
   });
 }

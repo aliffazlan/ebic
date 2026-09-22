@@ -7,9 +7,9 @@
     ],
     "stats": {
         "cooldown": 6,
-        "cast_range": 4,
-        "duration": 3,
-        "dmg_heal": 30
+        "cast_range": 3,
+        "duration": 2,
+        "dmg_heal": 40
     },
     "upgrade": {
         "summary": "A sealed ally can still walk, though it cannot attack or cast.",

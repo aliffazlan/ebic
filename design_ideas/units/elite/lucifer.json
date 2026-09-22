@@ -1,7 +1,7 @@
 {
     "name": "Lucifer",
     "type": "elite",
-    "max_hp": 800,
+    "max_hp": 880,
     "strength": 80,
     "agility": 30,
     "intelligence" : 20,

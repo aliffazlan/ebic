@@ -6,9 +6,9 @@
         "A pylon sharing its tile with another unit cannot be used."
     ],
     "stats": {
-        "cooldown": 2,
-        "barrier_hp": 50,
-        "barrier_duration": 2
+        "cooldown": 5,
+        "barrier_hp": 100,
+        "barrier_duration": 5
     },
     "upgrade": {
         "summary": "The pylon survives, taking %pylon_damage% damage instead of being consumed.",

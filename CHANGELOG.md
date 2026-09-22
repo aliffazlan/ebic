@@ -7,7 +7,45 @@ Every version lives in this one file, newest first — the project is small enou
 scrollable history beats hunting through per-version files. Entries are written for players
 rather than for the diff: what changed about playing the game, not which classes moved.
 
-## [Unreleased] — 0.4.0
+## 0.4.1 — 2026-09-22
+
+More tuning on top of 0.4.0's numbers — and the game finally introduces itself, walking a
+new player through their first match.
+
+### Balance
+
+- **Harbinger**: health 1200 → 1080.
+- **Sanity's Eclipse**: intelligence-difference damage multiplier 1.5 → 1.8, cooldown 9 → 8.
+- **Chronos**: health 1200 → 1140, strength 70 → 58, agility 110 → 104, intelligence 60 → 46.
+- **Overwhelming Odds**: the damage and healing dealt per unit of advantage or deficit rises
+  to 30 (was 16).
+- **Duel**: winning against a basic unit no longer heals the survivor at all — winning
+  against anything else still heals, but only 30% of max health (was 50% for every win).
+- **Orbital Beam** can no longer be cast on empty ground, only on a unit.
+- **Dislocation**: cooldown 2 → 5, and its barrier now lasts 5 turns (was 2) for 100 health
+  (was 50).
+- **Artemis**: health 440 → 390.
+- **Cold Embrace**: duration 3 → 2, damage/heal 30 → 40, cast range 4 → 3.
+- **Branch**: Branchlings' health 50 → 100.
+- **Grivath**: health 750 → 680, strength 60 → 56, agility 54 → 48, intelligence 48 → 42.
+- **Lucifer**: health 800 → 880.
+- **Translocation**: every throw is shorter — itself 4 → 3 tiles, an ally 3 → 2, an enemy
+  2 → 1.
+- **Homing Missile**: cast range 8 → 6.
+- **Thaddeus**: health 850 → 920.
+- **Holy Shield**: barrier 50 → 80.
+- **Implosion**: damage per turn of cooldown rises to 18 (was 12).
+
+### Tutorial
+
+- **A "Tutorial" option now sits first in the lobby.** It walks a brand-new player through
+  drafting a champion and three elites, arranging a formation, and fighting a staged battle,
+  narrated by Valor throughout. Along the way it covers the shape of a turn (three actions
+  for champions and elites, basics move for free) and the Strength/Agility/Intelligence
+  attack exchange — what winning and losing an attack actually looks like — closing on a
+  scripted victory over Harbinger.
+
+## [0.4.0] — 2026-09-17
 
 A pass across the roster now that a season of 0.3.0 has settled the numbers — ten units
 retuned, five abilities rebuilt outright, and an upgrade that finally reaches the fight

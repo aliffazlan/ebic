@@ -1,7 +1,7 @@
 {
     "name": "Harbinger",
     "type": "champion",
-    "max_hp": 1200,
+    "max_hp": 1080,
     "strength": 66,
     "agility": 30,
     "intelligence" : 86,

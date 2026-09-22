@@ -8,7 +8,7 @@
     ],
     "stats": {
         "cooldown": 6,
-        "cast_range": 8,
+        "cast_range": 6,
         "delay": 1,
         "damage": 50,
         "aoe_damage": 20

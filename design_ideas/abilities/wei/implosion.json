@@ -8,7 +8,7 @@
     "stats": {
         "cooldown": 5,
         "cast_range": 2,
-        "dmg_per_cooldown": 12,
+        "dmg_per_cooldown": 18,
         "radius": 1
     },
     "upgrade": {

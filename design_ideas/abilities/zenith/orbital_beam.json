@@ -1,7 +1,7 @@
 {
     "name": "Orbital Beam",
     "type": "active",
-    "description": "Calls down a beam from orbit on a unit or empty tile within %cast_range% tiles, dealing %damage% damage.",
+    "description": "Calls down a beam from orbit on a unit within %cast_range% tiles, dealing %damage% damage.",
     "stats": {
         "cooldown": 2,
         "damage": 60,

@@ -264,10 +264,10 @@ export class TutorialRunner implements MatchActions {
     const target = next.units.find((u) => u.id === targetId)!;
     const effect: EffectSnapshot = {
       name: "Cold Embrace",
-      description: "Sealed in ice - healed for 30 at the start of each of the next 3 turns.",
+      description: "Sealed in ice - healed for 40 at the start of each of the next 2 turns.",
       category: "BUFF",
       permanent: false,
-      remainingTurns: 3,
+      remainingTurns: 2,
       statusFlags: [],
       extraInfo: null,
       partnerUnitId: null,

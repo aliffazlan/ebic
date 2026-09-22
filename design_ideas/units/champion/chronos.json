@@ -1,10 +1,10 @@
 {
     "name": "Chronos",
     "type": "champion",
-    "max_hp": 1200,
-    "strength": 70,
-    "agility": 110,
-    "intelligence" : 60,
+    "max_hp": 1140,
+    "strength": 58,
+    "agility": 104,
+    "intelligence" : 46,
     "attack_range": 1,
     "abilities": [
         "backtrack", "dilation", "timeless_strike"

@@ -1,7 +1,7 @@
 {
     "name": "Thaddeus",
     "type": "elite",
-    "max_hp": 850,
+    "max_hp": 920,
     "strength": 30,
     "agility": 9,
     "intelligence" : 20,

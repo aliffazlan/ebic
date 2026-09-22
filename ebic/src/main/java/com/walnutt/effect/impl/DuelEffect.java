@@ -40,9 +40,11 @@ public class DuelEffect extends Effect {
         super("Duel",
             "Locked in a forced duel: neither unit can act freely, and each is forced to attack the "
                 + "other at the end of its turn. The winner permanently gains " + duelBonus + " to all "
-                + "stats (x" + winMultiplier + " if the loser wasn't a Basic) and heals "
-                + Math.round(duelHealPercent * 100) + "% of max health. Separating the duelists early "
-                + "ends the duel with no reward.",
+                + "stats (x" + winMultiplier + " if the loser wasn't a Basic)"
+                + (opponent.getUnitType() == UnitType.BASIC
+                    ? ""
+                    : ", and heals " + Math.round(duelHealPercent * 100) + "% of max health")
+                + ". Separating the duelists early ends the duel with no reward.",
             duration);
         this.opponent = opponent;
         this.duelBonus = duelBonus;
@@ -113,12 +115,15 @@ public class DuelEffect extends Effect {
             partner.resolved = true;
         }
 
-        double multiplier = opponent.getUnitType() == UnitType.BASIC ? 1.0 : winMultiplier;
+        boolean loserWasBasic = opponent.getUnitType() == UnitType.BASIC;
+        double multiplier = loserWasBasic ? 1.0 : winMultiplier;
         Unit winner = getOwner();
         for (Stat stat : new Stat[] {Stat.STRENGTH, Stat.AGILITY, Stat.INTELLIGENCE}) {
             winner.addPermanentModifier(StatModifier.flat(stat, duelBonus * multiplier, this));
         }
-        winner.heal(state, (int) Math.round(winner.getMaxHealth() * duelHealPercent));
+        if (!loserWasBasic) {
+            winner.heal(state, (int) Math.round(winner.getMaxHealth() * duelHealPercent));
+        }
         // A duel won is a duel that can be started again at once - the reward for committing to
         // one, and the reason the upgraded form snowballs.
         if (refreshOnWin != null) {
