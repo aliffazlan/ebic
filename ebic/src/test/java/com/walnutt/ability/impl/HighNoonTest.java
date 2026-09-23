@@ -10,6 +10,8 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import com.walnutt.TriggerHandler;
+
 import com.walnutt.ability.Attack;
 import com.walnutt.ability.target.UnitTarget;
 import com.walnutt.combat.Attribute;
@@ -18,6 +20,9 @@ import com.walnutt.combat.NormalEncounter;
 import com.walnutt.data.AbilityDefinition;
 import com.walnutt.data.UpgradeDefinition;
 import com.walnutt.effect.impl.HighNoonMarkEffect;
+import com.walnutt.event.GameEvent;
+import com.walnutt.event.PassiveProcEvent;
+import com.walnutt.event.PostDamageEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
@@ -214,5 +219,59 @@ class HighNoonTest {
 
         assertTrue(victim.isDead());
         assertEquals(0, victim.getHealth(), "health never goes negative from the remaining unfired shots");
+    }
+
+    @Test
+    void everyBarrageShotCanTriggerDoubleDraw() {
+        Unit flint = new EliteUnit("Flint", Team.PLAYER_ONE, new UnitStats(100, 0, 0, 560));
+        HighNoon highNoon = newHighNoon(Map.of("cooldown", 5.0, "cast_range", 2.0, "count", 3.0), "active");
+        flint.addAbility(highNoon);
+        highNoon.upgrade();
+        AbilityDefinition doubleDrawDefinition =
+            new AbilityDefinition("Double Draw", "passive", "desc", Map.of(), List.of(), List.of(), null);
+        flint.addAbility(new DoubleDraw(doubleDrawDefinition));
+        Unit victim = new BasicUnit("Victim", Team.PLAYER_TWO, new UnitStats(0, 0, 100, 100000));
+        GameState state = scenario(alwaysFails(), flint, victim);
+        int[] doubleDraws = {0};
+        state.getEventBus().addGlobalListener(new TriggerHandler() {
+            @Override
+            public void onDamageTaken(GameState s, PostDamageEvent event) {
+                if ("Double Draw".equals(event.damageEvent().getCauseLabel())) {
+                    doubleDraws[0]++;
+                }
+            }
+        });
+
+        highNoon.onUse(state, new UnitTarget(victim));
+
+        // 3 successful barrage shots, one Double Draw each - and Double Draw's own shot never
+        // chains into another one.
+        assertEquals(3, doubleDraws[0]);
+        assertFalse(highNoon.isBarrageInProgress());
+    }
+
+    @Test
+    void consumingAMarkPublishesExactlyOneProcForTheMarkedUnit() {
+        Unit flint = new EliteUnit("Flint", Team.PLAYER_ONE, new UnitStats(100, 0, 0, 560));
+        flint.addAbility(newHighNoon(Map.of(), null));
+        Unit victim = new BasicUnit("Victim", Team.PLAYER_TWO, new UnitStats(0, 0, 100, 100000));
+        victim.addEffect(new HighNoonMarkEffect(flint, 3, 2.5));
+        GameState state = scenario(alwaysFails(), flint, victim);
+        List<PassiveProcEvent> procs = new java.util.ArrayList<>();
+        state.getEventBus().addGlobalListener(new TriggerHandler() {
+            @Override
+            public void onGameEvent(GameState s, GameEvent event) {
+                if (event instanceof PassiveProcEvent proc) {
+                    procs.add(proc);
+                }
+            }
+        });
+
+        CombatEngine.performAttack(state, new NormalEncounter(flint, victim, Attribute.STRENGTH, Attribute.INTELLIGENCE));
+        CombatEngine.performAttack(state, new NormalEncounter(flint, victim, Attribute.STRENGTH, Attribute.INTELLIGENCE));
+
+        assertEquals(1, procs.size(), "only the hit that consumed the mark signals it");
+        assertEquals(victim, procs.get(0).unit());
+        assertEquals("High Noon Mark Consumed", procs.get(0).label());
     }
 }

@@ -15,6 +15,9 @@ import com.walnutt.unit.Unit;
 
 /** Flint - fans a second shot off the back of the first, judged by an attribute he didn't swing. */
 public class DoubleDraw extends PassiveAbility {
+    // Set while this passive's own second shot resolves - that shot publishes a chained
+    // PostAttackEvent of its own, which must never fan out into yet another Double Draw.
+    private boolean firing;
 
     public DoubleDraw(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription());
@@ -22,7 +25,7 @@ public class DoubleDraw extends PassiveAbility {
 
     @Override
     public void onPostAttack(GameState state, PostAttackEvent event) {
-        if (event.attacker() != owner || event.chained()) {
+        if (event.attacker() != owner || firing || (event.chained() && !inOwnHighNoonBarrage())) {
             return;
         }
         boolean succeeded = event.damageEvent().getDamage() > 0;
@@ -58,15 +61,30 @@ public class DoubleDraw extends PassiveAbility {
      * attribute value, discarding that reduction.
      */
     private void fireSecondShot(GameState state, Unit target, Attribute attribute, int amount) {
-        PreAttackEvent preAttack = new PreAttackEvent(owner, target);
-        state.getEventBus().publish(state, preAttack);
-        if (preAttack.isCancelled()) {
-            return;
+        firing = true;
+        try {
+            PreAttackEvent preAttack = new PreAttackEvent(owner, target);
+            state.getEventBus().publish(state, preAttack);
+            if (preAttack.isCancelled()) {
+                return;
+            }
+            DamageEvent damage = new DamageEvent(owner, target, amount);
+            damage.setAttackerAttribute(attribute);
+            damage.setCauseLabel("Double Draw");
+            target.takeDamage(state, damage);
+            state.getEventBus().publish(state, new PostAttackEvent(owner, target, damage, true));
+        } finally {
+            firing = false;
         }
-        DamageEvent damage = new DamageEvent(owner, target, amount);
-        damage.setAttackerAttribute(attribute);
-        damage.setCauseLabel("Double Draw");
-        target.takeDamage(state, damage);
-        state.getEventBus().publish(state, new PostAttackEvent(owner, target, damage, true));
+    }
+
+    /**
+     * Upgraded High Noon's barrage fires chained shots (so Counterstrike/Energy Break don't
+     * react once per shot), but each of those shots may still trigger this passive - any
+     * other chained attack (Timeless Strike-style) still may not.
+     */
+    private boolean inOwnHighNoonBarrage() {
+        return owner.getAbilities().stream()
+            .anyMatch(a -> a instanceof HighNoon highNoon && highNoon.isBarrageInProgress());
     }
 }

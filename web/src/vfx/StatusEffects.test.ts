@@ -32,4 +32,9 @@ describe("statusVisualFor", () => {
     expect(STATUS_VISUAL_BY_EFFECT_NAME["Poison Bloom"]).toMatchObject({ thick: true });
     expect(STATUS_VISUAL_BY_EFFECT_NAME.Poison).not.toHaveProperty("thick", true);
   });
+
+  it("marks High Noon's target with a crosshair and gives Bloodwake inward particles", () => {
+    expect(statusVisualFor(effect("High Noon Mark"))).toMatchObject({ mode: "unit", kind: "crosshair" });
+    expect(statusVisualFor(effect("Bloodwake"))).toMatchObject({ mode: "unit", kind: "inward-particles", color: 0xdc2626 });
+  });
 });

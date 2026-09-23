@@ -19,6 +19,9 @@ public class HighNoon extends Ability {
     private int duration;
     private double critMultiplier;
     private int barrageCount;
+    // True only while onUse's barrage loop is running - lets DoubleDraw tell this barrage's
+    // chained shots (which may trigger it) apart from any other chained attack (which may not).
+    private boolean barrageInProgress;
 
     public HighNoon(AbilityDefinition definition) {
         super(definition.name(), definition.formattedDescription(), true);
@@ -46,16 +49,25 @@ public class HighNoon extends Ability {
         Unit primaryTarget = ((UnitTarget) target).getUnit();
         int remaining = barrageCount;
         int fired = 0;
-        while (fired < remaining && !primaryTarget.isDead()) {
-            Optional<HighNoonMarkEffect> before = markFrom(primaryTarget);
-            CombatEngine.performAttack(state, new WeightedEncounter(owner, primaryTarget), true);
-            fired++;
-            if (before.isPresent() && before.get().isExpired()) {
-                remaining++;
+        barrageInProgress = true;
+        try {
+            while (fired < remaining && !primaryTarget.isDead()) {
+                Optional<HighNoonMarkEffect> before = markFrom(primaryTarget);
+                CombatEngine.performAttack(state, new WeightedEncounter(owner, primaryTarget), true);
+                fired++;
+                if (before.isPresent() && before.get().isExpired()) {
+                    remaining++;
+                }
             }
+        } finally {
+            barrageInProgress = false;
         }
         state.spendMoves(getMoveCost(state));
         resetToMax();
+    }
+
+    public boolean isBarrageInProgress() {
+        return barrageInProgress;
     }
 
     /** This unit's own currently-active High Noon mark on target, if any - not any other Flint's. */

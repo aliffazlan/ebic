@@ -183,6 +183,19 @@ const SNOW_GOLEM_CIRCLE_FRAMES = BRANCH_SUMMON_CIRCLE_FRAMES;
 const SNOW_BLAST_PULSE_RADIUS_PX = HEX_SIZE * 2;
 const SNOW_BLAST_PULSE_COUNT = 5;
 const SNOW_BLAST_PULSE_TOTAL_FRAMES = 45; // ~0.75s, ~5 pulses at Homing Missile's own ~80ms-per-pulse cadence
+// High Noon's mark-consumed burst: a red cone out of the far side of the target, away from
+// the shooter, per temp/vfx.txt - see playMarkConsumedBurst.
+const HIGH_NOON_BURST_COLOR = 0xdc2626;
+const HIGH_NOON_BURST_SPREAD_DEG = 55;
+const HIGH_NOON_BURST_COUNT = 22;
+const HIGH_NOON_BURST_SPEED = 3.2;
+// A tile effect's pulsing ring (Homing Missile's lock) - Dilation's own expanding-ring shape
+// (see StatusEffectPlayer's spawnPulseCircle) at ~70% of its size, so it's plainly a
+// different marker from High Noon's crosshair per temp/vfx.txt.
+const TILE_PULSE_PERIOD_MS = 2000;
+const TILE_PULSE_MIN_RADIUS_PX = 14;
+const TILE_PULSE_MAX_RADIUS_PX = 42;
+const TILE_PULSE_ALPHA_SCALE = 0.9;
 
 // Real matches' PlacementStateSnapshot carries no map radius (see
 // API_CONTRACT.md) - placement always happens before the first real
@@ -206,14 +219,15 @@ const PLACEMENT_MAP_ROW_LIMIT = 5;
  */
 const TILE_EFFECT_STYLES: Record<string, {
   fill: number; fillAlpha: number; stroke: number; strokeAlpha: number; inset: number;
-  reticle?: boolean; aboveUnits?: boolean;
+  pulse?: boolean; aboveUnits?: boolean;
 }> = {
   burning: { fill: 0xff5722, fillAlpha: 0.28, stroke: 0xff8a50, strokeAlpha: 0.85, inset: 2 },
   // Shawl's Acidic Brew. Sickly green, and a touch fainter than burning ground: it does
   // no damage on contact, it only softens whoever is standing in it.
   acid: { fill: 0x84cc16, fillAlpha: 0.24, stroke: 0xa3e635, strokeAlpha: 0.8, inset: 2 },
   eclipse: { fill: 0x93c5fd, fillAlpha: 0.16, stroke: 0xbfdbfe, strokeAlpha: 0.45, inset: 2 },
-  missile: { fill: 0xfb923c, fillAlpha: 0.18, stroke: 0xf97316, strokeAlpha: 0.9, inset: 5, reticle: true, aboveUnits: true },
+  // Only `stroke` is used - a pulse style draws its ring alone, no hex fill or border.
+  missile: { fill: 0xfb923c, fillAlpha: 0, stroke: 0xf97316, strokeAlpha: 0.9, inset: 5, pulse: true, aboveUnits: true },
   unknown: { fill: 0x94a3b8, fillAlpha: 0.2, stroke: 0xcbd5e1, strokeAlpha: 0.6, inset: 2 },
 };
 
@@ -318,6 +332,9 @@ export class Board {
   // each renderPairEffects call (same reasoning as activeStatusEffectTicks,
   // just not keyed per-unit since pairEffectLayer itself is wiped every time).
   private activePairEffectTicks = new Set<() => void>();
+  // Pulsing tile markers (Homing Missile's lock), cleared and rebuilt wholesale each
+  // renderTileEffects call - same reasoning as activePairEffectTicks.
+  private activeTileEffectTicks = new Set<() => void>();
   // One-shot vfx tickers not otherwise owned by a unit id (Pylon's sky-drop,
   // Backtrack's trail ghosts, Mimic's particles, Overwhelming Odds'/Pylon
   // Collapse's pulses, ...) - every one is also wrapped in safeTick, but this
@@ -514,6 +531,7 @@ export class Board {
     this.activePairEffectTicks.clear();
     for (const tick of this.activeVfxOneShotTicks) Ticker.shared.remove(tick);
     this.activeVfxOneShotTicks.clear();
+    this.clearTileEffectTicks();
     for (const charge of this.sanityEclipseCharges.values()) Ticker.shared.remove(charge.tick);
     this.sanityEclipseCharges.clear();
     for (const tick of this.activeArrowTicks) Ticker.shared.remove(tick);
@@ -853,6 +871,19 @@ export class Board {
       onComplete();
     });
     for (const tick of ticks) this.activeAttackAnimTicks.add(tick);
+  }
+
+  /** High Noon's mark-consumed burst - a red cone out of the far side of `to`, facing away from `from`. */
+  playMarkConsumedBurst(from: { x: number; y: number }, to: { x: number; y: number }): void {
+    spawnParticleBurst(this.vfxLayer, Ticker.shared, {
+      x: to.x,
+      y: to.y,
+      color: HIGH_NOON_BURST_COLOR,
+      count: HIGH_NOON_BURST_COUNT,
+      speed: HIGH_NOON_BURST_SPEED,
+      directionDeg: (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI,
+      spreadDeg: HIGH_NOON_BURST_SPREAD_DEG,
+    });
   }
 
   /**
@@ -1299,25 +1330,36 @@ export class Board {
   private renderTileEffects(tileEffects: TileEffectSnapshot[]): void {
     this.tileEffectLayer.removeChildren();
     this.tileMarkerLayer.removeChildren();
+    this.clearTileEffectTicks();
     for (const effect of tileEffects) {
       const { x, y } = axialToPixel({ q: effect.q, r: effect.r }, HEX_SIZE);
       const style = TILE_EFFECT_STYLES[effect.kind] ?? TILE_EFFECT_STYLES.unknown;
-      const points = hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - style.inset);
       const glow = new Graphics();
-      glow.poly(points).fill({ color: style.fill, alpha: style.fillAlpha });
-      glow.poly(points).stroke({ width: 2, color: style.stroke, alpha: style.strokeAlpha });
-      if (style.reticle) {
-        // A crosshair rather than more shading: this marks where something is about to
-        // land, and needs to read as a target rather than as ground the tile has become.
-        const arm = HEX_SIZE * 0.34;
-        glow.moveTo(-arm, 0).lineTo(arm, 0).moveTo(0, -arm).lineTo(0, arm)
-          .stroke({ width: 2, color: style.stroke, alpha: style.strokeAlpha });
-        glow.circle(0, 0, arm * 0.55).stroke({ width: 2, color: style.stroke, alpha: style.strokeAlpha });
+      if (style.pulse) {
+        // A pulsing ring rather than shading: this marks where something is about to land,
+        // and needs to read as a target rather than as ground the tile has become. Phased
+        // off wall-clock time, so the redraw on every snapshot is seamless.
+        const tick = safeTick(() => {
+          const progress = (performance.now() % TILE_PULSE_PERIOD_MS) / TILE_PULSE_PERIOD_MS;
+          const radius = TILE_PULSE_MIN_RADIUS_PX + (TILE_PULSE_MAX_RADIUS_PX - TILE_PULSE_MIN_RADIUS_PX) * progress;
+          glow.clear().circle(0, 0, radius).stroke({ width: 2, color: style.stroke, alpha: (1 - progress) * TILE_PULSE_ALPHA_SCALE });
+        });
+        this.activeTileEffectTicks.add(tick);
+        Ticker.shared.add(tick);
+      } else {
+        const points = hexPolygonPoints({ x: 0, y: 0 }, HEX_SIZE - style.inset);
+        glow.poly(points).fill({ color: style.fill, alpha: style.fillAlpha });
+        glow.poly(points).stroke({ width: 2, color: style.stroke, alpha: style.strokeAlpha });
       }
       glow.position.set(x, y);
       glow.eventMode = "none";
       (style.aboveUnits ? this.tileMarkerLayer : this.tileEffectLayer).addChild(glow);
     }
+  }
+
+  private clearTileEffectTicks(): void {
+    for (const tick of this.activeTileEffectTicks) Ticker.shared.remove(tick);
+    this.activeTileEffectTicks.clear();
   }
 
   /**

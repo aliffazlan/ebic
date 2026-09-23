@@ -21,7 +21,9 @@ export type UnitStatusVisualKind =
   | "energy-bars"
   | "doom"
   | "shrink"
-  | "chains";
+  | "chains"
+  | "crosshair"
+  | "inward-particles";
 
 export interface UnitStatusVisual {
   mode: "unit";
@@ -64,6 +66,8 @@ const FROSTBITE_BLUE = 0xbfe7ff;
 const REFRACTION_PINK = 0xf9a8d4;
 const INFERNAL_BLADE_RED = 0xdc2626;
 const MANIFESTATION_PURPLE = 0x581c87;
+const HIGH_NOON_ORANGE = 0xf97316;
+const BLOODWAKE_RED = 0xdc2626;
 
 /**
  * One entry per effect name (see EffectSnapshot.name, sourced from the
@@ -101,6 +105,12 @@ export const STATUS_VISUAL_BY_EFFECT_NAME: Record<string, StatusVisualSpec> = {
   // SVG (see spawnChainsOverlay), the same call made for Frostbite's snowflakes.
   "Infernal Blade": { mode: "unit", kind: "chains", color: INFERNAL_BLADE_RED },
   Manifestation: { mode: "unit", kind: "smoke", color: MANIFESTATION_PURPLE },
+  // The crosshair Homing Missile's tile marker used to draw (that marker is now a pulse, so
+  // the two can't be confused), per temp/vfx.txt.
+  "High Noon Mark": { mode: "unit", kind: "crosshair", color: HIGH_NOON_ORANGE },
+  // Large red particles drawn in from outside the portrait, fading out before they reach its
+  // centre - Sanity's Eclipse's charge, minus the orb, per temp/vfx.txt.
+  Bloodwake: { mode: "unit", kind: "inward-particles", color: BLOODWAKE_RED },
 };
 
 /**

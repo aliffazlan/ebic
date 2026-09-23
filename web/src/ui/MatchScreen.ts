@@ -235,6 +235,7 @@ export class MatchScreen implements Screen, MatchActions {
           indicators: this.indicators,
           playVfx: (events) => this.board?.playVfx(events),
           playAttackAnimation: (from, to, spec, onComplete) => this.board?.playAttackAnimation(from, to, spec, onComplete),
+          playMarkConsumedBurst: (from, to) => this.board?.playMarkConsumedBurst(from, to),
           showIndicators: (specs) => this.board?.showIndicators(specs),
           showIndicatorAt: (pos, spec) => this.board?.showIndicatorAt(pos, spec),
           resolveUnitPosition: (unitId) => this.board?.resolveUnitPosition(unitId) ?? null,

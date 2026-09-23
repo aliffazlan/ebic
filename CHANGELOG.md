@@ -7,6 +7,54 @@ Every version lives in this one file, newest first — the project is small enou
 scrollable history beats hunting through per-version files. Entries are written for players
 rather than for the diff: what changed about playing the game, not which classes moved.
 
+## 0.5.0 — 2026-09-23
+
+Two elites join the roster: a vampire whose bite gets meaner the longer a fight drags on,
+and a gunslinger who never fires just once.
+
+### New units
+
+**Noctis** — a vampire elite, 630 health, who feeds on the wounded and grows more dangerous
+the longer a fight against him runs.
+
+- *Bloodwake* — awakens a 3-turn bloodlust (7-turn cooldown), gaining 30 bonus damage every
+  turn it remains active, with no cap for as long as it's kept alive. While it lasts, his
+  move actions are free and he may move twice a turn. Landing a kill or recasting Bloodwake
+  while it's active refreshes the duration — the accumulated bonus damage is never reset.
+  Upgraded, attacks are free and doubled too, and a refresh **extends** the duration instead
+  of resetting it.
+- *Sanguine* (passive) — every percentage point of a target's missing health adds 1.5% to
+  Noctis's attack damage, so a nearly-dead target is a nearly-double-damage target. Killing
+  a target with an attack heals him for 40% of its max HP. Upgraded, his attacks also deal
+  20% of the target's *current* HP as bonus damage — added before Sanguine's own missing-HP
+  amplifier, so it gets amplified right along with the rest of the attack.
+
+**Flint** — a gunslinger elite, 560 health, 2 attack range, who turns one gunfight into two.
+
+- *Double Draw* (passive) — every successful attack draws a second shot at a random enemy
+  within range, dealing damage equal to one of his two *unused* attributes, picked at
+  random. The second shot counts as a normal attack in its own right — it can place or
+  consume a High Noon mark on whoever it lands on — but it never draws a third. Upgraded,
+  even a missed attack still draws a second shot, just for 40% of the damage.
+- *High Noon* (passive) — every successful attack has a 40% chance to mark its target for
+  3 turns. Attacking a marked target costs no action and deals 250% damage, consuming the
+  mark — only the unit who placed it can collect. Upgraded, it gains an active: unload a
+  flurry of 5 shots into one target up to 2 tiles away (5-turn cooldown), and every mark
+  consumed mid-barrage adds one more shot to the volley. Every shot in the barrage can
+  trigger Double Draw.
+
+### Visuals
+
+- **Noctis** attacks with two red slashes; **Bloodwake** draws red particles in toward him
+  for as long as it lasts.
+- **Flint** fires a gray round, and **Double Draw**'s second shot follows a beat later. A
+  **High Noon** mark shows as a crosshair on its target, and consuming it bursts red out the
+  far side of the target. The barrage plays shot by shot, about half a second apart.
+- **Grivath** finally has his own attack: three quick white slashes.
+- **Homing Missile**'s locked-on marker is now a pulsing orange ring instead of a crosshair,
+  so it can't be mistaken for a High Noon mark.
+
+
 ## 0.4.1 — 2026-09-22
 
 More tuning on top of 0.4.0's numbers — and the game finally introduces itself, walking a

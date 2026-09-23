@@ -22,6 +22,7 @@
         },
         "details": [
             "Every shot in the barrage counts as a normal attack, so each one can place or consume a mark on its own.",
+            "Each shot in the barrage can also trigger Double Draw.",
             "A target that dies partway through the barrage ends it early - the remaining shots are never fired."
         ]
     }

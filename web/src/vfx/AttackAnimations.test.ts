@@ -45,8 +45,22 @@ describe("attackAnimationFor", () => {
     expect(evayne.strokes[1].delayMs).toBe(300);
   });
 
-  it("falls back to the default white slash for grivath, summons, and unknown ids", () => {
-    for (const id of ["grivath", "maxwell_drone", "yuki_golem", "not_a_real_unit", null, undefined]) {
+  it("gives Grivath three smaller white slashes, Noctis two red ones, and Flint a gray projectile", () => {
+    const grivath = attackAnimationFor("grivath");
+    expect(grivath.strokes).toHaveLength(3);
+    expect(grivath.strokes.map((s) => s.delayMs ?? 0)).toEqual([0, 220, 440]);
+    expect(grivath.strokes.every((s) => s.kind === "slash" && s.color === 0xffffff && s.scale === 0.6)).toBe(true);
+
+    const noctis = attackAnimationFor("noctis");
+    expect(noctis.strokes).toHaveLength(2);
+    expect(noctis.strokes.every((s) => s.kind === "slash" && s.color === 0xdc2626)).toBe(true);
+    expect(noctis.strokes[1].delayMs).toBe(300);
+
+    expect(attackAnimationFor("flint").strokes).toEqual([{ kind: "projectile", color: 0x9ca3af }]);
+  });
+
+  it("falls back to the default white slash for summons and unknown ids", () => {
+    for (const id of ["maxwell_drone", "yuki_golem", "not_a_real_unit", null, undefined]) {
       expect(attackAnimationFor(id)).toEqual(DEFAULT_ATTACK_ANIMATION);
     }
   });
@@ -177,5 +191,12 @@ describe("perplexingShotSpecForChainIndex", () => {
 
   it("caps width at 6px as a safeguard", () => {
     expect(perplexingShotSpecForChainIndex(10).strokes[0]).toMatchObject({ width: 6 });
+  });
+});
+
+describe("Double Draw", () => {
+  it("qualifies for the attack animation like a basic attack", () => {
+    expect(ATTACK_ANIMATION_CAUSE_LABELS.has("Double Draw")).toBe(true);
+    expect(qualifiesForAttackAnimation(damage("Double Draw"))).toBe(true);
   });
 });

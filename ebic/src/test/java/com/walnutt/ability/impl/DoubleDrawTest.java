@@ -148,4 +148,18 @@ class DoubleDrawTest {
         assertEquals(500 - 38, marked.getHealth());
         assertTrue(marked.getActiveEffect(HighNoonMarkEffect.class).isEmpty(), "the mark was consumed");
     }
+
+    @Test
+    void aChainedAttackOutsideAHighNoonBarrageDrawsNothing() {
+        Unit flint = newFlint(15);
+        Unit target = new BasicUnit("Target", Team.PLAYER_TWO, new UnitStats(0, 0, 30, 500));
+        GameState state = scenario(flint, target);
+
+        DamageEvent damageEvent = new DamageEvent(flint, target, 10);
+        damageEvent.setAttackerAttribute(Attribute.STRENGTH);
+        target.takeDamage(state, damageEvent);
+        state.getEventBus().publish(state, new PostAttackEvent(flint, target, damageEvent, true));
+
+        assertEquals(500 - 10, target.getHealth());
+    }
 }

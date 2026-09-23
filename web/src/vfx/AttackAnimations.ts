@@ -174,6 +174,8 @@ const YELLOW_GREEN = 0xa3e635;
 const MAGENTA = 0xd946ef;
 const BRIGHT_GREEN = 0x4ade80;
 const GOLD = 0xfbbf24;
+const BLOOD_RED = 0xdc2626;
+const GUNMETAL_GRAY = 0x9ca3af;
 
 export const DEFAULT_ATTACK_ANIMATION: AttackAnimationSpec = {
   strokes: [{ kind: "slash", color: WHITE }],
@@ -181,7 +183,7 @@ export const DEFAULT_ATTACK_ANIMATION: AttackAnimationSpec = {
 
 /**
  * One entry per unit with a bespoke attack animation, keyed by definitionId.
- * Anything not listed here (grivath, summons, any future unit) falls through
+ * Anything not listed here (summons, any future unit) falls through
  * to DEFAULT_ATTACK_ANIMATION via attackAnimationFor - deliberately not
  * special-cased, the same way UnitArt.ts's art lookups fall back gracefully.
  */
@@ -197,6 +199,15 @@ const ATTACK_ANIMATION_BY_DEFINITION_ID: Record<string, AttackAnimationSpec> = {
   branch: { strokes: [{ kind: "projectile", color: DARK_GREEN }] },
   dirge: { strokes: [{ kind: "slash", color: WHITE }] },
   discharge: { strokes: [{ kind: "lightning", color: YELLOW }] },
+  flint: { strokes: [{ kind: "projectile", color: GUNMETAL_GRAY }] },
+  // Three quick, smaller slashes - Evayne's two-slash shape with one more beat.
+  grivath: {
+    strokes: [
+      { kind: "slash", color: WHITE, scale: 0.6 },
+      { kind: "slash", color: WHITE, scale: 0.6, delayMs: 220 },
+      { kind: "slash", color: WHITE, scale: 0.6, delayMs: 440 },
+    ],
+  },
   evayne: {
     strokes: [
       { kind: "slash", color: WHITE, scale: 0.7 },
@@ -207,6 +218,12 @@ const ATTACK_ANIMATION_BY_DEFINITION_ID: Record<string, AttackAnimationSpec> = {
   lucifer: { strokes: [{ kind: "slash", color: RED_ORANGE }] },
   maxwell: { strokes: [{ kind: "beam", color: LIGHT_BLUE }] },
   mercurial: { strokes: [{ kind: "slash", color: JOKER_PURPLE }] },
+  noctis: {
+    strokes: [
+      { kind: "slash", color: BLOOD_RED },
+      { kind: "slash", color: BLOOD_RED, delayMs: 300 },
+    ],
+  },
   shawl: { strokes: [{ kind: "lightning", color: DARK_BLUE }] },
   spitter: { strokes: [{ kind: "projectile", color: YELLOW_GREEN }] },
   thaddeus: { strokes: [{ kind: "slash", color: WHITE }] },

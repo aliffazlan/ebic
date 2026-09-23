@@ -54,10 +54,15 @@ export const ENCOUNTER_CAUSE_LABELS: ReadonlySet<string> = new Set([
   "Counterstrike",
   "Duel",
   "Cloak and Dagger",
+  // Flint's passive second shot - a real attribute-judged attack (see DoubleDraw.java), so
+  // it gets Flint's attack animation and can MISS, just not the engine's default label.
+  "Double Draw",
 ]);
 
 /** The engine's default causeLabel, back-filled by CombatEngine for a plain attack. */
 const ATTACK_CAUSE_LABEL = "Attack";
+/** Flint's passive follow-up shot - reads as a basic attack, not an ability. */
+const DOUBLE_DRAW_CAUSE_LABEL = "Double Draw";
 const BURN_CAUSE_LABEL = "Burn";
 const POISON_CAUSE_LABEL = "Poison";
 
@@ -109,6 +114,7 @@ export function damageKind(causeLabel: string | null): IndicatorKind {
     case POISON_CAUSE_LABEL:
       return "poison";
     case ATTACK_CAUSE_LABEL:
+    case DOUBLE_DRAW_CAUSE_LABEL:
       return "attack";
     // Every other label is an ability - and so is a null label, which only
     // happens when damage is applied without going through CombatEngine.

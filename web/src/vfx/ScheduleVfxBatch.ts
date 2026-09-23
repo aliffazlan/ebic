@@ -10,6 +10,7 @@ import {
   attackAnimationFor,
   partitionVfxBatch,
   perplexingShotSpecForChainIndex,
+  qualifiesForAttackAnimation,
   type AttackAnimationSpec,
 } from "./AttackAnimations";
 import { groupIndicators, indicatorFor, type IndicatorSpec } from "./VfxIndicators";
@@ -34,6 +35,11 @@ export interface VfxBatchDeps {
   resolveUnitPosition: (unitId: string | null) => { x: number; y: number } | null;
   /** Registers one more event still to be visually applied to this unit's displayed hp/dead. */
   beginPendingHpChange: (unitId: string) => void;
+  /**
+   * High Noon's mark-consumed burst - a cone of particles out of the far side of `to`, away
+   * from `from`. Played as the consuming hit's animation lands, alongside its indicator.
+   */
+  playMarkConsumedBurst: (from: { x: number; y: number }, to: { x: number; y: number }) => void;
   /** Resolves an event's attacker to its unit-type id, for the animation lookup. */
   sourceDefinitionId: (event: VfxEvent) => string | null;
 }
@@ -76,27 +82,81 @@ const ORBITAL_BEAM_GAP_MS = 600;
  * ORBITAL_BEAM_SKY_OFFSET_PX above, tuned to roughly the top of a unit's icon.
  */
 const EYE_OF_THE_STORM_ORIGIN_OFFSET_PX = 22;
+/**
+ * Flint's Double Draw - a short beat before the second shot fires, so it reads as a
+ * follow-up to the shot before it rather than the same shot twice, per temp/vfx.txt.
+ */
+const DOUBLE_DRAW_LEAD_IN_MS = 200;
+/**
+ * Upgraded High Noon's barrage - the minimum spacing between successive shots from one
+ * caster, so each plays on its own (any Double Draw it triggers queues in between).
+ */
+const HIGH_NOON_BARRAGE_SHOT_GAP_MS = 500;
+/** HighNoonMarkEffect's PassiveProcEvent, as it arrives on the wire (sourceUnitId = the marked unit). */
+const HIGH_NOON_MARK_CONSUMED_ABILITY_ID = "high_noon_mark_consumed";
+
+function isMarkConsumedProc(event: VfxEvent): boolean {
+  return event.type === "ability_used" && event.abilityId === HIGH_NOON_MARK_CONSUMED_ABILITY_ID;
+}
+
+/**
+ * Pairs each mark-consumed proc with the hit that consumed it. The backend publishes the
+ * proc from inside the damage pipeline, so it's always buffered just *before* its own damage
+ * event - the next attack-animated hit on that same unit is the one. Snapshots alone can't
+ * tell this: a barrage can consume and reapply a mark several times within one batch.
+ */
+function findMarkConsumingHits(events: VfxEvent[]): Set<VfxEvent> {
+  const pendingByUnit = new Set<string>();
+  const hits = new Set<VfxEvent>();
+  for (const event of events) {
+    if (isMarkConsumedProc(event) && event.sourceUnitId) {
+      pendingByUnit.add(event.sourceUnitId);
+    } else if (event.targetUnitId && pendingByUnit.has(event.targetUnitId) && qualifiesForAttackAnimation(event)) {
+      pendingByUnit.delete(event.targetUnitId);
+      hits.add(event);
+    }
+  }
+  return hits;
+}
+
+function withLeadIn(spec: AttackAnimationSpec, leadInMs: number): AttackAnimationSpec {
+  return { strokes: spec.strokes.map((stroke) => ({ ...stroke, delayMs: (stroke.delayMs ?? 0) + leadInMs })) };
+}
 
 export function scheduleVfxBatch(events: VfxEvent[], deps: VfxBatchDeps): void {
-  const { attackEvents, abilityDamageEvents, otherEvents } = partitionVfxBatch(events);
+  const markConsumingHits = findMarkConsumingHits(events);
+  // The proc is a timing cue only - left in, playVfx would fire its generic burst the moment
+  // the batch arrives, well before the hit it belongs to has even started animating.
+  const { attackEvents, abilityDamageEvents, otherEvents } = partitionVfxBatch(events.filter((e) => !isMarkConsumedProc(e)));
   deps.playVfx(otherEvents);
 
+  // Upgraded High Noon's ability_used event arrives in the same batch as its barrage (the
+  // cast's POST phase, after every shot) - any caster that cast it this batch gets the
+  // barrage pacing on its "Attack" steps.
+  const highNoonBarrageSources = new Set(
+    events.filter((e) => e.type === "ability_used" && e.abilityId === "high_noon" && e.sourceUnitId).map((e) => e.sourceUnitId),
+  );
+
   const attackSteps = attackEvents.map((event) => {
-    const spec = attackAnimationFor(deps.sourceDefinitionId(event));
+    let spec = attackAnimationFor(deps.sourceDefinitionId(event));
+    if (event.causeLabel === "Double Draw") spec = withLeadIn(spec, DOUBLE_DRAW_LEAD_IN_MS);
     const durationMs = attackAnimationDurationMs(spec);
+    const inBarrage = event.causeLabel === "Attack" && highNoonBarrageSources.has(event.sourceUnitId);
+    const gapMs = inBarrage ? Math.max(durationMs, HIGH_NOON_BARRAGE_SHOT_GAP_MS) : durationMs;
     const from = deps.resolveUnitPosition(event.sourceUnitId);
     const to = deps.resolveUnitPosition(event.targetUnitId);
     const indicatorSpec = indicatorFor(event);
     if (indicatorSpec) deps.beginPendingHpChange(indicatorSpec.unitId);
-    return { spec, durationMs, from, to, indicatorSpec };
+    return { spec, gapMs, from, to, indicatorSpec, consumesMark: markConsumingHits.has(event) };
   });
-  for (const { spec, durationMs, from, to, indicatorSpec } of attackSteps) {
+  for (const { spec, gapMs, from, to, indicatorSpec, consumesMark } of attackSteps) {
     deps.indicators.enqueue(() => {
       if (!from || !to) return; // defensive - shouldn't happen for a well-formed event
       deps.playAttackAnimation(from, to, spec, () => {
+        if (consumesMark) deps.playMarkConsumedBurst(from, to);
         if (indicatorSpec) deps.showIndicatorAt(to, indicatorSpec);
       });
-    }, durationMs);
+    }, gapMs);
   }
 
   // Ability damage that gets its own animation (Fireblast, Perplexing Shot's chain,

@@ -96,6 +96,12 @@ export function spawnUnitStatusOverlay(
     case "chains":
       ticks.push(...spawnChainsOverlay(parent, spec.color, tokenRadiusPx));
       return;
+    case "crosshair":
+      spawnCrosshairOverlay(parent, spec.color);
+      return;
+    case "inward-particles":
+      spawnInwardParticleEmitter(parent, ticker, spec.color, tokenRadiusPx, ticks);
+      return;
   }
 }
 
@@ -448,6 +454,72 @@ function drawChainArc(g: Graphics, x1: number, y1: number, x2: number, y2: numbe
   const cx = (x1 + x2) / 2 + nx * bulge;
   const cy = (y1 + y2) / 2 + ny * bulge;
   g.moveTo(x1, y1).quadraticCurveTo(cx, cy, x2, y2).stroke({ width: CHAIN_WIDTH_PX, color, cap: "round" });
+}
+
+// --- crosshair: High Noon's mark, static (no ticker) ---
+// The exact reticle Board.ts used to draw on Homing Missile's impact tile (arm = HEX_SIZE *
+// 0.34), moved here onto the marked unit's own token.
+
+const CROSSHAIR_ARM_PX = 11.5;
+const CROSSHAIR_RING_RADIUS_PX = CROSSHAIR_ARM_PX * 0.55;
+const CROSSHAIR_ALPHA = 0.9;
+
+function spawnCrosshairOverlay(parent: Container, color: number): void {
+  const g = new Graphics();
+  g.moveTo(-CROSSHAIR_ARM_PX, 0).lineTo(CROSSHAIR_ARM_PX, 0).moveTo(0, -CROSSHAIR_ARM_PX).lineTo(0, CROSSHAIR_ARM_PX)
+    .stroke({ width: 2, color, alpha: CROSSHAIR_ALPHA });
+  g.circle(0, 0, CROSSHAIR_RING_RADIUS_PX).stroke({ width: 2, color, alpha: CROSSHAIR_ALPHA });
+  parent.addChild(g);
+}
+
+// --- inward particles: Bloodwake - large dots drawn in from outside the portrait ---
+// Each spawns on a ring outside the token and eases toward its centre, but is fully faded
+// by INWARD_FADE_OUT_AT of the way in, so none ever actually reaches the centre.
+
+const INWARD_INTERVAL_MS = 120;
+const INWARD_LIFE_FRAMES = 36;
+const INWARD_RADIUS_PX = 3.5;
+const INWARD_SPAWN_RADIUS_MULTIPLIER = 1.7;
+const INWARD_FADE_OUT_AT = 0.6;
+
+function spawnInwardParticleEmitter(parent: Container, ticker: Ticker, color: number, radiusPx: number, ticks: (() => void)[]): void {
+  let nextSpawn = now();
+  const tick = safeTick(() => {
+    const t = now();
+    if (t >= nextSpawn) {
+      nextSpawn = t + INWARD_INTERVAL_MS;
+      spawnInwardParticle(parent, ticker, color, radiusPx, ticks);
+    }
+  });
+  ticker.add(tick);
+  ticks.push(tick);
+}
+
+/** See spawnEmberParticle's doc comment - registered in the shared `ticks` array for the same reason. */
+function spawnInwardParticle(parent: Container, ticker: Ticker, color: number, radiusPx: number, ticks: (() => void)[]): void {
+  const angle = Math.random() * Math.PI * 2;
+  const startX = Math.cos(angle) * radiusPx * INWARD_SPAWN_RADIUS_MULTIPLIER;
+  const startY = Math.sin(angle) * radiusPx * INWARD_SPAWN_RADIUS_MULTIPLIER;
+  const dot = new Graphics().circle(0, 0, INWARD_RADIUS_PX).fill({ color });
+  dot.position.set(startX, startY);
+  dot.alpha = 0;
+  parent.addChild(dot);
+  let elapsed = 0;
+  const tick = safeTick(() => {
+    elapsed += 1;
+    const t = Math.min(1, elapsed / INWARD_LIFE_FRAMES);
+    const travelled = INWARD_FADE_OUT_AT * t * t; // ease-in, never past INWARD_FADE_OUT_AT of the way
+    dot.position.set(startX * (1 - travelled), startY * (1 - travelled));
+    // Quick fade in, then out to nothing by the end of its (shortened) path.
+    dot.alpha = t < 0.2 ? t / 0.2 : 1 - (t - 0.2) / 0.8;
+    if (t >= 1) {
+      ticker.remove(tick);
+      removeFromTicks(ticks, tick);
+      dot.destroy();
+    }
+  });
+  ticks.push(tick);
+  ticker.add(tick);
 }
 
 // --- energy shield: 3 thin jittering lines across the token, like jail bars ---

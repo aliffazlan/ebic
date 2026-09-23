@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { scheduleVfxBatch, type VfxBatchDeps } from "./ScheduleVfxBatch";
 import { IndicatorScheduler } from "./IndicatorScheduler";
-import { LIGHTNING_DURATION_MS, SLASH_DURATION_MS } from "./AttackAnimations";
+import { LIGHTNING_DURATION_MS, PROJECTILE_DURATION_MS, SLASH_DURATION_MS } from "./AttackAnimations";
 import type { VfxEvent } from "../types/contract";
 
 function damage(
@@ -29,6 +29,7 @@ function makeDeps(overrides: Partial<VfxBatchDeps> = {}): {
     showIndicatorAt: (pos, spec) => calls.push(`indicatorAt:${spec.unitId}@${pos.x},${pos.y}`),
     resolveUnitPosition: (unitId) => (unitId ? { x: unitId.length, y: 0 } : null),
     beginPendingHpChange: (unitId) => calls.push(`pending:${unitId}`),
+    playMarkConsumedBurst: (from, to) => calls.push(`burst:${from.x},${from.y}->${to.x},${to.y}`),
     sourceDefinitionId: () => "chronos",
     ...overrides,
   };
@@ -178,5 +179,65 @@ describe("scheduleVfxBatch", () => {
     expect(calls.filter((c) => c.startsWith("anim:"))).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(calls.filter((c) => c.startsWith("anim:"))).toEqual(["anim:2,-600->2,0", "anim:2,-600->2,0"]);
+  });
+
+  function abilityUsed(abilityId: string, sourceUnitId: string): VfxEvent {
+    return { type: "ability_used", abilityId, sourceUnitId, targetUnitId: null, amount: null, causeLabel: null };
+  }
+
+  it("delays a Double Draw shot by a short lead-in after the shot before it", () => {
+    const starts: number[] = [];
+    const specs: number[] = [];
+    const { deps } = makeDeps({
+      sourceDefinitionId: () => "flint",
+      playAttackAnimation: (_from, _to, spec, onComplete) => {
+        starts.push(Date.now());
+        specs.push(spec.strokes[0].delayMs ?? 0);
+        onComplete();
+      },
+    });
+    const t0 = Date.now();
+    scheduleVfxBatch([damage("Attack", 20, "flint1", "u1"), damage("Double Draw", 15, "flint1", "u2")], deps);
+    vi.advanceTimersByTime(PROJECTILE_DURATION_MS * 3);
+    // Second step starts right after the first shot's own duration, but its stroke carries the lead-in.
+    expect(starts.map((t) => t - t0)).toEqual([0, PROJECTILE_DURATION_MS]);
+    expect(specs).toEqual([0, 200]);
+  });
+
+  it("plays the mark-consumed burst on the hit that consumed the mark, and hides the proc from playVfx", () => {
+    const { deps, calls } = makeDeps({ sourceDefinitionId: () => "flint" });
+    scheduleVfxBatch(
+      [
+        damage("Attack", 20, "flint1", "u1"),
+        abilityUsed("high_noon_mark_consumed", "u1"),
+        damage("Attack", 50, "flint1", "u1"),
+      ],
+      deps,
+    );
+    expect(calls[0]).toBe("playVfx:0");
+    vi.advanceTimersByTime(PROJECTILE_DURATION_MS * 3);
+    const bursts = calls.filter((c) => c.startsWith("burst:"));
+    expect(bursts).toHaveLength(1);
+    // The burst lands with the second hit (-50), not the first.
+    const burstIndex = calls.indexOf(bursts[0]);
+    expect(calls.slice(0, burstIndex).filter((c) => c.startsWith("indicatorAt:"))).toHaveLength(1);
+  });
+
+  it("spaces a High Noon barrage's shots at least 500ms apart", () => {
+    const starts: number[] = [];
+    const { deps } = makeDeps({
+      sourceDefinitionId: () => "flint",
+      playAttackAnimation: (_from, _to, _spec, onComplete) => {
+        starts.push(Date.now());
+        onComplete();
+      },
+    });
+    const t0 = Date.now();
+    scheduleVfxBatch(
+      [damage("Attack", 20, "flint1", "u1"), damage("Attack", 20, "flint1", "u1"), abilityUsed("high_noon", "flint1")],
+      deps,
+    );
+    vi.advanceTimersByTime(2000);
+    expect(starts.map((t) => t - t0)).toEqual([0, 500]);
   });
 });

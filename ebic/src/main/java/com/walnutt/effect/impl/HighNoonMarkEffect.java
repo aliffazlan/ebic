@@ -2,6 +2,7 @@ package com.walnutt.effect.impl;
 
 import com.walnutt.effect.Effect;
 import com.walnutt.event.DamageEvent;
+import com.walnutt.event.PassiveProcEvent;
 import com.walnutt.game.GameState;
 import com.walnutt.unit.Unit;
 
@@ -36,6 +37,9 @@ public class HighNoonMarkEffect extends Effect {
             return;
         }
         event.multiplyDamage(critMultiplier);
+        // Vfx cue only - the frontend pairs this with the very next damage event on this unit
+        // to play the mark-consumed burst (see ScheduleVfxBatch.ts).
+        state.getEventBus().publish(state, new PassiveProcEvent(getOwner(), "High Noon Mark Consumed"));
         expireNow(state);
     }
 }
