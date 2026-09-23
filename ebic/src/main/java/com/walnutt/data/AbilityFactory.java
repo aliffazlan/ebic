@@ -22,6 +22,7 @@ import com.walnutt.ability.impl.Dilation;
 import com.walnutt.ability.impl.Dislocation;
 import com.walnutt.ability.impl.Dispersion;
 import com.walnutt.ability.impl.Doom;
+import com.walnutt.ability.impl.DoubleDraw;
 import com.walnutt.ability.impl.Duel;
 import com.walnutt.ability.impl.EnergyBreak;
 import com.walnutt.ability.impl.EnergyShield;
@@ -33,6 +34,7 @@ import com.walnutt.ability.impl.Fireblast;
 import com.walnutt.ability.impl.Frostbite;
 import com.walnutt.ability.impl.Gyroscope;
 import com.walnutt.ability.impl.HiddenPotential;
+import com.walnutt.ability.impl.HighNoon;
 import com.walnutt.ability.impl.HolyShield;
 import com.walnutt.ability.impl.HomingMissile;
 import com.walnutt.ability.impl.Implosion;
@@ -121,6 +123,8 @@ public final class AbilityFactory {
         Map.entry("cripple", Cripple::new),
         Map.entry("bloodwake", Bloodwake::new),
         Map.entry("sanguine", Sanguine::new),
+        Map.entry("double_draw", DoubleDraw::new),
+        Map.entry("high_noon", HighNoon::new),
         Map.entry("static_link", StaticLink::new),
         Map.entry("eye_of_the_storm", EyeOfTheStorm::new),
         Map.entry("overheat", Overheat::new),
@@ -232,11 +236,13 @@ public final class AbilityFactory {
         "sanity_eclipse",       // the orb falls twice
         "objurgation",          // a killing blow burns every point
         "dislocation",          // the pylon survives, hurt
+        "double_draw",          // a miss still draws a second shot, just a weaker one
 
         // Reshapes: the ability is a different thing afterwards.
         "steady_focus",         // a toggle rather than a timer
         "feast",                // the hunger never lifts
         "bloodwake",            // attacks join in free, and a refresh extends instead of resetting
+        "high_noon",            // gains an active barrage that can chain off its own marks
         "translocation",        // reaches anywhere, and swaps
         "psychic_projection",   // indefinite, and no longer stunning
         "mimic",                // copies kept for good, and upgraded

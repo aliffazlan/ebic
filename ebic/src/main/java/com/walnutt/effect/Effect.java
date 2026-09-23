@@ -224,6 +224,17 @@ public abstract class Effect extends TriggerHandler {
     }
 
     /**
+     * True while this effect grants one SPECIFIC attacker a free attack against its
+     * owner (Flint's High Noon: a marked target can be shot without costing an action).
+     * Unlike {@link #grantsFreeAttack()}, which lives on the attacker and applies to any
+     * target, this lives on the DEFENDER and names exactly who it's free for. Default
+     * false, so no existing effect changes behaviour.
+     */
+    public boolean grantsFreeAttackFrom(Unit attacker) {
+        return false;
+    }
+
+    /**
      * Extra move actions beyond the normal one-per-turn allowance this effect grants its
      * owner while it's active (Noctis's Bloodwake lets him move twice). Default 0.
      *

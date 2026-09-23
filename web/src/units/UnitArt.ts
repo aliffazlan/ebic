@@ -69,7 +69,7 @@ const NEUTRAL_BASIC_ART = "basic0";
 
 const CHAMPIONS = ["chronos", "ember", "harbinger", "joker", "valor", "zenith"];
 const ELITES = [
-  "artemis", "auroth", "branch", "dirge", "discharge", "evayne", "grivath",
+  "artemis", "auroth", "branch", "dirge", "discharge", "evayne", "flint", "grivath",
   "lanaya", "lucifer", "maxwell", "mercurial", "noctis", "shawl", "spitter",
   "thaddeus", "wei", "yuki",
 ];

@@ -406,6 +406,19 @@ public abstract class Unit {
         return false;
     }
 
+    /**
+     * As {@link #hasFreeAttack()}, but for a free attack one of THIS unit's own active
+     * effects grants to one specific attacker (Flint's High Noon mark).
+     */
+    public boolean isFreeAttackTargetFor(Unit attacker) {
+        for (Effect effect : effects) {
+            if (!effect.isExpired() && effect.grantsFreeAttackFrom(attacker)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public boolean isBlockedFrom(ActionKind kind) {
         for (StatusFlag flag : StatusFlag.values()) {
             if (!hasStatus(flag)) {

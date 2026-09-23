@@ -53,6 +53,14 @@ public class Attack extends Ability {
         return owner != null && (owner.getUnitType() == UnitType.BASIC || owner.hasFreeAttack()) ? 0 : 1;
     }
 
+    /**
+     * getMoveCost ignores who the target is; this doesn't - Flint's High Noon grants a free
+     * attack against one specific marked target rather than unconditionally like hasFreeAttack.
+     */
+    private int costAgainst(GameState state, Unit defender) {
+        return defender.isFreeAttackTargetFor(owner) ? 0 : getMoveCost(state);
+    }
+
     /** Attack ignores the base `range` field entirely - its reach is the owner's stat. */
     @Override
     public int getRange() {
@@ -66,13 +74,20 @@ public class Attack extends Ability {
 
     @Override
     public boolean canUse(GameState state, Target target) {
-        if (owner == null || owner.hasAttackedThisTurn() || owner.isBlockedFrom(ActionKind.ATTACK)) {
-            return false;
-        }
-        if (!state.canSpendMoves(getMoveCost(state))) {
+        if (owner == null || owner.isBlockedFrom(ActionKind.ATTACK)) {
             return false;
         }
         if (!(target instanceof UnitTarget unitTarget)) {
+            return false;
+        }
+        Unit defender = unitTarget.getUnit();
+        // Flint's High Noon: attacking a target it marked doesn't consume the turn's one
+        // attack, so hasAttackedThisTurn is skipped entirely against that specific target.
+        boolean free = defender.isFreeAttackTargetFor(owner);
+        if (!free && owner.hasAttackedThisTurn()) {
+            return false;
+        }
+        if (!state.canSpendMoves(costAgainst(state, defender))) {
             return false;
         }
         // Nothing to attack with: every attribute at 0 (stripped by Cripple, Decay or
@@ -81,7 +96,6 @@ public class Attack extends Ability {
         if (!owner.hasUsableAttribute()) {
             return false;
         }
-        Unit defender = unitTarget.getUnit();
         // Repeated from Ability.canUse because Attack deliberately doesn't call super -
         // a sealed-off unit (cloaked, frozen, imprisoned) can't be swung at either.
         if (!defender.isTargetable()) {
@@ -107,11 +121,18 @@ public class Attack extends Ability {
     @Override
     public void onUse(GameState state, Target target) {
         Unit defender = ((UnitTarget) target).getUnit();
+        boolean free = defender.isFreeAttackTargetFor(owner);
+        // Captured before the attack lands: a marked target's mark (and the free attack it
+        // grants) is consumed by the very damage this attack deals, so costAgainst would read
+        // false - and charge a move point after all - if it were computed any later than this.
+        int cost = costAgainst(state, defender);
 
         CombatEngine.performAttack(state, buildEncounter(state, defender));
 
-        owner.markAttacked();
-        state.spendMoves(getMoveCost(state));
+        if (!free) {
+            owner.markAttacked();
+        }
+        state.spendMoves(cost);
     }
 
     /**

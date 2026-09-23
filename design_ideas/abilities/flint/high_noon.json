@@ -1,10 +1,10 @@
 {
     "name": "High Noon",
     "type": "passive",
-    "description": "On attack, has a %chance% % chance to mark the target enemy. Attacks on a marked enemy do not consume an action. Attacking a marked enemy causes it to take %crit_damage% % damage, and consumes the mark.",
+    "description": "A successful attack has a %chance:pct%% chance to mark its target for %duration% turns. Attacking a marked target consumes the mark and costs no action, dealing %crit_damage:pct%% damage.",
     "details": [
-        "Only the unit who caused the mark can consume the mark.",
-        "Failed attacks do not consume the mark."
+        "Only the unit that placed a mark can consume it.",
+        "A failed attack neither places nor consumes a mark."
     ],
     "stats": {
         "duration": 3,
@@ -12,15 +12,17 @@
         "crit_damage": 2.5
     },
     "upgrade": {
-        "summary": "Gains an active component. Unleashes a flurry of bullets at the target.",
-        "description": "On cast, attacks %count% times at the targetted unit. If a mark is consumed during these attacks, an additional attack is added.",
+        "type": "active",
+        "summary": "Gains an active: unload a flurry of shots into one target.",
+        "description": "Fires %count% attacks at a targeted enemy up to %cast_range% tiles away. Every mark consumed mid-barrage adds one more attack to it.",
         "stats": {
             "cooldown": 5,
             "cast_range": 2,
             "count": 5
         },
         "details": [
-
+            "Every shot in the barrage counts as a normal attack, so each one can place or consume a mark on its own.",
+            "A target that dies partway through the barrage ends it early - the remaining shots are never fired."
         ]
     }
 }
