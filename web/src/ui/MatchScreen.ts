@@ -8,11 +8,13 @@ import { showErrorModal } from "./ErrorModal";
 import { IndicatorScheduler } from "../vfx/IndicatorScheduler";
 import { scheduleVfxBatch } from "../vfx/ScheduleVfxBatch";
 import type { AxialCoord } from "../hex/HexMath";
-import type { Attribute, ServerMessage, Team, UnitSnapshot, UnitType } from "../types/contract";
+import type { Attribute, SandboxTool, ServerMessage, Team, UnitSnapshot, UnitType } from "../types/contract";
+import type { AttributePrompt } from "../state/GameStateStore";
 import type { MatchActions } from "./MatchActions";
 import type { Screen } from "./Screen";
 import { artId, warmPortraits } from "../units/UnitArt";
 import { CHROME_VOID_HEX } from "./Colors";
+import { api } from "../net/api";
 
 // How long the pre-encounter strobe plays on the board before the attribute
 // modal actually appears - see API_CONTRACT.md's explanation of the
@@ -79,11 +81,12 @@ export class MatchScreen implements Screen, MatchActions {
     playerTwoName: string,
     onExit: () => void,
     spectateCode?: string,
+    isSandbox = false,
   ) {
     this.root = root;
     this.matchId = matchId;
     this.onExit = onExit;
-    this.store = new GameStateStore(yourTeam, playerOneName, playerTwoName);
+    this.store = new GameStateStore(yourTeam, playerOneName, playerTwoName, isSandbox);
     this.socket = new GameSocket(
       matchId,
       {
@@ -214,9 +217,12 @@ export class MatchScreen implements Screen, MatchActions {
         // doesn't count.
         // Files the vfx batch that just arrived under the turn this state names.
         this.store.commitCombatLog(msg.payload.currentTeam);
-        this.announceTurnIfItJustBecameYours(msg.payload.currentTeam);
+        // A sandbox player plays both sides, so there is no "your turn" moment to announce.
+        if (!priorState.isSandbox) this.announceTurnIfItJustBecameYours(msg.payload.currentTeam);
         this.store.setState({
           snapshot: msg.payload,
+          // In a sandbox "you" are whoever is acting - see MatchUiState.isSandbox.
+          ...(priorState.isSandbox ? { yourTeam: msg.payload.currentTeam } : {}),
           gameOver: msg.payload.gameOver ? wasGameOver : null,
           // A real "state" message means the match has begun for both
           // players - placement is over, drop any lingering placement UI.
@@ -225,7 +231,7 @@ export class MatchScreen implements Screen, MatchActions {
           // encounter has resolved (see the "waiting for other player" state
           // below) - defensive alongside the "vfx" case, which normally gets
           // there first since vfx always precedes the state it reflects.
-          ...(priorState.prompt?.kind === "attribute" ? { prompt: null, attributeSubmitted: false } : {}),
+          ...(priorState.prompt?.kind === "attribute" ? CLEARED_ENCOUNTER : {}),
         });
         break;
       }
@@ -250,7 +256,7 @@ export class MatchScreen implements Screen, MatchActions {
           // paragraph) - clear it here so the waiting-state modal closes.
           const priorPrompt = this.store.getState().prompt;
           if (priorPrompt?.kind === "attribute") {
-            this.store.setState({ prompt: null, attributeSubmitted: false });
+            this.store.setState(CLEARED_ENCOUNTER);
           }
         }
         break;
@@ -276,6 +282,10 @@ export class MatchScreen implements Screen, MatchActions {
         this.store.setState({ placementState: msg.payload, selectedUnitId: null });
         break;
       case "prompt": {
+        if (msg.payload.kind === "attribute" && this.store.getState().isSandbox) {
+          this.handleSandboxAttributePrompt(msg.payload);
+          break;
+        }
         // Any freshly arriving prompt supersedes an in-flight delayed one
         // (see the field comment on pendingAttributePromptTimer).
         if (this.pendingAttributePromptTimer !== null) {
@@ -313,6 +323,67 @@ export class MatchScreen implements Screen, MatchActions {
         this.store.setState({ gameOver: msg.payload });
         break;
     }
+  }
+
+  /**
+   * In a sandbox both halves of an encounter come to this one client, a moment apart. They
+   * share one strobe and one modal: the first to arrive starts the strobe, and anything that
+   * lands while it plays (or after the modal is up) just joins the per-team map the modal
+   * reads - it must not restart the timer the way an ordinary superseding prompt does.
+   */
+  private handleSandboxAttributePrompt(payload: AttributePrompt): void {
+    const state = this.store.getState();
+    this.store.setState({
+      sandboxAttributePrompts: { ...state.sandboxAttributePrompts, [payload.team]: payload },
+    });
+    if (this.pendingAttributePromptTimer !== null || state.prompt?.kind === "attribute") return;
+
+    this.board?.strobeUnits([payload.unitId, payload.opponentUnitId]);
+    this.store.setState({
+      selectedAbilityId: null,
+      sandboxAttributeSubmitted: [],
+      sandboxTool: null,
+      sandboxPicker: null,
+      multiPrimaryUnitId: null,
+      multiPrimaryTile: null,
+    });
+    this.pendingAttributePromptTimer = window.setTimeout(() => {
+      this.pendingAttributePromptTimer = null;
+      this.store.setState({ prompt: payload });
+    }, ATTRIBUTE_STROBE_MS);
+  }
+
+  /**
+   * A pending sandbox tool claims the next board click. Returns true if it did - including
+   * when the click cancels the tool, since a click that misses shouldn't ALSO select a unit.
+   */
+  private handleSandboxToolClick(coord: AxialCoord, clickedUnitId?: string): boolean {
+    const state = this.store.getState();
+    const tool = state.sandboxTool;
+    if (!tool) return false;
+
+    if (tool.kind === "spawn") {
+      const prompt = state.prompt;
+      const spawnTiles = prompt?.kind === "action" ? (prompt.sandboxSpawnTiles ?? []) : [];
+      if (spawnTiles.some((tile) => tile.q === coord.q && tile.r === coord.r)) {
+        this.sendSandbox({ tool: "spawn", team: tool.team, definitionId: tool.definitionId, q: coord.q, r: coord.r });
+      } else {
+        this.cancelSandboxTool();
+      }
+      return true;
+    }
+
+    // Remove/heal want a unit. Bare ground with someone standing on it counts - the same
+    // "resolve what the player meant" courtesy castAtCoord extends to spells.
+    const unitId =
+      clickedUnitId ??
+      state.snapshot?.units.find((u) => u.q === coord.q && u.r === coord.r && !u.dead)?.id;
+    if (unitId) {
+      this.sendSandbox({ tool: tool.kind, unitId });
+    } else {
+      this.cancelSandboxTool();
+    }
+    return true;
   }
 
   /**
@@ -389,6 +460,8 @@ export class MatchScreen implements Screen, MatchActions {
       return;
     }
 
+    if (this.handleSandboxToolClick(coord)) return;
+
     if (state.selectedAbilityId && state.selectedUnitId) {
       if (this.handleMultiStageClick(coord)) return;
       this.castAtCoord(coord);
@@ -416,6 +489,8 @@ export class MatchScreen implements Screen, MatchActions {
       this.selectUnit(unit.id);
       return;
     }
+
+    if (this.handleSandboxToolClick({ q: unit.q, r: unit.r }, unit.id)) return;
 
     if (state.selectedAbilityId && state.selectedUnitId) {
       if (this.handleMultiStageClick({ q: unit.q, r: unit.r }, unit.id)) return;
@@ -529,10 +604,17 @@ export class MatchScreen implements Screen, MatchActions {
 
   endTurn(): void {
     this.socket.send({ type: "action", kind: "end_turn" });
-    this.store.setState({ prompt: null, multiPrimaryUnitId: null, multiPrimaryTile: null });
+    this.store.setState({ prompt: null, multiPrimaryUnitId: null, multiPrimaryTile: null, sandboxTool: null, sandboxPicker: null });
   }
 
-  sendAttribute(value: Attribute): void {
+  sendAttribute(value: Attribute, team?: Team): void {
+    const state = this.store.getState();
+    if (state.isSandbox && team) {
+      // Both sides answer from this one client; the server routes each by the team it names.
+      this.socket.send({ type: "attribute", value, team });
+      this.store.setState({ sandboxAttributeSubmitted: [...state.sandboxAttributeSubmitted, team] });
+      return;
+    }
     this.socket.send({ type: "attribute", value });
     // Real bug fix (see API_CONTRACT.md): a fresh `prompt` only gets pushed
     // to whichever team is next to act - after the *defender* answers, it's
@@ -545,13 +627,19 @@ export class MatchScreen implements Screen, MatchActions {
     this.store.setState({ attributeSubmitted: true });
   }
 
+  /** A sandbox's one socket answers for both seats, so a choice has to say whose it is. */
+  private sandboxTeamOfPrompt(): { team?: Team } {
+    const state = this.store.getState();
+    return state.isSandbox && state.prompt ? { team: state.prompt.team } : {};
+  }
+
   cancelChoice(): void {
-    this.socket.send({ type: "choice", cancel: true });
+    this.socket.send({ type: "choice", cancel: true, ...this.sandboxTeamOfPrompt() });
     this.store.setState({ prompt: null });
   }
 
   sendChoice(optionId: string): void {
-    this.socket.send({ type: "choice", optionId });
+    this.socket.send({ type: "choice", optionId, ...this.sandboxTeamOfPrompt() });
     // Same optimistic clear as sendAttribute: the dialogue was raised mid-cast, so the
     // next thing this client hears may be a state/vfx push rather than a fresh prompt.
     this.store.setState({ prompt: null });
@@ -577,6 +665,61 @@ export class MatchScreen implements Screen, MatchActions {
   }
 
   exitToLobby(): void {
+    if (this.store.getState().isSandbox) {
+      // Best-effort: if this fails the server still tears the sandbox down once the socket
+      // has been gone for the abandon grace period.
+      api.endSandbox(this.matchId).catch(() => undefined);
+    }
     this.onExit();
   }
+
+  // ---- Sandbox tools ----
+
+  openSandboxPicker(team: Team | null): void {
+    this.store.setState({ sandboxPicker: team, sandboxTool: null });
+  }
+
+  chooseSandboxSpawn(team: Team, definitionId: string, name: string): void {
+    this.store.setState({
+      sandboxPicker: null,
+      sandboxTool: { kind: "spawn", team, definitionId, name },
+      selectedAbilityId: null,
+      multiPrimaryUnitId: null,
+      multiPrimaryTile: null,
+    });
+  }
+
+  startSandboxTool(kind: "remove" | "heal"): void {
+    this.store.setState({
+      sandboxTool: { kind },
+      sandboxPicker: null,
+      selectedAbilityId: null,
+      multiPrimaryUnitId: null,
+      multiPrimaryTile: null,
+    });
+  }
+
+  cancelSandboxTool(): void {
+    this.store.setState({ sandboxTool: null, sandboxPicker: null });
+  }
+
+  sendSandbox(tool: SandboxTool): void {
+    this.socket.send({ type: "action", kind: "sandbox", ...tool });
+    // Same optimistic clear as castAbility: the server re-renders and sends a fresh action
+    // prompt (with fresh spawn tiles) once the tool has been applied.
+    this.store.setState({
+      sandboxTool: null,
+      prompt: null,
+      // Whatever was selected may be the unit that just left the board.
+      ...(tool.tool === "remove" || tool.tool === "clear" ? { selectedUnitId: null, selectedAbilityId: null } : {}),
+    });
+  }
 }
+
+/** Everything an encounter leaves behind once it resolves - both halves, in a sandbox. */
+const CLEARED_ENCOUNTER = {
+  prompt: null,
+  attributeSubmitted: false,
+  sandboxAttributePrompts: {},
+  sandboxAttributeSubmitted: [],
+};

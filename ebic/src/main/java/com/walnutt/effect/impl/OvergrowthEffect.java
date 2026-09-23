@@ -45,4 +45,10 @@ public class OvergrowthEffect extends Effect {
             }
         }
     }
+
+    /** As onExpire: Branch's grove never outlives Branch. */
+    @Override
+    public void onStripped(GameState state) {
+        onExpire(state);
+    }
 }

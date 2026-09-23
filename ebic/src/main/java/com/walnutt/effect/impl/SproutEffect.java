@@ -118,4 +118,14 @@ public class SproutEffect extends Effect {
         unit.addEffect(new BarrierEffect("Sprout Barrier",
             "A shell of bark absorbing the next " + barrierHp + " damage.", barrierDuration, barrierHp));
     }
+
+    @Override
+    public Unit getSource() {
+        return caster;
+    }
+
+    @Override
+    public boolean references(Unit unit) {
+        return super.references(unit) || (unit != null && unit == branchling);
+    }
 }

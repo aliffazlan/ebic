@@ -1885,3 +1885,76 @@ input[type="range"]::-moz-range-thumb {
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(8px); }
 }
+/* ---- sandbox (see SandboxHud.ts) ---- */
+
+.sandbox-button-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.sandbox-button-row button {
+  flex: 1;
+  padding: 8px 6px;
+  font-size: 12px;
+}
+
+.sandbox-hint {
+  margin: 4px 0 8px;
+  line-height: 1.4;
+}
+
+.sandbox-picker-panel {
+  width: 460px;
+  max-width: 90%;
+}
+
+.sandbox-picker-panel h3 {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sandbox-picker-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+.sandbox-picker-list button {
+  padding: 8px 6px;
+  font-size: 13px;
+}
+
+.sandbox-attribute-sets {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.sandbox-attribute-set {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.sandbox-attribute-set-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Two sets side by side leave each about half the usual width - stack the three buttons. */
+.sandbox-attribute-set .attribute-buttons {
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sandbox-attribute-set .attribute-buttons button {
+  padding: 10px;
+}

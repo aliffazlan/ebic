@@ -109,4 +109,9 @@ public class AcidPoolEffect extends Effect {
             }
         }
     }
+
+    @Override
+    public Unit getSource() {
+        return caster;
+    }
 }

@@ -84,4 +84,9 @@ public class BurningGroundEffect extends Effect {
             BurnEffect.apply(state, occupant, caster, burnStacks);
         }
     }
+
+    @Override
+    public Unit getSource() {
+        return caster;
+    }
 }

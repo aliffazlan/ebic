@@ -146,4 +146,20 @@ class ChannelHubTest {
 
         assertTrue(spectator.getSent().isEmpty());
     }
+
+    @Test
+    void aSandboxSocketHoldsBothSeatsButGetsEachBroadcastOnce() {
+        ChannelHub hub = new ChannelHub();
+        hub.cachePrompt(Team.PLAYER_ONE, "{\"type\":\"prompt\",\"team\":\"PLAYER_ONE\"}");
+        hub.cachePrompt(Team.PLAYER_TWO, "{\"type\":\"prompt\",\"team\":\"PLAYER_TWO\"}");
+        RecordingChannel sandbox = new RecordingChannel();
+
+        hub.registerSandbox(sandbox);
+        assertEquals(2, sandbox.getSent().size(), "both seats' outstanding prompts are replayed");
+        assertTrue(hub.isConnected(Team.PLAYER_ONE));
+        assertTrue(hub.isConnected(Team.PLAYER_TWO));
+
+        hub.broadcast("{\"type\":\"message\"}");
+        assertEquals(1, sandbox.getSent().stream().filter("{\"type\":\"message\"}"::equals).count());
+    }
 }

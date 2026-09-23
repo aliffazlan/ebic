@@ -2337,6 +2337,22 @@ export class Board {
       }
     }
 
+    // An armed sandbox tool owns the next click (see MatchScreen.handleSandboxToolClick), so
+    // it owns the highlights too: where a spawn may land, or every unit a remove/heal can hit.
+    if (state.sandboxTool) {
+      if (state.sandboxTool.kind === "spawn") {
+        const tiles = state.prompt?.kind === "action" ? (state.prompt.sandboxSpawnTiles ?? []) : [];
+        for (const tile of tiles) {
+          this.highlightTile(tile.q, tile.r);
+        }
+      } else {
+        for (const unit of state.snapshot?.units ?? []) {
+          if (!unit.dead) this.ringUnit(unit.id, LEGAL_UNIT_RING_COLOR);
+        }
+      }
+      return;
+    }
+
     if (state.prompt?.kind === "action" && state.selectedUnitId && state.selectedAbilityId) {
       this.drawCastRange(state);
       const legal = state.prompt.legalTargets?.[state.selectedUnitId]?.[state.selectedAbilityId];

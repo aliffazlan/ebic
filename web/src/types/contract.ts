@@ -83,6 +83,8 @@ export interface RejoinableMatchSummary {
   /** True if this seat currently has a live connection elsewhere (e.g. another tab) -
    * the client should not offer to rejoin a match it's already connected to. */
   connected: boolean;
+  /** A sandbox has no opponent - `opponentName` is just the caller's own name. */
+  isSandbox: boolean;
 }
 
 export interface RejoinableMatchesResponse {
@@ -118,6 +120,13 @@ export interface MatchInfo {
   yourTeam: Team;
   winnerName: string | null;
   isPublic: boolean;
+  // One player holding both seats on an empty board - see the SANDBOX tab in Hud.
+  isSandbox: boolean;
+}
+
+export interface CreateSandboxMatchResponse {
+  matchId: string;
+  status: MatchStatus;
 }
 
 export interface ApiErrorBody {
@@ -348,7 +357,9 @@ export interface ChoiceOption {
 }
 
 export type PromptPayload =
-  | { kind: "action"; team: Team; legalTargets: LegalTargetsByUnit }
+  // `sandboxSpawnTiles` only ever appears in a sandbox match: every tile a unit may be
+  // spawned on right now. The client highlights these and cancels a spawn click anywhere else.
+  | { kind: "action"; team: Team; legalTargets: LegalTargetsByUnit; sandboxSpawnTiles?: { q: number; r: number }[] }
   // `selectableAttributes` is the subset this unit can actually bring - an attribute it
   // has none of is not a legal answer. Render the others disabled rather than hiding them,
   // so the player can see *why* the choice is constrained. A unit with none at all is
@@ -417,6 +428,16 @@ export type PlacementEdit =
   | { kind: "move"; unitId: string; q: number; r: number }
   | { kind: "confirm" };
 
+// Sandbox-only tools. The server refuses these outside a sandbox match.
+export type SandboxTool =
+  | { tool: "spawn"; team: Team; definitionId: string; q: number; r: number }
+  | { tool: "remove"; unitId: string }
+  | { tool: "heal"; unitId: string }
+  | { tool: "clear" }
+  | { tool: "refill_moves" }
+  | { tool: "reset_cooldowns" }
+  | { tool: "switch_team" };
+
 export type ClientMessage =
   | { type: "ping" }
   | { type: "action"; kind: "end_turn" }
@@ -437,9 +458,12 @@ export type ClientMessage =
       q?: number;
       r?: number;
     }
-  | { type: "attribute"; value: Attribute }
+  // `team` is only sent in a sandbox, where one socket answers for both seats and the
+  // server can't otherwise tell whose pick this is.
+  | { type: "attribute"; value: Attribute; team?: Team }
   // `cancel` closes a choice dialogue without picking anything, at no cost - always
   // available, including when every option is disabled.
-  | { type: "choice"; optionId?: string; cancel?: boolean }
+  | { type: "choice"; optionId?: string; cancel?: boolean; team?: Team }
+  | ({ type: "action"; kind: "sandbox" } & SandboxTool)
   | { type: "pick"; definitionId: string }
   | ({ type: "placement_edit" } & PlacementEdit);

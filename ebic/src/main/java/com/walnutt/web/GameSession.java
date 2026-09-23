@@ -61,6 +61,11 @@ public final class GameSession {
     private static final long ABANDON_GRACE_SECONDS = 60;
     private volatile ScheduledFuture<?> abandonCheck;
 
+    /** One player holding both seats on an empty board - see Game.newSandboxMatch. */
+    private final boolean sandbox;
+    /** Set by shutdown() so the interrupt it causes isn't reported as an internal error. */
+    private volatile boolean stopping;
+
     private volatile GameState state;
     private Thread thread;
 
@@ -79,6 +84,15 @@ public final class GameSession {
                         Team botTeam, BotConfig botConfig, Map<Team, String> favourites,
                         String playerOneUsername, String playerTwoUsername, Runnable onCleanup,
                         ScheduledExecutorService scheduler) {
+        this(matchId, playerOneUserId, playerTwoUserId, matchService, botTeam, botConfig, favourites,
+            playerOneUsername, playerTwoUsername, onCleanup, scheduler, false);
+    }
+
+    public GameSession(String matchId, long playerOneUserId, long playerTwoUserId, MatchService matchService,
+                        Team botTeam, BotConfig botConfig, Map<Team, String> favourites,
+                        String playerOneUsername, String playerTwoUsername, Runnable onCleanup,
+                        ScheduledExecutorService scheduler, boolean sandbox) {
+        this.sandbox = sandbox;
         this.matchId = matchId;
         this.playerOneUserId = playerOneUserId;
         this.playerTwoUserId = playerTwoUserId;
@@ -127,6 +141,9 @@ public final class GameSession {
             hub.clearDraftAndPlacementCaches();
             game.start();
         } catch (Exception e) {
+            if (stopping) {
+                return; // shutdown() interrupted the blocked input wait - a deliberate end, not a crash
+            }
             LOG.log(Level.ERROR, "Match " + matchId + " aborted due to an internal error", e);
             hub.broadcast(JsonSupport.messageEnvelope("The match hit an internal error and could not continue."));
             try {
@@ -140,6 +157,9 @@ public final class GameSession {
     }
 
     private Game newMatch() {
+        if (sandbox) {
+            return Game.newSandboxMatch(input, renderer);
+        }
         if (botTeam == null) {
             return Game.newConcurrentFullDraftMatch(input, input, renderer, favourites);
         }
@@ -156,6 +176,10 @@ public final class GameSession {
     }
 
     public void registerChannel(Team team, ClientChannel channel) {
+        if (sandbox) {
+            registerSandboxChannel(channel);
+            return;
+        }
         boolean isReconnect = !everConnected.add(team);
         // Replayed before register()'s own sends so the frontend's round-rollover detection
         // (GameStateStore.commitCombatLog) starts fresh against the history, the same order
@@ -170,7 +194,22 @@ public final class GameSession {
         onPresenceChanged();
     }
 
+    /** No join/leave chatter in a sandbox - there is nobody else to tell. */
+    private void registerSandboxChannel(ClientChannel channel) {
+        if (!everConnected.add(Team.PLAYER_ONE)) {
+            hub.replayCombatLogTo(channel);
+        }
+        hub.registerSandbox(channel);
+        onPresenceChanged();
+    }
+
     public void unregisterChannel(Team team, ClientChannel channel) {
+        if (sandbox) {
+            hub.unregister(Team.PLAYER_ONE, channel);
+            hub.unregister(Team.PLAYER_TWO, channel);
+            onPresenceChanged();
+            return;
+        }
         boolean actuallyDisconnected = hub.unregister(team, channel);
         if (actuallyDisconnected && matchService.getRawStatus(matchId) == MatchService.Status.IN_PROGRESS) {
             hub.broadcast(JsonSupport.messageEnvelope(usernameFor(team) + " disconnected from the game."));
@@ -256,7 +295,52 @@ public final class GameSession {
     }
 
     public void handleMessage(Team team, JsonObject message) {
-        input.offer(team, message);
+        input.offer(sandbox ? sandboxSeatFor(message) : team, message);
+    }
+
+    /**
+     * Which seat a sandbox message is answering. An attribute or choice pick names its team -
+     * mid-encounter both seats are waiting at once. Everything else is an action, and only the
+     * side whose turn it is is ever asked for one; routing it anywhere else would leave it
+     * queued up to fire, stale, at the start of the other side's next turn.
+     */
+    private Team sandboxSeatFor(JsonObject message) {
+        String type = JsonSupport.optString(message, "type");
+        if ("attribute".equals(type) || "choice".equals(type)) {
+            String named = JsonSupport.optString(message, "team");
+            for (Team team : Team.values()) {
+                if (team.name().equals(named)) {
+                    return team;
+                }
+            }
+        }
+        GameState current = state;
+        return current == null ? Team.PLAYER_ONE : current.getCurrentPlayer().getTeam();
+    }
+
+    public boolean isSandbox() {
+        return sandbox;
+    }
+
+    /**
+     * Ends a sandbox on its player's say-so. The match thread is parked waiting for input,
+     * so it has to be interrupted out of that wait - flagged first so runMatch doesn't
+     * mistake the interrupt for a crash.
+     */
+    public void shutdown() {
+        stopping = true;
+        cancelAbandonCheck();
+        try {
+            matchService.finishMatch(matchId, null);
+        } catch (RuntimeException ignored) {
+            // best-effort - the session is going away regardless
+        }
+        synchronized (this) {
+            if (thread != null) {
+                thread.interrupt();
+            }
+        }
+        onCleanup.run();
     }
 
     /** Whether a seat currently has a live channel - used by the "rejoin match" list to tell

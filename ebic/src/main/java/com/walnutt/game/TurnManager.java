@@ -7,6 +7,7 @@ import com.walnutt.ability.target.Target;
 import com.walnutt.event.AbilityCastEvent;
 import com.walnutt.event.TurnEndEvent;
 import com.walnutt.event.TurnStartEvent;
+import com.walnutt.game.sandbox.SandboxController;
 import com.walnutt.ui.ActionChoice;
 import com.walnutt.ui.InputHandler;
 import com.walnutt.ui.Renderer;
@@ -37,6 +38,15 @@ public class TurnManager {
             ActionChoice choice = input.chooseAction(state, player);
             if (choice.isEndTurn()) {
                 break;
+            }
+            if (choice.isSandbox()) {
+                String refusal = SandboxController.apply(state, choice.getSandboxCommand());
+                if (refusal != null) {
+                    renderer.renderMessage(refusal);
+                }
+                // Switch Team hands the rest of this turn to the other side.
+                player = state.getCurrentPlayer();
+                continue;
             }
 
             Ability ability = choice.getAbility();

@@ -81,6 +81,35 @@ public abstract class Effect extends TriggerHandler {
         this.owner = owner;
     }
 
+    /**
+     * The unit that applied this effect, when that is someone other than its owner (a poison's
+     * poisoner, a mark's marksman) - or null when the effect has no outside source worth
+     * tracking. Only the sandbox reads this today: removing a unit from the game strips
+     * everything it had applied to anyone else.
+     */
+    public Unit getSource() {
+        return null;
+    }
+
+    /**
+     * True if this effect holds onto {@code unit} in any way - as its source, or as a linked
+     * partner (a Duel opponent, a latched Feast target, a Projection clone). Whatever such an
+     * effect does next assumes that unit is still in play, so a sandbox removal strips it.
+     */
+    public boolean references(Unit unit) {
+        return unit != null && getSource() == unit;
+    }
+
+    /**
+     * Runs instead of onExpire when the sandbox strips this effect because a unit it refers to
+     * was removed from the game. Deliberately NOT onExpire: many of those deliver a payload (a
+     * missile landing, a bloom bursting, an orb detonating), and a removal is not a trigger.
+     * Override only for pure cleanup that would otherwise be left dangling - restoring a stat
+     * the effect had taken, freeing a stacked tile, taking a clone off the board.
+     */
+    public void onStripped(GameState state) {
+    }
+
     public int getRemainingTurns() {
         return remainingTurns;
     }

@@ -228,6 +228,13 @@ export class TutorialScreen implements Screen, MatchActions, TutorialHost {
     this.onExit();
   }
 
+  // Sandbox tools - the SANDBOX tab never renders here, so nothing can call these.
+  openSandboxPicker(): void {}
+  chooseSandboxSpawn(): void {}
+  startSandboxTool(): void {}
+  cancelSandboxTool(): void {}
+  sendSandbox(): void {}
+
   // ---- TutorialHost ----
 
   showDialogue(lines: DialogueLine[]): Promise<void> {

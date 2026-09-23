@@ -85,4 +85,9 @@ public class DoomEffect extends Effect {
             expireNow(state);
         }
     }
+
+    @Override
+    public Unit getSource() {
+        return source;
+    }
 }

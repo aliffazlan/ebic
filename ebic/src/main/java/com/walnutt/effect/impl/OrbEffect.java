@@ -145,4 +145,9 @@ public class OrbEffect extends Effect {
             unit.takeDamage(state, event);
         }
     }
+
+    @Override
+    public Unit getSource() {
+        return caster;
+    }
 }

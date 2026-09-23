@@ -60,10 +60,12 @@ public final class GameSessionManager {
                 level = storedLevel(id);
             }
 
+            boolean sandbox = matchService.isSandbox(id);
             GameSession session = new GameSession(id, participants.playerOneId(), participants.playerTwoId(),
-                matchService, botTeam, level == null ? null : level.config(), favourites(participants, botTeam),
+                matchService, botTeam, level == null ? null : level.config(),
+                sandbox ? Map.of() : favourites(participants, botTeam),
                 auth.getUsername(participants.playerOneId()), auth.getUsername(participants.playerTwoId()),
-                () -> sessions.remove(id), abandonScheduler);
+                () -> sessions.remove(id), abandonScheduler, sandbox);
             session.start();
             return session;
         });

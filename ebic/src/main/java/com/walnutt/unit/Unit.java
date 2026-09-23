@@ -208,6 +208,16 @@ public abstract class Unit {
     }
 
     /**
+     * Takes an effect off this unit without it expiring - no onExpire, only its own
+     * {@link Effect#onStripped} cleanup. Sandbox-only: see SandboxController.
+     */
+    public void stripEffect(GameState state, Effect effect) {
+        if (effects.remove(effect)) {
+            effect.onStripped(state);
+        }
+    }
+
+    /**
      * Strictest minimum attack range imposed by any active effect, or 0 if none.
      * Aggregated by max (not sum) so two overlapping minimums of 3 and 2 yield 3.
      */

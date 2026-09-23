@@ -72,6 +72,7 @@ public final class Database {
         addColumnIfMissing("matches", "bot_level", "TEXT");
         addColumnIfMissing("users", "favourite_unit", "TEXT");
         addColumnIfMissing("matches", "is_public", "INTEGER NOT NULL DEFAULT 0");
+        addColumnIfMissing("matches", "is_sandbox", "INTEGER NOT NULL DEFAULT 0");
     }
 
     /** Idempotent ALTER for a column added to a table that may already exist in a dev database. */

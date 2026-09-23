@@ -43,4 +43,10 @@ public class MimicEffect extends Effect {
             : "cooldown " + copy.getCurrentCooldown();
         return "Copied: " + copy.getName() + " (" + cooldown + ")";
     }
+
+    /** Hands the copied ability back, exactly as a natural expiry does. */
+    @Override
+    public void onStripped(GameState state) {
+        onExpire(state);
+    }
 }

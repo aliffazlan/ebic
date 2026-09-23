@@ -1,6 +1,8 @@
 package com.walnutt.map;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,6 +61,10 @@ public class GameMap {
     /** Largest |r| that exists on this map; equal to the radius when nothing is trimmed. */
     public int getRowLimit() {
         return rowLimit;
+    }
+
+    public Collection<Tile> getAllTiles() {
+        return Collections.unmodifiableCollection(tiles.values());
     }
 
     public boolean isWithinBounds(Position position) {

@@ -141,6 +141,7 @@ public class SnowGolem extends Ability {
             state.getAbilityDefinitions());
         state.getMap().moveUnit(golem, destination);
         state.getPlayer(owner.getTeam()).addUnit(golem);
+        state.recordSummoner(golem, owner);
         activeGolems.add(golem);
     }
 }

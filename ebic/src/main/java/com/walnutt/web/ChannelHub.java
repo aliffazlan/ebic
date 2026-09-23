@@ -50,6 +50,25 @@ public final class ChannelHub {
     }
 
     /**
+     * The sandbox's single player holds both seats through one socket. Replays the shared
+     * state once, then BOTH seats' outstanding prompts - mid-encounter, that is both halves
+     * of the attribute chooser.
+     */
+    public void registerSandbox(ClientChannel channel) {
+        channels.put(Team.PLAYER_ONE, channel);
+        channels.put(Team.PLAYER_TWO, channel);
+        if (lastStateJson != null) {
+            channel.send(lastStateJson);
+        }
+        for (Team team : Team.values()) {
+            String promptJson = lastPromptJson.get(team);
+            if (promptJson != null) {
+                channel.send(promptJson);
+            }
+        }
+    }
+
+    /**
      * Only removes the mapping if it's still the same channel instance (a newer reconnect wins
      * the race). Returns whether it actually removed anything, so a caller can tell a genuine
      * disconnect from a stale close of an already-replaced channel.
@@ -65,9 +84,18 @@ public final class ChannelHub {
         }
     }
 
+    /**
+     * A sandbox's one socket sits in both seats (see registerSandbox), so the two seats are
+     * sent to as a set rather than one after the other - otherwise it would get everything twice.
+     */
     public void broadcast(String json) {
-        sendTo(Team.PLAYER_ONE, json);
-        sendTo(Team.PLAYER_TWO, json);
+        Set<ClientChannel> seated = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        seated.addAll(channels.values());
+        for (ClientChannel channel : seated) {
+            if (channel.isOpen()) {
+                channel.send(json);
+            }
+        }
         for (ClientChannel channel : spectatorChannels) {
             if (channel.isOpen()) {
                 channel.send(json);

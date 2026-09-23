@@ -220,4 +220,15 @@ public class FeastEffect extends Effect {
                 state.getEventBus().publish(state, new PostMoveEvent(owner, from, tile.getPosition()));
             });
     }
+
+    @Override
+    public boolean references(Unit unit) {
+        return super.references(unit) || (unit != null && unit == latchedTarget);
+    }
+
+    /** Sandbox removal of the latched unit (or Grivath) - just let go; there is no tile left to share. */
+    @Override
+    public void onStripped(GameState state) {
+        clearLatch();
+    }
 }

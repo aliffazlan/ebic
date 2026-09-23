@@ -36,6 +36,7 @@ public class BurnEffect extends Effect {
         this.category = EffectCategory.DEBUFF;
     }
 
+    @Override
     public Unit getSource() {
         return source;
     }

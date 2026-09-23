@@ -64,4 +64,9 @@ public class FrostbiteEffect extends Effect {
             ? Math.max(killThreshold, basicKillThreshold)
             : killThreshold;
     }
+
+    @Override
+    public Unit getSource() {
+        return source;
+    }
 }

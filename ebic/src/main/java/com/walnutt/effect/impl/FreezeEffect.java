@@ -58,4 +58,9 @@ public class FreezeEffect extends Effect {
             getOwner().heal(state, amountPerTurn);
         }
     }
+
+    @Override
+    public Unit getSource() {
+        return caster;
+    }
 }

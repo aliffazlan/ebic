@@ -95,12 +95,14 @@ public final class WebServer {
         app.get("/api/units", this::handleUnits);
         app.post("/api/matches", this::handleCreateMatch);
         app.post("/api/matches/bot", this::handleCreateBotMatch);
+        app.post("/api/matches/sandbox", this::handleCreateSandboxMatch);
         app.post("/api/matches/join", this::handleJoinMatch);
         app.get("/api/matches/public", this::handleListPublicMatches);
         app.get("/api/matches/rejoinable", this::handleListRejoinableMatches);
         app.get("/api/matches/{matchId}", this::handleMatchStatus);
         app.post("/api/matches/{matchId}/start", this::handleStartLobby);
         app.post("/api/matches/{matchId}/leave", this::handleLeaveLobby);
+        app.post("/api/matches/{matchId}/end-sandbox", this::handleEndSandbox);
         app.post("/api/matches/{matchId}/visibility", this::handleSetVisibility);
         app.post("/api/matches/{matchId}/join", this::handleJoinPublicLobby);
         app.post("/api/matches/{matchId}/spectate", this::handleSpectatePublicLobby);
@@ -312,10 +314,36 @@ public final class WebServer {
             row.addProperty("team", rejoinable.team());
             row.addProperty("opponentName", rejoinable.opponentName());
             row.addProperty("connected", connected);
+            row.addProperty("isSandbox", rejoinable.isSandbox());
             matchesArray.add(row);
         }
         payload.add("matches", matchesArray);
         sendJson(ctx, 200, payload);
+    }
+
+    /** A sandbox: the caller holds both seats on an empty board - see MatchService.createSandboxMatch. */
+    private void handleCreateSandboxMatch(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        MatchService.MatchSummary summary = matches.createSandboxMatch(user.userId());
+        JsonObject payload = new JsonObject();
+        payload.addProperty("matchId", summary.matchId());
+        payload.addProperty("status", summary.status());
+        sendJson(ctx, 201, payload);
+    }
+
+    /**
+     * Leaving a sandbox ends it for good - unlike a real match there is no opponent to keep
+     * the game going, and nothing in it worth rejoining once its player has walked away.
+     */
+    private void handleEndSandbox(Context ctx) {
+        AuthService.AuthedUser user = requireAuth(ctx);
+        String matchId = ctx.pathParam("matchId");
+        MatchService.MatchStatusView view = matches.getStatus(user.userId(), matchId);
+        if (!view.isSandbox()) {
+            throw new ApiException(409, "not a sandbox match");
+        }
+        sessions.get(matchId).ifPresentOrElse(GameSession::shutdown, () -> matches.finishMatch(matchId, null));
+        ctx.status(204);
     }
 
     /**
@@ -366,6 +394,7 @@ public final class WebServer {
         payload.addProperty("yourTeam", view.yourTeam());
         payload.addProperty("winnerName", view.winnerName());
         payload.addProperty("isPublic", view.isPublic());
+        payload.addProperty("isSandbox", view.isSandbox());
         sendJson(ctx, 200, payload);
     }
 

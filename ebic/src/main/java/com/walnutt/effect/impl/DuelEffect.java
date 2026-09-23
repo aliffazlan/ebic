@@ -143,4 +143,9 @@ public class DuelEffect extends Effect {
             partner.expireNow(state);
         }
     }
+
+    @Override
+    public boolean references(Unit unit) {
+        return super.references(unit) || (unit != null && unit == opponent);
+    }
 }

@@ -265,4 +265,11 @@ export class FixtureScreen implements Screen, MatchActions {
   exitToLobby(): void {
     location.href = location.pathname;
   }
+
+  // Sandbox tools - the SANDBOX tab never renders here, so nothing can call these.
+  openSandboxPicker(): void {}
+  chooseSandboxSpawn(): void {}
+  startSandboxTool(): void {}
+  cancelSandboxTool(): void {}
+  sendSandbox(): void {}
 }

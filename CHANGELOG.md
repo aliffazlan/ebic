@@ -54,6 +54,23 @@ the longer a fight against him runs.
 - **Homing Missile**'s locked-on marker is now a pulsing orange ring instead of a crosshair,
   so it can't be mistaken for a High Noon mark.
 
+### Sandbox
+
+A new **Sandbox match** on the main menu: an empty board where you play both sides, for
+trying out an interaction without having to engineer it in a real game.
+
+- No draft or placement — it starts straight in combat. End Turn hands over to the other
+  side as normal, and there is no "your turn" banner.
+- A **Sandbox** tab (only in sandbox matches) holds the tools: **Add P1 / P2 unit** (any
+  champion, elite or basic, placed on a tile you click — several champions per side are
+  fine), **Remove unit**, **Clear board**, **Full heal unit**, **Reset cooldowns**, **Refill
+  moves** and **Switch team**, which hands control over without firing any end- or
+  start-of-turn effects.
+- Removing a unit takes it out of the game — it doesn't die, so nothing that triggers on a
+  death fires. Its summons go with it, along with anything it had applied to other units.
+- Attribute encounters show both sides' choices in one window; each side locks in on its own.
+- A champion dying doesn't end the game. Leaving ends the sandbox; refreshing brings you back.
+
 
 ## 0.4.1 — 2026-09-22
 

@@ -39,4 +39,9 @@ public class ImprisonmentEffect extends Effect {
         getOwner().addPermanentModifier(StatModifier.flat(Stat.INTELLIGENCE, -amount, this));
         caster.addPermanentModifier(StatModifier.flat(Stat.INTELLIGENCE, amount, this));
     }
+
+    @Override
+    public Unit getSource() {
+        return caster;
+    }
 }

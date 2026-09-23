@@ -22,6 +22,8 @@ import com.walnutt.game.DefaultArrangement;
 import com.walnutt.game.GameState;
 import com.walnutt.game.Player;
 import com.walnutt.game.Team;
+import com.walnutt.game.sandbox.SandboxCommand;
+import com.walnutt.game.sandbox.SandboxController;
 import com.walnutt.map.Position;
 import com.walnutt.map.Tile;
 import com.walnutt.ui.ActionChoice;
@@ -79,6 +81,15 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
         Team team = player.getTeam();
         JsonObject prompt = promptOf("action", team);
         prompt.add("legalTargets", buildLegalTargets(state, player));
+        if (state.isSandbox()) {
+            // Same "the client never computes legality" principle as legalTargets - it
+            // highlights these and cancels a spawn on anything else without a round trip.
+            JsonArray spawnTiles = new JsonArray();
+            for (Tile tile : SandboxController.spawnTiles(state)) {
+                spawnTiles.add(tileJson(new TileTarget(tile)));
+            }
+            prompt.add("sandboxSpawnTiles", spawnTiles);
+        }
         sendPrompt(team, prompt);
 
         while (true) {
@@ -90,6 +101,15 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             if ("end_turn".equals(kind)) {
                 hub.clearPrompt(team);
                 return ActionChoice.endTurn();
+            }
+            if ("sandbox".equals(kind) && state.isSandbox()) {
+                SandboxCommand command = parseSandboxCommand(state, msg);
+                if (command == null) {
+                    hub.sendTo(team, JsonSupport.messageEnvelope("Invalid sandbox command."));
+                    continue;
+                }
+                hub.clearPrompt(team);
+                return ActionChoice.sandbox(command);
             }
             if (!"ability".equals(kind)) {
                 hub.sendTo(team, JsonSupport.messageEnvelope("Unrecognized action kind."));
@@ -682,6 +702,52 @@ public final class WebInputHandler implements InputHandler, ConcurrentSetupHandl
             }
             default -> null;
         };
+    }
+
+    /**
+     * Only resolves ids and coordinates into real objects - whether the command can actually
+     * be carried out (a free tile, a unit still on the board) is SandboxController's call.
+     */
+    private SandboxCommand parseSandboxCommand(GameState state, JsonObject msg) {
+        String tool = JsonSupport.optString(msg, "tool");
+        if (tool == null) {
+            return null;
+        }
+        return switch (tool) {
+            case "spawn" -> {
+                Team spawnTeam = parseTeam(JsonSupport.optString(msg, "team"));
+                String definitionId = JsonSupport.optString(msg, "definitionId");
+                Integer q = JsonSupport.optInt(msg, "q");
+                Integer r = JsonSupport.optInt(msg, "r");
+                yield spawnTeam == null || definitionId == null || q == null || r == null
+                    ? null
+                    : new SandboxCommand.Spawn(spawnTeam, definitionId, new Position(q, r));
+            }
+            case "remove" -> {
+                Unit unit = ids.resolve(JsonSupport.optString(msg, "unitId"));
+                yield unit == null ? null : new SandboxCommand.Remove(unit);
+            }
+            case "heal" -> {
+                Unit unit = ids.resolve(JsonSupport.optString(msg, "unitId"));
+                yield unit == null ? null : new SandboxCommand.Heal(unit);
+            }
+            case "clear" -> new SandboxCommand.Clear();
+            case "refill_moves" -> new SandboxCommand.RefillMoves();
+            case "reset_cooldowns" -> new SandboxCommand.ResetCooldowns();
+            case "switch_team" -> new SandboxCommand.SwitchTeam();
+            default -> null;
+        };
+    }
+
+    private static Team parseTeam(String name) {
+        if (name == null) {
+            return null;
+        }
+        try {
+            return Team.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private Tile resolveTile(GameState state, JsonObject msg) {

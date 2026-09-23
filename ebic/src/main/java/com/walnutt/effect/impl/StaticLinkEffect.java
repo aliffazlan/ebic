@@ -120,4 +120,14 @@ public class StaticLinkEffect extends Effect {
         // scheduled sweep (startTurn/endTurn), which could be a full opponent turn away.
         expireNow(state);
     }
+
+    @Override
+    public Unit getSource() {
+        return caster;
+    }
+
+    @Override
+    public boolean references(Unit unit) {
+        return super.references(unit) || (unit != null && unit == target);
+    }
 }

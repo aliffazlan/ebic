@@ -257,9 +257,20 @@ export class App {
     // LobbyScreen/LobbyRoomScreen) so both player names reach the combat log for
     // every match, not just ones a caller happened to already have both names for.
     const info = await api.getMatch(matchId);
+    // In a sandbox both seats hold the same username, which would make the combat log
+    // useless - name the sides for their colours instead.
+    const playerOneName = info.isSandbox ? "Blue" : info.playerOneName;
+    const playerTwoName = info.isSandbox ? "Red" : (info.playerTwoName ?? "");
     this.setScreen(
-      new MatchScreen(this.root, matchId, yourTeam, info.playerOneName, info.playerTwoName ?? "", () =>
-        void this.endMatch(),
+      new MatchScreen(
+        this.root,
+        matchId,
+        yourTeam,
+        playerOneName,
+        playerTwoName,
+        () => void this.endMatch(),
+        undefined,
+        info.isSandbox,
       ),
     );
   }

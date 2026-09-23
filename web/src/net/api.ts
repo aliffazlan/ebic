@@ -9,6 +9,7 @@ import type {
   BotLevel,
   CreateBotMatchResponse,
   CreateMatchResponse,
+  CreateSandboxMatchResponse,
   FavouriteUnitResponse,
   JoinMatchResponse,
   MatchInfo,
@@ -108,6 +109,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ level }),
     });
+  },
+
+  /** An empty board where the caller plays both sides - no draft, straight into combat. */
+  createSandboxMatch(): Promise<CreateSandboxMatchResponse> {
+    return request<CreateSandboxMatchResponse>("/matches/sandbox", { method: "POST" });
+  },
+
+  /** Ends a sandbox for good. A sandbox has no opponent to keep it going, so leaving it is final. */
+  endSandbox(matchId: string): Promise<void> {
+    return request<void>(`/matches/${encodeURIComponent(matchId)}/end-sandbox`, { method: "POST" });
   },
 
   joinMatch(joinCode: string): Promise<JoinMatchResponse> {

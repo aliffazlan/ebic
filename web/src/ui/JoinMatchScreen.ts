@@ -238,7 +238,7 @@ export class JoinMatchScreen implements Screen {
 
     this.rejoinBtn.disabled = false;
     this.rejoinBtn.title = "";
-    this.rejoinBtn.textContent = available.length === 1 ? `Rejoin vs ${available[0].opponentName}` : "Rejoin match";
+    this.rejoinBtn.textContent = available.length === 1 ? `Rejoin ${rejoinLabel(available[0])}` : "Rejoin match";
   }
 
   /** A single candidate rejoins immediately; more than one opens a small picker instead of
@@ -265,7 +265,7 @@ export class JoinMatchScreen implements Screen {
     row.className = "public-lobby-row";
 
     const name = document.createElement("span");
-    name.textContent = `vs ${match.opponentName}`;
+    name.textContent = rejoinLabel(match);
     row.appendChild(name);
 
     const status = document.createElement("span");
@@ -384,4 +384,9 @@ function hint(text: string): HTMLElement {
   el.className = "hint";
   el.textContent = text;
   return el;
+}
+
+/** A sandbox has no opponent, so it is named for what it is rather than "vs yourself". */
+function rejoinLabel(match: RejoinableMatchSummary): string {
+  return match.isSandbox ? "sandbox" : `vs ${match.opponentName}`;
 }

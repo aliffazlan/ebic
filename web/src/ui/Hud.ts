@@ -20,6 +20,8 @@ import { audioManager } from "../audio/AudioManager";
 import { actionForHotkeyCode, getHotkey, setHotkey, hotkeyLabel, type HotkeyAction } from "../app/AppSettings";
 import { isTextEntry } from "../board/CameraController";
 import { volumeRow, hotkeyRow } from "./SettingsRows";
+import { api } from "../net/api";
+import { SIDE_NAMES, renderSandboxPanel, renderSandboxPicker, sandboxToolHint } from "./SandboxHud";
 
 const ATTRIBUTES: Attribute[] = ["STRENGTH", "AGILITY", "INTELLIGENCE"];
 
@@ -33,7 +35,7 @@ const HOTKEY_ROWS: ReadonlyArray<{ action: HotkeyAction; label: string }> = [
 ];
 
 /** Which log the left column shows; null means collapsed to just the tab rail. */
-type LogTab = "combat" | "system" | "settings" | null;
+type LogTab = "combat" | "system" | "settings" | "sandbox" | null;
 
 /** Combat-log halves, top to bottom. */
 const TEAMS: Team[] = ["PLAYER_ONE", "PLAYER_TWO"];
@@ -145,6 +147,12 @@ export class Hud {
   // One tooltip for the whole HUD - see Tooltip, which explains why it cannot live
   // inside the subtree render() wipes on every store update.
   private tooltip: Tooltip;
+  // The sandbox unit picker's roster, fetched the first time it opens - null until then
+  // (and while loading). Held here for the same reason as logTab: render() rebuilds the
+  // picker from scratch on every store update.
+  private sandboxUnits: UnitDefinitionSnapshot[] | null = null;
+  private sandboxUnitsError: string | null = null;
+  private sandboxUnitsRequested = false;
 
   constructor(
     hudHost: HTMLElement,
@@ -159,6 +167,8 @@ export class Hud {
     this.store = store;
     this.actions = actions;
     this.tooltip = new Tooltip();
+    // A sandbox is played from its tools, so that tab is where it opens.
+    if (store.getState().isSandbox) this.logTab = "sandbox";
     this.unsubscribe = this.store.subscribe((state) => this.render(state));
     window.addEventListener("keydown", this.onKeyDown);
   }
@@ -186,7 +196,9 @@ export class Hud {
 
     if (action === "cancel") {
       const state = this.store.getState();
-      if (state.selectedAbilityId) {
+      if (state.sandboxTool || state.sandboxPicker) {
+        this.actions.cancelSandboxTool();
+      } else if (state.selectedAbilityId) {
         this.actions.selectAbility(null);
       } else if (state.selectedUnitId) {
         this.actions.selectUnit(null);
@@ -222,6 +234,16 @@ export class Hud {
     body.appendChild(this.renderTopBar(state));
 
     const isYourTurn = state.snapshot?.currentTeam === state.yourTeam;
+    if (state.sandboxTool) {
+      // Mirrored here from the SANDBOX tab, which may well be closed while the board waits.
+      const banner = document.createElement("div");
+      banner.className = "hud-section";
+      const inner = document.createElement("div");
+      inner.className = "waiting-banner";
+      inner.textContent = `${sandboxToolHint(state.sandboxTool)} Esc cancels.`;
+      banner.appendChild(inner);
+      body.appendChild(banner);
+    }
     if (state.snapshot && !isYourTurn && !state.gameOver) {
       const banner = document.createElement("div");
       banner.className = "hud-section";
@@ -259,8 +281,33 @@ export class Hud {
     } else if (state.prompt?.kind === "choice") {
       this.hudHost.appendChild(this.renderChoiceModal(state.prompt));
     } else if (state.prompt?.kind === "attribute") {
-      this.hudHost.appendChild(this.renderAttributeModal(state));
+      this.hudHost.appendChild(
+        state.isSandbox ? this.renderSandboxAttributeModal(state) : this.renderAttributeModal(state),
+      );
+    } else if (state.sandboxPicker) {
+      this.loadSandboxUnits();
+      this.hudHost.appendChild(
+        renderSandboxPicker(state.sandboxPicker, this.sandboxUnits, this.sandboxUnitsError, this.actions),
+      );
     }
+  }
+
+  /** Fetches the picker's roster once per match; re-renders when it lands. */
+  private loadSandboxUnits(): void {
+    if (this.sandboxUnitsRequested) return;
+    this.sandboxUnitsRequested = true;
+    api.getUnits().then(
+      (res) => {
+        this.sandboxUnits = res.units;
+        this.render(this.store.getState());
+      },
+      () => {
+        this.sandboxUnitsError = "Couldn't load the unit list.";
+        // Let the next opening try again rather than showing the error forever.
+        this.sandboxUnitsRequested = false;
+        this.render(this.store.getState());
+      },
+    );
   }
 
   /**
@@ -353,6 +400,9 @@ export class Hud {
     if (state.isSpectator) {
       teamBadge.className = "badge";
       teamBadge.textContent = "Spectating";
+    } else if (state.isSandbox) {
+      teamBadge.className = "badge";
+      teamBadge.textContent = "Sandbox";
     } else {
       teamBadge.className = `badge ${state.yourTeam === "PLAYER_ONE" ? "team-one" : "team-two"}`;
       teamBadge.textContent = state.yourTeam === "PLAYER_ONE" ? "Player One" : "Player Two";
@@ -365,6 +415,10 @@ export class Hud {
       if (state.isSpectator) {
         turnBadge.className = "badge turn-theirs";
         turnBadge.textContent = state.snapshot.currentTeam === "PLAYER_ONE" ? "Player One's turn" : "Player Two's turn";
+      } else if (state.isSandbox) {
+        const current = state.snapshot.currentTeam;
+        turnBadge.className = `badge ${current === "PLAYER_ONE" ? "team-one" : "team-two"}`;
+        turnBadge.textContent = `${SIDE_NAMES[current]}'s turn`;
       } else {
         const isYourTurn = state.snapshot.currentTeam === state.yourTeam;
         turnBadge.className = `badge ${isYourTurn ? "turn-yours" : "turn-theirs"}`;
@@ -419,7 +473,9 @@ export class Hud {
     sub.className = "unit-panel-sub";
     const ownershipLabel = state.isSpectator
       ? (unit.team === "PLAYER_ONE" ? "Player One" : "Player Two")
-      : (unit.team === state.yourTeam ? "Yours" : "Enemy");
+      : state.isSandbox
+        ? SIDE_NAMES[unit.team]
+        : (unit.team === state.yourTeam ? "Yours" : "Enemy");
     sub.textContent = `${unit.unitType} · ${ownershipLabel}${unit.dead ? " · Dead" : ""}`;
     section.appendChild(sub);
 
@@ -678,6 +734,7 @@ export class Hud {
       panel.appendChild(
         this.logTab === "combat" ? this.renderCombatLog(state)
           : this.logTab === "system" ? this.renderMessageLog(state)
+          : this.logTab === "sandbox" && state.isSandbox ? renderSandboxPanel(state, this.actions)
           : this.renderSettingsPanel(),
       );
       this.logHost.appendChild(panel);
@@ -692,6 +749,8 @@ export class Hud {
       this.renderLogTab("system", "System", state.messages.length > this.lastSeenMessageCount),
     );
     rail.appendChild(this.renderLogTab("settings", "Settings", false));
+    // Never in a real match - the tools only exist server-side for a sandbox anyway.
+    if (state.isSandbox) rail.appendChild(this.renderLogTab("sandbox", "Sandbox", false));
     return rail;
   }
 
@@ -1073,10 +1132,103 @@ export class Hud {
     return backdrop;
   }
 
+  /**
+   * The sandbox encounter: this client is both sides, so both pick from the one modal.
+   * Blue always sits on the left and Red on the right - here the slot IS the team, since
+   * nobody is "looking from" either side. Each half locks independently; a side with no
+   * usable attribute is never prompted, so its half says so instead of offering buttons.
+   */
+  private renderSandboxAttributeModal(state: MatchUiState): HTMLElement {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+
+    const panel = document.createElement("div");
+    panel.className = "modal-panel attribute-modal-panel";
+    backdrop.appendChild(panel);
+
+    const title = document.createElement("h2");
+    title.textContent = "Choose attributes";
+    panel.appendChild(title);
+
+    // Either prompt names both units; which one is which side comes from the snapshot.
+    const anyPrompt = state.sandboxAttributePrompts.PLAYER_ONE ?? state.sandboxAttributePrompts.PLAYER_TWO;
+    const ids = anyPrompt ? [anyPrompt.unitId, anyPrompt.opponentUnitId] : [];
+    const units = ids.map((id) => this.store.findUnit(id));
+    const unitFor = (team: Team) => units.find((u) => u?.team === team) ?? null;
+
+    const encounter = document.createElement("div");
+    encounter.className = "encounter-row";
+    const vs = document.createElement("div");
+    vs.className = "encounter-vs";
+    vs.textContent = "VS";
+    encounter.append(
+      this.renderEncounterCard(unitFor("PLAYER_ONE"), "PLAYER_ONE", false, true),
+      vs,
+      this.renderEncounterCard(unitFor("PLAYER_TWO"), "PLAYER_ONE", true, true),
+    );
+    panel.appendChild(encounter);
+
+    const sets = document.createElement("div");
+    sets.className = "sandbox-attribute-sets";
+    for (const team of TEAMS) {
+      sets.appendChild(this.renderSandboxAttributeSet(state, team, unitFor(team)));
+    }
+    panel.appendChild(sets);
+
+    return backdrop;
+  }
+
+  private renderSandboxAttributeSet(state: MatchUiState, team: Team, unit: UnitSnapshot | null): HTMLElement {
+    const set = document.createElement("div");
+    set.className = "sandbox-attribute-set";
+    set.style.borderColor = teamCssColor(team);
+
+    const label = document.createElement("div");
+    label.className = "sandbox-attribute-set-label";
+    label.style.color = teamCssColor(team);
+    label.textContent = `${team === "PLAYER_ONE" ? "P1" : "P2"} (${SIDE_NAMES[team]})`;
+    set.appendChild(label);
+
+    const prompt = state.sandboxAttributePrompts[team];
+    if (!prompt) {
+      // Either this side has nothing to fight with, or its prompt is still in flight - it
+      // follows the other side's by a moment, and render() runs again when it lands.
+      const none = document.createElement("div");
+      none.className = "hint";
+      none.textContent = unit && unit.strength <= 0 && unit.agility <= 0 && unit.intelligence <= 0
+        ? "No usable attribute."
+        : "Waiting…";
+      set.appendChild(none);
+      return set;
+    }
+
+    if (state.sandboxAttributeSubmitted.includes(team)) {
+      const locked = document.createElement("div");
+      locked.className = "waiting-banner";
+      locked.textContent = "Locked in";
+      set.appendChild(locked);
+      return set;
+    }
+
+    const row = document.createElement("div");
+    row.className = "attribute-buttons";
+    for (const attr of ATTRIBUTES) {
+      const btn = document.createElement("button");
+      btn.className = "primary";
+      btn.textContent = attr;
+      btn.disabled = !prompt.selectableAttributes.includes(attr);
+      btn.addEventListener("click", () => this.actions.sendAttribute(attr, team));
+      row.appendChild(btn);
+    }
+    set.appendChild(row);
+    return set;
+  }
+
   private renderEncounterCard(
     unit: UnitSnapshot | null,
     yourTeam: Team,
     mirrored: boolean,
+    isSandbox = false,
   ): HTMLElement {
     const card = document.createElement("div");
     card.className = "encounter-card";
@@ -1102,7 +1254,8 @@ export class Hud {
 
     const sub = document.createElement("div");
     sub.className = "hint";
-    sub.textContent = `${unit.unitType} · ${unit.team === yourTeam ? "Yours" : "Enemy"}`;
+    const side = isSandbox ? SIDE_NAMES[unit.team] : (unit.team === yourTeam ? "Yours" : "Enemy");
+    sub.textContent = `${unit.unitType} · ${side}`;
     card.appendChild(sub);
 
     const cardBarrierBar = renderBarrierBar(unit);

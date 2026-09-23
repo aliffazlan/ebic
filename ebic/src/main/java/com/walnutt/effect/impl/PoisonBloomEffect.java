@@ -147,4 +147,9 @@ public class PoisonBloomEffect extends Effect {
     private PoisonEffect poisonOnHost() {
         return getOwner() == null ? null : PoisonEffect.on(getOwner());
     }
+
+    @Override
+    public Unit getSource() {
+        return caster;
+    }
 }

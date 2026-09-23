@@ -165,6 +165,27 @@ export class LobbyScreen implements Screen {
     joinBtn.addEventListener("click", () => this.callbacks.onOpenJoinMatch());
     card.appendChild(joinBtn);
 
+    // Sandbox - last, since it isn't really a match: one player on both sides of an empty
+    // board, for trying mechanics out without having to engineer the situation in a real game.
+    const sandboxHeading = document.createElement("h2");
+    sandboxHeading.textContent = "Sandbox";
+    card.appendChild(sandboxHeading);
+
+    const sandboxBtn = document.createElement("button");
+    sandboxBtn.textContent = "Sandbox match";
+    sandboxBtn.addEventListener("click", async () => {
+      sandboxBtn.disabled = true;
+      try {
+        const res = await api.createSandboxMatch();
+        // Both seats are the caller's; the board starts from Player One's side.
+        this.callbacks.onMatchReady(res.matchId, "PLAYER_ONE");
+      } catch (err) {
+        setError(err);
+        sandboxBtn.disabled = false;
+      }
+    });
+    card.appendChild(sandboxBtn);
+
     this.root.appendChild(wrap);
     this.el = wrap;
     // Consumed after one render - each LobbyScreen instance is only ever mounted once.

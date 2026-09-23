@@ -52,6 +52,7 @@ final class BranchlingSpawner {
 
         state.getMap().moveUnit(branchigga, tile);
         state.getPlayer(summoner.getTeam()).addUnit(branchigga);
+        state.recordSummoner(branchigga, summoner);
         return branchigga;
     }
 

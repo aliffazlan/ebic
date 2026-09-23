@@ -381,4 +381,11 @@ export class TutorialRunner implements MatchActions {
   exitToLobby(): void {
     this.host.exitToLobby();
   }
+
+  // Sandbox tools - the SANDBOX tab never renders here, so nothing can call these.
+  openSandboxPicker(): void {}
+  chooseSandboxSpawn(): void {}
+  startSandboxTool(): void {}
+  cancelSandboxTool(): void {}
+  sendSandbox(): void {}
 }

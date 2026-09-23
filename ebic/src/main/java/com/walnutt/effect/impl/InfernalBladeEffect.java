@@ -62,4 +62,9 @@ public class InfernalBladeEffect extends Effect {
             existing -> existing.extendDuration(duration),
             () -> target.addEffect(new InfernalBladeEffect(source, duration)));
     }
+
+    @Override
+    public Unit getSource() {
+        return source;
+    }
 }

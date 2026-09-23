@@ -27,7 +27,7 @@ public final class MatchService {
     }
 
     public record MatchStatusView(String matchId, String status, String playerOneName, String playerTwoName,
-                                   String yourTeam, String winnerName, boolean isPublic) {
+                                   String yourTeam, String winnerName, boolean isPublic, boolean isSandbox) {
     }
 
     /** One row in the public lobby browser. */
@@ -44,7 +44,8 @@ public final class MatchService {
     }
 
     /** One row in the "rejoin match" list - a non-finished match the caller is seated in. */
-    public record RejoinableMatchSummary(String matchId, String status, String team, String opponentName) {
+    public record RejoinableMatchSummary(String matchId, String status, String team, String opponentName,
+                                          boolean isSandbox) {
     }
 
     /**
@@ -155,6 +156,43 @@ public final class MatchService {
             throw new IllegalStateException("Failed to create bot match", e);
         }
         return new MatchSummary(matchId, null, Status.DRAFTING.name(), false);
+    }
+
+    /**
+     * A sandbox: the caller sits in BOTH seats, so the WS layer's ordinary participant checks
+     * let them in and the session manager's "both seats filled" gate is met without anyone
+     * else. No join code and never public, so nobody can join or spectate it. Straight to
+     * IN_PROGRESS - there is no draft to wait for.
+     */
+    public MatchSummary createSandboxMatch(long callerUserId) {
+        String matchId = UUID.randomUUID().toString();
+        String sql = """
+            INSERT INTO matches (id, join_code, status, player_one_id, player_two_id, is_sandbox, created_at)
+            VALUES (?, NULL, ?, ?, ?, 1, ?)
+            """;
+        try (PreparedStatement ps = db.connection().prepareStatement(sql)) {
+            ps.setString(1, matchId);
+            ps.setString(2, Status.IN_PROGRESS.name());
+            ps.setLong(3, callerUserId);
+            ps.setLong(4, callerUserId);
+            ps.setLong(5, System.currentTimeMillis());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to create sandbox match", e);
+        }
+        return new MatchSummary(matchId, null, Status.IN_PROGRESS.name(), false);
+    }
+
+    public boolean isSandbox(String matchId) {
+        try (PreparedStatement ps = db.connection().prepareStatement(
+                "SELECT is_sandbox FROM matches WHERE id = ?")) {
+            ps.setString(1, matchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getBoolean("is_sandbox");
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load the match's sandbox flag", e);
+        }
     }
 
     /** The difficulty this match was created with, or null for a human-versus-human match. */
@@ -563,7 +601,7 @@ public final class MatchService {
      */
     public java.util.List<RejoinableMatchSummary> listRejoinableMatches(long callerUserId) {
         String sql = """
-            SELECT m.id, m.status, m.player_one_id, m.player_two_id,
+            SELECT m.id, m.status, m.player_one_id, m.player_two_id, m.is_sandbox,
                    p1.username AS p1name, p2.username AS p2name
             FROM matches m
             JOIN users p1 ON p1.id = m.player_one_id
@@ -584,7 +622,8 @@ public final class MatchService {
                     String team = isPlayerOne ? "PLAYER_ONE" : "PLAYER_TWO";
                     String opponentName = isPlayerOne ? rs.getString("p2name") : rs.getString("p1name");
                     rejoinable.add(new RejoinableMatchSummary(
-                        rs.getString("id"), rs.getString("status"), team, opponentName));
+                        rs.getString("id"), rs.getString("status"), team, opponentName,
+                        rs.getBoolean("is_sandbox")));
                 }
             }
         } catch (SQLException e) {
@@ -595,7 +634,7 @@ public final class MatchService {
 
     public MatchStatusView getStatus(long callerUserId, String matchId) {
         String sql = """
-            SELECT m.status, m.player_one_id, m.player_two_id, m.winner_id, m.is_public,
+            SELECT m.status, m.player_one_id, m.player_two_id, m.winner_id, m.is_public, m.is_sandbox,
                    p1.username AS p1name, p2.username AS p2name, w.username AS wname
             FROM matches m
             JOIN users p1 ON p1.id = m.player_one_id
@@ -622,7 +661,8 @@ public final class MatchService {
                     rs.getString("p2name"),
                     yourTeam,
                     rs.getString("wname"),
-                    rs.getBoolean("is_public")
+                    rs.getBoolean("is_public"),
+                    rs.getBoolean("is_sandbox")
                 );
             }
         } catch (SQLException e) {

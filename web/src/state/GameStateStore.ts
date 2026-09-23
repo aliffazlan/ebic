@@ -9,6 +9,17 @@ import type {
   VfxEvent,
 } from "../types/contract";
 
+export type AttributePrompt = Extract<PromptPayload, { kind: "attribute" }>;
+
+/**
+ * A sandbox tool waiting on a board click. Spawn wants a tile, remove/heal want a unit;
+ * a click on anything else cancels it.
+ */
+export type SandboxToolMode =
+  | { kind: "spawn"; team: Team; definitionId: string; name: string }
+  | { kind: "remove" }
+  | { kind: "heal" };
+
 export interface MatchUiState {
   // Null for a spectator - a read-only viewer who is not one of the two seated players.
   // Every existing comparison against a real Team is naturally always false for null, which
@@ -56,6 +67,18 @@ export interface MatchUiState {
   multiPrimaryUnitId: string | null;
   /** The first tile of a two-tile cast, once picked. Mutually exclusive with the above. */
   multiPrimaryTile: { q: number; r: number } | null;
+  // One player holding both seats. `yourTeam` then follows whoever's turn it is (see
+  // MatchScreen), which is what lets every existing "is it your turn / your unit" check
+  // work unchanged for whichever side is acting.
+  isSandbox: boolean;
+  // Sandbox only: an encounter asks BOTH seats at once, and here both are this client - so
+  // each side's prompt is kept by team rather than in the single `prompt` slot, which still
+  // holds one of them so the usual "an encounter is open" gating keeps working.
+  sandboxAttributePrompts: Partial<Record<Team, AttributePrompt>>;
+  sandboxAttributeSubmitted: Team[];
+  sandboxTool: SandboxToolMode | null;
+  // Which side the unit picker is open for, or null while it's closed.
+  sandboxPicker: Team | null;
 }
 
 const MAX_MESSAGES = 50;
@@ -75,7 +98,7 @@ export class GameStateStore extends Store<MatchUiState> {
   // turn they belong to - see commitCombatLog.
   private pendingLogLines: CombatLogSegment[][] = [];
 
-  constructor(yourTeam: Team | null, playerOneName: string, playerTwoName: string) {
+  constructor(yourTeam: Team | null, playerOneName: string, playerTwoName: string, isSandbox = false) {
     super({
       yourTeam,
       isSpectator: yourTeam === null,
@@ -95,6 +118,11 @@ export class GameStateStore extends Store<MatchUiState> {
       selectedAbilityId: null,
       multiPrimaryUnitId: null,
       multiPrimaryTile: null,
+      isSandbox,
+      sandboxAttributePrompts: {},
+      sandboxAttributeSubmitted: [],
+      sandboxTool: null,
+      sandboxPicker: null,
     });
   }
 

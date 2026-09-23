@@ -19,6 +19,7 @@ public class HighNoonMarkEffect extends Effect {
         this.critMultiplier = critMultiplier;
     }
 
+    @Override
     public Unit getSource() {
         return source;
     }

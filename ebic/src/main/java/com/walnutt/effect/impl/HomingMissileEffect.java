@@ -105,4 +105,9 @@ public class HomingMissileEffect extends Effect {
             caught.addEffect(new StatusEffect("Missile Stun", stunDuration, StatusFlag.STUNNED));
         }
     }
+
+    @Override
+    public Unit getSource() {
+        return source;
+    }
 }

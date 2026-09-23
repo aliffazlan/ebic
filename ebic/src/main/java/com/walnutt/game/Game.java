@@ -135,6 +135,25 @@ public class Game {
         return new Game(state, renderer);
     }
 
+    /**
+     * The sandbox: the full-size board with no draft, no placement and nobody on it. Straight
+     * into combat, Player One first; units come and go through the sandbox tools (see
+     * SandboxController), and the win check is off, so it only ends when its player leaves.
+     */
+    public static Game newSandboxMatch(InputHandler input, Renderer renderer) {
+        JsonDataLoader loader = new JsonDataLoader(JsonDataLoader.locateDesignIdeasRoot());
+        GameMap map = new GameMap(FULL_MATCH_MAP_RADIUS, FULL_MATCH_MAP_ROW_LIMIT);
+        Player playerOne = new Player("Player One", Team.PLAYER_ONE);
+        Player playerTwo = new Player("Player Two", Team.PLAYER_TWO);
+
+        GameState state = new GameState(map, List.of(playerOne, playerTwo), new Random());
+        state.setUnitDefinitions(loader.loadAllUnits());
+        state.setAbilityDefinitions(loader.loadAllAbilities());
+        state.setInputHandler(input);
+        state.setSandbox(true);
+        return new Game(state, renderer);
+    }
+
     /** chat.txt's minimal first playable test: 1 Champion + 1 Basic per side on a small hex map. */
     public static Game newMinimalMatch() {
         JsonDataLoader loader = new JsonDataLoader(JsonDataLoader.locateDesignIdeasRoot());

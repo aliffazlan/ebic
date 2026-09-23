@@ -1,6 +1,7 @@
 package com.walnutt.game;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -11,6 +12,7 @@ import com.walnutt.event.EventBus;
 import com.walnutt.map.GameMap;
 import com.walnutt.map.Tile;
 import com.walnutt.ui.InputHandler;
+import com.walnutt.unit.SummonedUnit;
 import com.walnutt.unit.Unit;
 
 /**
@@ -32,6 +34,10 @@ public class GameState {
     private int remainingMoves;
     private boolean gameOver;
     private Player winner;
+    private boolean sandbox;
+    /** Summons that are ordinary roster units rather than SummonedUnits (Branchigga, Snow Golems) -
+     * the only way a sandbox removal can find them from the unit that raised them. */
+    private final Map<Unit, Unit> summonersBySummon = new IdentityHashMap<>();
 
     public GameState(GameMap map, List<Player> players, Random random) {
         this.map = map;
@@ -128,8 +134,17 @@ public class GameState {
         this.abilityDefinitions = abilityDefinitions;
     }
 
+    /** A sandbox match never ends on its own - see checkWinCondition. */
+    public boolean isSandbox() {
+        return sandbox;
+    }
+
+    public void setSandbox(boolean sandbox) {
+        this.sandbox = sandbox;
+    }
+
     public void checkWinCondition() {
-        if (gameOver) {
+        if (gameOver || sandbox) {
             return;
         }
         for (Player player : players) {
@@ -148,6 +163,23 @@ public class GameState {
 
     public void registerSummon(Unit unit) {
         summonedUnits.add(unit);
+    }
+
+    /** Records who raised a roster-unit summon - see summonersBySummon. */
+    public void recordSummoner(Unit summon, Unit summoner) {
+        summonersBySummon.put(summon, summoner);
+    }
+
+    /** Every unit {@code summoner} brought into play that is still in it, of either kind. */
+    public List<Unit> getSummonsOf(Unit summoner) {
+        List<Unit> summons = new ArrayList<>();
+        for (Unit unit : getAllActiveUnits()) {
+            boolean summonedUnit = unit instanceof SummonedUnit s && s.getSummoner() == summoner;
+            if (summonedUnit || summonersBySummon.get(unit) == summoner) {
+                summons.add(unit);
+            }
+        }
+        return summons;
     }
 
     public List<Unit> getAllActiveUnits() {

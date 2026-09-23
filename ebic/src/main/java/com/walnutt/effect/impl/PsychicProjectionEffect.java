@@ -53,4 +53,15 @@ public class PsychicProjectionEffect extends Effect {
         }
         player.removeUnit(clone);
     }
+
+    @Override
+    public boolean references(Unit unit) {
+        return super.references(unit) || (unit != null && unit == clone);
+    }
+
+    /** The clone must never outlive its projection, however the projection ends. */
+    @Override
+    public void onStripped(GameState state) {
+        onExpire(state);
+    }
 }
